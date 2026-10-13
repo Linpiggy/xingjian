@@ -1,0 +1,35 @@
+{
+  "kind": "real_application_smoke",
+  "checkedAt": "2026-10-13T04:09:16.239Z",
+  "applicationEndpoint": "POST /api/plans",
+  "httpStatus": 200,
+  "durationMs": 1164,
+  "inputSummary": {
+    "city": "杭州",
+    "dayCount": 2,
+    "keywords": [
+      "浙江省博物馆孤山馆",
+      "西湖博物馆",
+      "浙江美术馆"
+    ]
+  },
+  "providerCallsExpected": {
+    "placeSearch": 3,
+    "walking": 1
+  },
+  "placeCount": 3,
+  "routeCount": 1,
+  "draftStatus": "unverified",
+  "walking": {
+    "meters": 4494,
+    "seconds": 3595,
+    "geometrySegments": 12,
+    "coordinateSystem": "GCJ-02"
+  },
+  "limitations": [
+    "Not a JS basemap test",
+    "No weather, meals, opening, reservations, return transport or full budget verification",
+    "No raw merchant data or credentials retained",
+    "City is a test example, not a confirmed MVP city"
+  ]
+}
