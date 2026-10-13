@@ -1,7 +1,8 @@
 "use client";
 import { useState, type FormEvent, type ReactNode } from "react";
 import { ArrowRight, Info } from "lucide-react";
-import type { TripInput } from "@/domain/models";
+import type { PlaceCandidate, TripInput } from "@/domain/models";
+import { PlacePicker } from "./place-picker";
 import { tripInputSchema } from "@/lib/contracts";
 import { parseYuanFen } from "@/lib/money";
 
@@ -36,13 +37,21 @@ export function TripForm({
   pending,
   error,
   onSubmit,
+  mapKey,
+  mapsConfigured,
 }: {
   startDate: string;
   pending: boolean;
   error: string | null;
   onSubmit: (input: TripInput) => void;
+  mapKey: string;
+  mapsConfigured: boolean;
 }) {
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [selected, setSelected] = useState<PlaceCandidate[]>([]);
+  const [city, setCity] = useState("杭州");
+  const [dayCount, setDayCount] = useState("2");
+  const [budget, setBudget] = useState("1500");
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const data = new FormData(event.currentTarget);
@@ -57,10 +66,8 @@ export function TripForm({
       travelers: numeric("travelers"),
       budgetPerPersonFen:
         parseYuanFen(String(data.get("budgetPerPersonFen") ?? "")) ?? Number.NaN,
-      keywords: String(data.get("keywords") ?? "")
-        .split(/[\n,，;；]/)
-        .map((x) => x.trim())
-        .filter(Boolean),
+      keywords: selected.map((candidate) => candidate.place.name),
+      selections: selected.map((candidate) => candidate.selection),
       stayMinutes: numeric("stayMinutes"),
       bufferMinutes: numeric("bufferMinutes"),
     });
@@ -94,7 +101,17 @@ export function TripForm({
                 <input
                   id="city"
                   name="city"
-                  defaultValue="杭州"
+                  value={city}
+                  onChange={(event) => {
+                    if (
+                      selected.length &&
+                      !window.confirm("更换城市会清空已选地点，继续吗？")
+                    ) {
+                      return;
+                    }
+                    setCity(event.target.value);
+                    setSelected([]);
+                  }}
                   autoComplete="address-level2"
                   maxLength={40}
                   aria-invalid={!!errors.city}
@@ -122,7 +139,12 @@ export function TripForm({
                 help="本轮支持单城市 2-3 日。"
                 error={errors.dayCount}
               >
-                <select id="dayCount" name="dayCount" defaultValue="2">
+                <select
+                  id="dayCount"
+                  name="dayCount"
+                  value={dayCount}
+                  onChange={(event) => setDayCount(event.target.value)}
+                >
                   <option value="2">2 天</option>
                   <option value="3">3 天</option>
                 </select>
@@ -157,7 +179,8 @@ export function TripForm({
                   min={0}
                   max={100000}
                   step="0.01"
-                  defaultValue={1500}
+                  value={budget}
+                  onChange={(event) => setBudget(event.target.value)}
                   aria-invalid={!!errors.budgetPerPersonFen}
                   aria-describedby={describe("budgetPerPersonFen")}
                 />
@@ -166,23 +189,16 @@ export function TripForm({
           </fieldset>
           <fieldset disabled={pending}>
             <legend>想去的地点</legend>
-            <Field
-              name="keywords"
-              label="地点名称"
-              help="每行一个，2-6 个；按填写顺序分天。下面仅是可修改的输入示例。"
-              error={errors.keywords}
-            >
-              <textarea
-                id="keywords"
-                name="keywords"
-                rows={5}
-                defaultValue={
-                  "浙江省博物馆孤山馆\n西湖博物馆\n中国丝绸博物馆\n浙江美术馆"
-                }
-                aria-invalid={!!errors.keywords}
-                aria-describedby={describe("keywords")}
-              />
-            </Field>
+            <PlacePicker
+              city={city}
+              dayCount={Number(dayCount)}
+              budgetPerPersonFen={parseYuanFen(budget)}
+              selected={selected}
+              onChange={setSelected}
+              error={errors.keywords ?? errors.selections}
+              mapKey={mapKey}
+              mapsConfigured={mapsConfigured}
+            />
             <div className="field-grid spacing">
               <Field
                 name="stayMinutes"
@@ -223,7 +239,8 @@ export function TripForm({
           <div className="notice">
             <Info size={18} aria-hidden="true" />
             <p>
-              查询真实高德地点与步行路线；本轮不生成 AI 推荐，也不安排餐饮或查询天气。
+              自定义搜索与 AI
+              推荐可以混合添加。生成时重新核对地点与步行路线；开放、预约、餐饮与完整预算仍待核实。
             </p>
           </div>
           {error && (
@@ -253,11 +270,12 @@ export function TripForm({
         <hr />
         <h3>本轮已经能做</h3>
         <ul>
-          <li>查询高德地点和真实步行耗时</li>
+          <li>搜索选择、地图点选与 AI 推荐</li>
+          <li>查询真实地点和步行耗时</li>
           <li>切换每天的行程，查看地点来源</li>
           <li>地图 Key 配置后绘制真实路线</li>
         </ul>
-        <div className="notice warning">
+        <div className="notice">
           <p>
             缺信息就显示未知。开放、预约、餐饮、返程与完整预算尚未校验，草稿不能当作已确认的出行方案。
           </p>

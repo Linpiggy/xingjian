@@ -19,7 +19,9 @@
     "check": "npm run secrets && npm run format:check && npm run lint && npm run typecheck && npm run test",
     "browser:install": "node scripts/playwright.mjs install chromium --only-shell",
     "e2e": "node scripts/playwright.mjs test",
-    "smoke:live": "node scripts/smoke-live.mjs"
+    "smoke:live": "node scripts/smoke-live.mjs",
+    "smoke:recommendation": "node scripts/smoke-recommendation-live.mjs",
+    "smoke:map": "node scripts/smoke-recommendation-live.mjs --map-only"
   },
   "dependencies": {
     "@amap/amap-jsapi-loader": "1.0.1",

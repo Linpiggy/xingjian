@@ -1,0 +1,67 @@
+{
+  "kind": "real_amap_point_smoke",
+  "checkedAt": "2026-10-13T14:04:51.323Z",
+  "status": "passed",
+  "inputSummary": {
+    "city": "杭州",
+    "keyword": "浙江省博物馆孤山馆"
+  },
+  "maximumCalls": {
+    "placeSearch": 1,
+    "model": 0,
+    "mapInitialization": 1
+  },
+  "automaticRetries": 0,
+  "ai": {
+    "status": "skipped_previously_verified"
+  },
+  "map": {
+    "status": "passed",
+    "completeEventObservedByUi": true,
+    "container": {
+      "width": 710,
+      "height": 360,
+      "position": "relative",
+      "hasSdkContainerClass": true,
+      "childCanvasCount": 1
+    },
+    "clickProducedGcj02Point": true,
+    "userPointAdded": true,
+    "proxyConfigured": true,
+    "networkSummary": {
+      "sdkResponses": 5,
+      "proxyResponses": 2,
+      "mapProviderResponses": 13,
+      "failedRequests": 0,
+      "proxyHttpStatuses": {
+        "200": 2
+      },
+      "businessCodes": []
+    }
+  },
+  "privacy": {
+    "credentialsInClientText": false,
+    "securityCodePassedToBrowser": false
+  },
+  "limitations": [
+    "One sample, not complete account coverage or production rights verification",
+    "No raw merchant/model response retained; live screenshots are local and ignored",
+    "No route, weather, meals, reservations or full budget verification"
+  ],
+  "placeSearch": {
+    "status": "passed",
+    "httpStatus": 200,
+    "candidateCount": 5
+  },
+  "runtimeErrors": 0,
+  "networkSummary": {
+    "sdkResponses": 5,
+    "proxyResponses": 2,
+    "mapProviderResponses": 13,
+    "failedRequests": 0,
+    "proxyHttpStatuses": {
+      "200": 2
+    },
+    "businessCodes": []
+  }
+}

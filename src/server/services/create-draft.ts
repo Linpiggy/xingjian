@@ -19,9 +19,31 @@ export async function createDraft(
     "这是路线草稿：尚未安排午晚餐，也未校验开放、预约、返程和完整费用。",
     "按输入顺序分天；停留与缓冲时间来自你的设置，不是景区实测。",
   ];
-  for (const keyword of input.keywords) {
-    const candidates = await provider.search(input.city, keyword);
-    const place = candidates.find((p) => p.name === keyword) ?? candidates[0];
+  for (const [index, keyword] of input.keywords.entries()) {
+    const selection = input.selections?.[index];
+    const candidates =
+      selection?.kind === "user"
+        ? []
+        : await provider.search(input.city, selection?.keyword ?? keyword);
+    const place: Place | undefined =
+      selection?.kind === "user"
+        ? {
+            id: selection.id,
+            name: selection.name,
+            location: selection.location,
+            address: null,
+            citycode: null,
+            openingHours: null,
+            source: {
+              kind: "user",
+              provider: "user",
+              coordinateSystem: "GCJ-02",
+              queriedAt: new Date().toISOString(),
+            },
+          }
+        : selection?.kind === "amap"
+          ? candidates.find((candidate) => candidate.id === selection.poiId)
+          : (candidates.find((candidate) => candidate.name === keyword) ?? candidates[0]);
     if (!place) {
       throw new ProviderError(
         "unavailable",
@@ -34,6 +56,11 @@ export async function createDraft(
         "unavailable",
         "多个名称匹配到同一地点，请改用不同地点。",
         "duplicate_place",
+      );
+    }
+    if (place.source.kind === "user") {
+      notices.push(
+        `“${place.name}”来自用户地图选点，名称、入口与城市范围未由供应商核实。`,
       );
     }
     if (place.name !== keyword) {
@@ -71,5 +98,9 @@ export async function createDraft(
       ),
     );
   }
-  return makeDraft(input, days, notices);
+  return makeDraft(
+    { ...input, keywords: places.map((place) => place.name) },
+    days,
+    notices,
+  );
 }

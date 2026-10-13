@@ -2,6 +2,14 @@
 import { useEffect, useRef, useState } from "react";
 import { MapPin, RotateCw } from "lucide-react";
 import type { Day } from "@/domain/models";
+import { initializeMap, type MapFailure } from "./initialize-map";
+
+const failureMessages: Record<MapFailure, string> = {
+  sdk_failed: "地图脚本加载失败，请检查网络与 JS Key 配置。",
+  sdk_timeout: "地图脚本加载超时，请检查网络后重试。",
+  basemap_timeout: "地图脚本已加载，但底图未就绪。请检查安全码、域名限制和安全代理。",
+  initialization_failed: "地图初始化失败，行程草稿仍保留。",
+};
 
 type Runtime = { map: AMap.Map; sdk: typeof AMap };
 export function RouteMap({
@@ -19,40 +27,35 @@ export function RouteMap({
 }) {
   const container = useRef<HTMLDivElement>(null);
   const buttons = useRef<{ id: string; element: HTMLButtonElement }[]>([]);
+  const initialCenter = useRef(day.items[0]?.place.location);
   const [runtime, setRuntime] = useState<Runtime | null>(null);
-  const [failed, setFailed] = useState(false);
+  const [failed, setFailed] = useState<MapFailure | null>(null);
   const [attempt, setAttempt] = useState(0);
   useEffect(() => {
     if (!configured || !container.current) {
       return;
     }
-    let cancelled = false;
-    let map: AMap.Map | undefined;
     const root = container.current;
     window._AMapSecurityConfig = {
       serviceHost: `${window.location.origin}/_AMapService`,
     };
-    void import("@amap/amap-jsapi-loader")
-      .then(async (module) => {
+    return initializeMap({
+      load: async () => {
+        const loaderModule = await import("@amap/amap-jsapi-loader");
         if (attempt) {
-          module.default.reset();
+          loaderModule.default.reset();
         }
-        const sdk = await module.default.load({ key: mapKey, version: "2.0" });
-        if (cancelled) {
-          return;
-        }
-        map = new sdk.Map(root, { zoom: 12, viewMode: "2D" });
-        setRuntime({ map, sdk });
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setFailed(true);
-        }
-      });
-    return () => {
-      cancelled = true;
-      map?.destroy();
-    };
+        return loaderModule.default.load({ key: mapKey, version: "2.0" });
+      },
+      create: (sdk) =>
+        new sdk.Map(root, {
+          zoom: 12,
+          viewMode: "2D",
+          center: initialCenter.current,
+        }),
+      onReady: (map, sdk) => setRuntime({ map, sdk }),
+      onFailure: setFailed,
+    });
   }, [configured, mapKey, attempt]);
   useEffect(() => {
     if (!runtime) {
@@ -94,7 +97,6 @@ export function RouteMap({
       map.setFitView(undefined, false, [60, 60, 60, 60]);
     }
     return () => {
-      map.clearMap();
       buttons.current = [];
     };
   }, [runtime, day, onSelect]);
@@ -118,11 +120,12 @@ export function RouteMap({
       ) : failed ? (
         <div className="map-state">
           <h3>地图加载失败</h3>
-          <p>请检查网络、JS Key、域名限制与安全代理。行程草稿仍保留。</p>
+          <p>{failureMessages[failed]}</p>
+          <p>行程草稿仍保留，不会用示意图替代底图。</p>
           <button
             className="button"
             onClick={() => {
-              setFailed(false);
+              setFailed(null);
               setRuntime(null);
               setAttempt((value) => value + 1);
             }}

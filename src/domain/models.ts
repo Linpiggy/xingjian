@@ -1,10 +1,14 @@
 export type Coordinate = [number, number];
-export type Source = {
-  kind: "provider" | "fixture";
-  provider: "amap";
+export type Source = (
+  { kind: "provider" | "fixture"; provider: "amap" } | { kind: "user"; provider: "user" }
+) & {
   queriedAt: string;
   coordinateSystem: "GCJ-02";
 };
+export type PlaceSelection =
+  | { kind: "amap"; poiId: string; keyword: string }
+  | { kind: "user"; id: string; name: string; location: Coordinate };
+export type PlaceCandidate = { place: Place; selection: PlaceSelection };
 export type Place = {
   id: string;
   name: string;
@@ -28,6 +32,7 @@ export type TripInput = {
   travelers: number;
   budgetPerPersonFen: number;
   keywords: string[];
+  selections?: PlaceSelection[];
   stayMinutes: number;
   bufferMinutes: number;
 };

@@ -21,6 +21,12 @@ for (const line of example.split(/\r?\n/)) {
   }
 }
 const secrets = [];
+const nonSecretSettings = new Set(["OPENAI_BASE_URL", "OPENAI_MODEL"]);
+for (const key of ["OPENAI_API_KEY", "DEEPSEEK_API_KEY"]) {
+  if (process.env[key]) {
+    secrets.push(Buffer.from(process.env[key]));
+  }
+}
 if (existsSync(".env.local")) {
   for (const line of readFileSync(".env.local", "utf8").split(/\r?\n/)) {
     if (!line.trim().startsWith("#") && line.includes("=")) {
@@ -29,7 +35,7 @@ if (existsSync(".env.local")) {
         .slice(line.indexOf("=") + 1)
         .trim()
         .replace(/^['"]|['"]$/g, "");
-      if (!key.startsWith("NEXT_PUBLIC_") && value) {
+      if (!key.startsWith("NEXT_PUBLIC_") && !nonSecretSettings.has(key) && value) {
         secrets.push(Buffer.from(value));
       }
     }

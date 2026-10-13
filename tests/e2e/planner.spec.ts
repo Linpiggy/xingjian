@@ -1,5 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { fixtureDraft, input } from "../fixtures/draft";
+import { addFixturePlaces } from "./fixtures";
 
 test("actual HTTP route accepts loopback origin without calling a provider", async ({
   request,
@@ -10,6 +11,17 @@ test("actual HTTP route accepts loopback origin without calling a provider", asy
   });
   expect(response.status()).toBe(503);
   expect((await response.json()).code).toBe("not_configured");
+  const recommendation = await request.post("/api/recommendations", {
+    headers: { Origin: "http://127.0.0.1:3100" },
+    data: {
+      city: "测试城市",
+      dayCount: 2,
+      budgetPerPersonFen: 10000,
+      interests: ["博物馆"],
+    },
+  });
+  expect(recommendation.status()).toBe(503);
+  expect((await recommendation.json()).code).toBe("ai_not_configured");
 });
 
 test("form validation, successful draft, selection and missing map config", async ({
@@ -36,6 +48,7 @@ test("form validation, successful draft, selection and missing map config", asyn
   await expect(page.getByText("请输入目的地城市", { exact: true })).toBeVisible();
   await expect(page.getByLabel("目的地城市")).toBeFocused();
   await page.getByLabel("目的地城市").fill("测试城市");
+  await addFixturePlaces(page);
   await page.getByRole("button", { name: "生成路线草稿" }).click();
   await expect(page.getByRole("heading", { name: "测试城市2日路线草稿" })).toBeVisible();
   await expect(
@@ -67,9 +80,9 @@ test("form validation, successful draft, selection and missing map config", asyn
     fullPage: true,
   });
   await page.emulateMedia({ colorScheme: "dark", reducedMotion: "reduce" });
-  await expect(page.locator("body")).toHaveCSS("background-color", "rgb(17, 36, 31)");
+  await expect(page.locator("body")).toHaveCSS("background-color", "rgb(244, 247, 246)");
   await page.screenshot({
-    path: `test-results/${testInfo.project.name}-dark.png`,
+    path: `test-results/${testInfo.project.name}-dark-preference-figma-light.png`,
     fullPage: true,
   });
   expect(errors).toEqual([]);
@@ -87,6 +100,7 @@ test("provider error preserves inputs and permits retry", async ({ page }) => {
   });
   await page.goto("/");
   await page.getByLabel("目的地城市").fill("测试城市");
+  await addFixturePlaces(page);
   await page.getByRole("button", { name: "生成路线草稿" }).click();
   await expect(page.getByRole("alert", { name: "行程查询失败" })).toContainText(
     "输入已保留",
@@ -114,6 +128,7 @@ test("empty budget is rejected and decimal budget sends integer fen", async ({
   await expect(page.getByText("请填写每人预算", { exact: true })).toBeVisible();
   expect(calls).toBe(0);
   await page.getByLabel("每人预算（元）").fill("1.10");
+  await addFixturePlaces(page);
   await page.getByRole("button", { name: "生成路线草稿" }).click();
   await expect(page.getByRole("heading", { name: "测试城市2日路线草稿" })).toBeVisible();
   expect(calls).toBe(1);
@@ -124,6 +139,7 @@ test("switching days and confirming new draft reset", async ({ page }) => {
     route.fulfill({ json: { draft: fixtureDraft() } }),
   );
   await page.goto("/");
+  await addFixturePlaces(page);
   await page.getByRole("button", { name: "生成路线草稿" }).click();
   await page.getByRole("button", { name: "第 2 天", exact: true }).click();
   await expect(page.getByRole("button", { name: /测试景点三/ })).toBeVisible();

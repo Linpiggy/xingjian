@@ -4,12 +4,32 @@ export const coordinateSchema = z.tuple([
   z.number().min(-180).max(180),
   z.number().min(-90).max(90),
 ]);
-const sourceSchema = z.object({
-  kind: z.enum(["provider", "fixture"]),
-  provider: z.literal("amap"),
+const sourceFields = {
   queriedAt: z.iso.datetime(),
   coordinateSystem: z.literal("GCJ-02"),
-});
+};
+const sourceSchema = z.discriminatedUnion("kind", [
+  z.object({ ...sourceFields, kind: z.literal("provider"), provider: z.literal("amap") }),
+  z.object({ ...sourceFields, kind: z.literal("fixture"), provider: z.literal("amap") }),
+  z.object({ ...sourceFields, kind: z.literal("user"), provider: z.literal("user") }),
+]);
+export const selectionSchema = z.discriminatedUnion("kind", [
+  z.strictObject({
+    kind: z.literal("amap"),
+    poiId: z
+      .string()
+      .min(1)
+      .max(80)
+      .regex(/^[A-Za-z0-9_-]+$/),
+    keyword: z.string().trim().min(1).max(60),
+  }),
+  z.strictObject({
+    kind: z.literal("user"),
+    id: z.string().regex(/^user:[a-zA-Z0-9-]{1,60}$/),
+    name: z.string().trim().min(1).max(60),
+    location: coordinateSchema,
+  }),
+]);
 export const placeSchema = z.object({
   id: z.string().min(1),
   name: z.string().min(1),
@@ -45,8 +65,9 @@ export const tripInputSchema = z
       .max(10_000_000, "每人预算不能超过十万元"),
     keywords: z
       .array(z.string().trim().min(1).max(60))
-      .min(2, "请至少填写两个地点")
+      .min(2, "请至少选择两个地点")
       .max(6, "本轮最多支持六个地点"),
+    selections: z.array(selectionSchema).min(2).max(6).optional(),
     stayMinutes: z
       .number({ error: "请填写停留时间" })
       .int({ error: "停留分钟数须为整数" })
@@ -59,7 +80,14 @@ export const tripInputSchema = z
       .max(60, "缓冲最多 60 分钟"),
   })
   .superRefine((input, ctx) => {
-    if (new Set(input.keywords).size !== input.keywords.length) {
+    if (input.selections && input.selections.length !== input.keywords.length) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["selections"],
+        message: "地点选择与清单不一致",
+      });
+    }
+    if (!input.selections && new Set(input.keywords).size !== input.keywords.length) {
       ctx.addIssue({ code: "custom", path: ["keywords"], message: "地点名称不能重复" });
     }
     if (input.keywords.length < input.dayCount) {
@@ -104,3 +132,33 @@ export const draftSchema = z.object({
   notices: z.array(z.string()),
 });
 export const planResponseSchema = z.object({ draft: draftSchema });
+export const placesResponseSchema = z.object({ places: z.array(placeSchema).max(5) });
+export const candidateSchema = z.object({
+  place: placeSchema,
+  selection: selectionSchema,
+});
+export const interestSchema = z.enum(["自然风光", "博物馆", "城市漫步", "当地美食"]);
+export const recommendationInputSchema = z.strictObject({
+  city: z.string().trim().min(1, "请先填写目的地城市").max(40),
+  dayCount: z.union([z.literal(2), z.literal(3)]),
+  budgetPerPersonFen: z.number().int().min(0).max(10_000_000),
+  interests: z.array(interestSchema).min(1, "至少选择一项兴趣").max(3),
+});
+export const aiChoicesSchema = z.strictObject({
+  recommendations: z
+    .array(
+      z.strictObject({
+        placeId: z.string().min(1).max(80),
+        reason: z.string().trim().min(1).max(160),
+      }),
+    )
+    .min(2)
+    .max(6),
+});
+export const recommendationsResponseSchema = z.object({
+  recommendations: z
+    .array(candidateSchema.extend({ reason: z.string().max(160) }))
+    .max(6),
+  model: z.string(),
+  queriedAt: z.iso.datetime(),
+});

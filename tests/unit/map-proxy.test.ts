@@ -62,6 +62,40 @@ describe("same-origin map proxy (mock upstream)", () => {
     }
     expect(fetcher).not.toHaveBeenCalled();
   });
+  it("accepts same-port loopback origins normalized by Next.js", async () => {
+    configured();
+    const fetcher = vi
+      .fn<typeof fetch>()
+      .mockResolvedValue(Response.json({ fixture: true }));
+    vi.stubGlobal("fetch", fetcher);
+    const response = await GET(
+      new Request("http://localhost:3000/_AMapService/v4/map/styles", {
+        headers: { origin: "http://127.0.0.1:3000" },
+      }),
+      { params: Promise.resolve({ path: ["v4", "map", "styles"] }) },
+    );
+    expect(response.status).toBe(200);
+    expect(fetcher).toHaveBeenCalledOnce();
+  });
+  it("rejects different loopback ports, schemes and cross-site fetches", async () => {
+    configured();
+    const fetcher = vi.fn<typeof fetch>();
+    vi.stubGlobal("fetch", fetcher);
+    const headersList: HeadersInit[] = [
+      { origin: "http://127.0.0.1:3001" },
+      { origin: "https://127.0.0.1:3000" },
+      { origin: "null" },
+      { "sec-fetch-site": "cross-site" },
+    ];
+    for (const headers of headersList) {
+      const response = await GET(
+        new Request("http://localhost:3000/_AMapService/v4/map/styles", { headers }),
+        { params: Promise.resolve({ path: ["v4", "map", "styles"] }) },
+      );
+      expect(response.status).toBe(403);
+    }
+    expect(fetcher).not.toHaveBeenCalled();
+  });
   it("rejects cross-site calls", async () => {
     configured();
     const fetcher = vi.fn<typeof fetch>();

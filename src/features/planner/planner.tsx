@@ -30,9 +30,13 @@ function PlaceDetails({ place }: { place: Place }) {
       <dl className="facts">
         <dt>数据来源</dt>
         <dd>
-          {place.source.kind === "fixture" ? "测试 fixture，非实时" : "高德地点查询"}
+          {place.source.kind === "fixture"
+            ? "测试 fixture，非实时"
+            : place.source.kind === "user"
+              ? "用户地图选点，未经 POI 核实"
+              : "高德地点查询"}
         </dd>
-        <dt>查询时间</dt>
+        <dt>记录时间</dt>
         <dd>
           <time dateTime={place.source.queriedAt}>
             {new Intl.DateTimeFormat("zh-CN", {
@@ -221,7 +225,7 @@ function Workspace({
               </div>
             </div>
           )}
-          <div className="notice warning">
+          <div className="notice">
             <CloudOff size={18} aria-hidden="true" />
             <p>天气未接入。没有实际预报，不推断雨天方案。</p>
           </div>
@@ -317,10 +321,12 @@ export function Planner({
     <>
       <header className="site-header">
         <span className="brand">
-          <Compass size={28} aria-hidden="true" />
+          <span className="brand-icon">
+            <Compass size={22} aria-hidden="true" />
+          </span>
           行间
         </span>
-        <span className="header-description">旅行规划工作台</span>
+        <span className="header-description">旅行规划</span>
         <button className="button" disabled={mutation.isPending} onClick={newPlan}>
           <Plus size={18} aria-hidden="true" />
           新建计划
@@ -341,6 +347,8 @@ export function Planner({
             </div>
             <TripForm
               startDate={startDate}
+              mapKey={mapKey}
+              mapsConfigured={mapsConfigured}
               pending={mutation.isPending}
               error={
                 mutation.error

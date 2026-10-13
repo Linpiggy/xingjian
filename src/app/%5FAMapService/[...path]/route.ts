@@ -1,4 +1,4 @@
-import { api, json } from "@/server/http";
+import { api, json, requireSameOrigin } from "@/server/http";
 import { withProviderBudget } from "@/server/providers/budget";
 
 export async function GET(
@@ -24,11 +24,15 @@ export async function GET(
       return json({ code: "invalid_path", message: "不支持的地图请求。" }, 400);
     }
     const requestUrl = new URL(request.url);
-    const origin = request.headers.get("origin");
-    if (
-      (origin && origin !== requestUrl.origin) ||
-      request.headers.get("sec-fetch-site") === "cross-site"
-    ) {
+    let trustedOrigin = true;
+    if (request.headers.has("origin")) {
+      try {
+        requireSameOrigin(request);
+      } catch {
+        trustedOrigin = false;
+      }
+    }
+    if (!trustedOrigin || request.headers.get("sec-fetch-site") === "cross-site") {
       return json({ code: "forbidden", message: "不允许跨站地图请求。" }, 403);
     }
     // Fixed upstream hosts only. No arbitrary target URL, credential/header forwarding or redirects.
