@@ -1,0 +1,537 @@
+{
+  "name": "02 行程规划工作台 / Desktop",
+  "id": "2:155",
+  "width": 720,
+  "height": 532,
+  "saved": "D:\\Dev\\Code\\project\\传智杯-AI-WEB\\design\\figma\\exports\\screen-02.png",
+  "measure": {
+    "name": "02 行程规划工作台 / Desktop",
+    "type": "FRAME",
+    "w": 1440,
+    "h": 1064,
+    "layout": "VERTICAL",
+    "sizeH": "FIXED",
+    "sizeV": "HUG",
+    "children": [
+      {
+        "name": "Header",
+        "type": "FRAME",
+        "w": 1440,
+        "h": 72,
+        "layout": "HORIZONTAL",
+        "sizeH": "FILL",
+        "sizeV": "FIXED",
+        "children": [
+          {
+            "name": "Frame 229",
+            "type": "FRAME",
+            "w": 90,
+            "h": 36,
+            "layout": "HORIZONTAL",
+            "sizeH": "HUG",
+            "sizeV": "HUG",
+            "children": [
+              {
+                "name": "Frame 227",
+                "type": "FRAME",
+                "w": 36,
+                "h": 36,
+                "layout": "HORIZONTAL",
+                "sizeH": "FIXED",
+                "sizeV": "FIXED"
+              },
+              {
+                "name": "行间",
+                "type": "TEXT",
+                "w": 44,
+                "h": 33,
+                "sizeH": "HUG",
+                "sizeV": "HUG"
+              }
+            ]
+          },
+          {
+            "name": "Frame 233",
+            "type": "FRAME",
+            "w": 232,
+            "h": 21,
+            "layout": "HORIZONTAL",
+            "sizeH": "HUG",
+            "sizeV": "HUG",
+            "children": [
+              {
+                "name": "旅行规划",
+                "type": "TEXT",
+                "w": 56,
+                "h": 21,
+                "sizeH": "HUG",
+                "sizeV": "HUG"
+              },
+              {
+                "name": "我的行程",
+                "type": "TEXT",
+                "w": 56,
+                "h": 21,
+                "sizeH": "HUG",
+                "sizeV": "HUG"
+              },
+              {
+                "name": "使用说明",
+                "type": "TEXT",
+                "w": 56,
+                "h": 21,
+                "sizeH": "HUG",
+                "sizeV": "HUG"
+              }
+            ]
+          },
+          {
+            "name": "Button / 新建计划",
+            "type": "FRAME",
+            "w": 98,
+            "h": 48,
+            "layout": "HORIZONTAL",
+            "sizeH": "HUG",
+            "sizeV": "FIXED",
+            "children": [
+              {
+                "name": "新建计划",
+                "type": "TEXT",
+                "w": 56,
+                "h": 21,
+                "sizeH": "HUG",
+                "sizeV": "HUG"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "Frame 113",
+        "type": "FRAME",
+        "w": 1440,
+        "h": 104,
+        "layout": "HORIZONTAL",
+        "sizeH": "FILL",
+        "sizeV": "FIXED",
+        "children": [
+          {
+            "name": "Frame 105",
+            "type": "FRAME",
+            "w": 230,
+            "h": 69,
+            "layout": "VERTICAL",
+            "sizeH": "HUG",
+            "sizeV": "HUG",
+            "children": [
+              {
+                "name": "杭州两日计划",
+                "type": "TEXT",
+                "w": 168,
+                "h": 42,
+                "sizeH": "HUG",
+                "sizeV": "HUG"
+              },
+              {
+                "name": "10/17 - 10/18 / 2 位成人 / 节奏适中",
+                "type": "TEXT",
+                "w": 230,
+                "h": 21,
+                "sizeH": "HUG",
+                "sizeV": "HUG"
+              }
+            ]
+          },
+          {
+            "name": "Frame 112",
+            "type": "FRAME",
+            "w": 258,
+            "h": 48,
+            "layout": "HORIZONTAL",
+            "sizeH": "HUG",
+            "sizeV": "HUG",
+            "children": [
+              {
+                "name": "Button / 撤销",
+                "type": "FRAME",
+                "w": 70,
+                "h": 48,
+                "layout": "HORIZONTAL",
+                "sizeH": "HUG",
+                "sizeV": "FIXED"
+              },
+              {
+                "name": "Button / 分享",
+                "type": "FRAME",
+                "w": 70,
+                "h": 48,
+                "layout": "HORIZONTAL",
+                "sizeH": "HUG",
+                "sizeV": "FIXED"
+              },
+              {
+                "name": "Button / 保存计划",
+                "type": "FRAME",
+                "w": 98,
+                "h": 48,
+                "layout": "HORIZONTAL",
+                "sizeH": "HUG",
+                "sizeV": "FIXED"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "Frame 115",
+        "type": "FRAME",
+        "w": 1440,
+        "h": 40,
+        "layout": "HORIZONTAL",
+        "sizeH": "FILL",
+        "sizeV": "FIXED",
+        "children": [
+          {
+            "name": "lucide:info",
+            "type": "FRAME",
+            "w": 20,
+            "h": 20,
+            "sizeH": "FIXED",
+            "sizeV": "FIXED",
+            "children": [
+              {
+                "name": "Group",
+                "type": "GROUP",
+                "w": 17,
+                "h": 17,
+                "sizeH": "FIXED",
+                "sizeV": "FIXED"
+              }
+            ]
+          },
+          {
+            "name": "设计示例：行程、预算与地图为示意；不是已校验的完整旅行方案。",
+            "type": "TEXT",
+            "w": 390,
+            "h": 20,
+            "sizeH": "HUG",
+            "sizeV": "HUG"
+          }
+        ]
+      },
+      {
+        "name": "Workbench columns",
+        "type": "FRAME",
+        "w": 1440,
+        "h": 800,
+        "layout": "HORIZONTAL",
+        "sizeH": "FILL",
+        "sizeV": "FIXED",
+        "children": [
+          {
+            "name": "Frame 162",
+            "type": "FRAME",
+            "w": 320,
+            "h": 760,
+            "layout": "VERTICAL",
+            "sizeH": "FIXED",
+            "sizeV": "FILL",
+            "children": [
+              {
+                "name": "Frame 118",
+                "type": "FRAME",
+                "w": 286,
+                "h": 44,
+                "layout": "HORIZONTAL",
+                "sizeH": "FILL",
+                "sizeV": "HUG"
+              },
+              {
+                "name": "Frame 123",
+                "type": "FRAME",
+                "w": 286,
+                "h": 48,
+                "layout": "HORIZONTAL",
+                "sizeH": "FILL",
+                "sizeV": "HUG"
+              },
+              {
+                "name": "10月17日 星期六 / 时间为示例",
+                "type": "TEXT",
+                "w": 286,
+                "h": 18,
+                "sizeH": "FILL",
+                "sizeV": "HUG"
+              },
+              {
+                "name": "Frame 131",
+                "type": "FRAME",
+                "w": 286,
+                "h": 73,
+                "layout": "HORIZONTAL",
+                "sizeH": "FILL",
+                "sizeV": "HUG"
+              },
+              {
+                "name": "下一路段按出发时刻查询",
+                "type": "TEXT",
+                "w": 286,
+                "h": 18,
+                "sizeH": "FILL",
+                "sizeV": "HUG"
+              },
+              {
+                "name": "Frame 139",
+                "type": "FRAME",
+                "w": 286,
+                "h": 73,
+                "layout": "HORIZONTAL",
+                "sizeH": "FILL",
+                "sizeV": "HUG"
+              },
+              {
+                "name": "Frame 146",
+                "type": "FRAME",
+                "w": 286,
+                "h": 73,
+                "layout": "HORIZONTAL",
+                "sizeH": "FILL",
+                "sizeV": "HUG"
+              },
+              {
+                "name": "Frame 153",
+                "type": "FRAME",
+                "w": 286,
+                "h": 73,
+                "layout": "HORIZONTAL",
+                "sizeH": "FILL",
+                "sizeV": "HUG"
+              },
+              {
+                "name": "Frame 160",
+                "type": "FRAME",
+                "w": 286,
+                "h": 73,
+                "layout": "HORIZONTAL",
+                "sizeH": "FILL",
+                "sizeV": "HUG"
+              },
+              {
+                "name": "拖动可调整；也可用上移 / 下移操作。",
+                "type": "TEXT",
+                "w": 286,
+                "h": 18,
+                "sizeH": "FILL",
+                "sizeV": "HUG"
+              }
+            ]
+          },
+          {
+            "name": "Frame 198",
+            "type": "FRAME",
+            "w": 720,
+            "h": 760,
+            "layout": "VERTICAL",
+            "sizeH": "FILL",
+            "sizeV": "FILL",
+            "children": [
+              {
+                "name": "Frame 190",
+                "type": "FRAME",
+                "w": 686,
+                "h": 52,
+                "layout": "HORIZONTAL",
+                "sizeH": "FILL",
+                "sizeV": "HUG"
+              },
+              {
+                "name": "Map / schematic only",
+                "type": "FRAME",
+                "w": 686,
+                "h": 542,
+                "sizeH": "FILL",
+                "sizeV": "FIXED"
+              },
+              {
+                "name": "Frame 193",
+                "type": "FRAME",
+                "w": 686,
+                "h": 44,
+                "layout": "HORIZONTAL",
+                "sizeH": "FILL",
+                "sizeV": "HUG"
+              },
+              {
+                "name": "Frame 197",
+                "type": "FRAME",
+                "w": 686,
+                "h": 48,
+                "layout": "HORIZONTAL",
+                "sizeH": "FILL",
+                "sizeV": "HUG"
+              }
+            ]
+          },
+          {
+            "name": "Frame 225",
+            "type": "FRAME",
+            "w": 304,
+            "h": 760,
+            "layout": "VERTICAL",
+            "sizeH": "FIXED",
+            "sizeV": "FILL",
+            "children": [
+              {
+                "name": "地点详情",
+                "type": "TEXT",
+                "w": 262,
+                "h": 30,
+                "sizeH": "FILL",
+                "sizeV": "HUG"
+              },
+              {
+                "name": "Frame 202",
+                "type": "FRAME",
+                "w": 103,
+                "h": 36,
+                "layout": "HORIZONTAL",
+                "sizeH": "HUG",
+                "sizeV": "HUG"
+              },
+              {
+                "name": "Frame 205",
+                "type": "FRAME",
+                "w": 262,
+                "h": 72,
+                "layout": "VERTICAL",
+                "sizeH": "FILL",
+                "sizeV": "HUG"
+              },
+              {
+                "name": "选中的地点会在行程与地图中同步突出显示。",
+                "type": "TEXT",
+                "w": 262,
+                "h": 42,
+                "sizeH": "FILL",
+                "sizeV": "HUG"
+              },
+              {
+                "name": "Frame 207",
+                "type": "FRAME",
+                "w": 262,
+                "h": 1,
+                "layout": "HORIZONTAL",
+                "sizeH": "FILL",
+                "sizeV": "FIXED"
+              },
+              {
+                "name": "来源与核实",
+                "type": "TEXT",
+                "w": 262,
+                "h": 21,
+                "sizeH": "FILL",
+                "sizeV": "HUG"
+              },
+              {
+                "name": "Frame 212",
+                "type": "FRAME",
+                "w": 262,
+                "h": 63,
+                "layout": "VERTICAL",
+                "sizeH": "FILL",
+                "sizeV": "HUG"
+              },
+              {
+                "name": "Frame 215",
+                "type": "FRAME",
+                "w": 262,
+                "h": 64,
+                "layout": "HORIZONTAL",
+                "sizeH": "FILL",
+                "sizeV": "HUG"
+              },
+              {
+                "name": "Button / 查看来源",
+                "type": "FRAME",
+                "w": 262,
+                "h": 48,
+                "layout": "HORIZONTAL",
+                "sizeH": "FILL",
+                "sizeV": "FIXED"
+              },
+              {
+                "name": "Frame 218",
+                "type": "FRAME",
+                "w": 262,
+                "h": 1,
+                "layout": "HORIZONTAL",
+                "sizeH": "FILL",
+                "sizeV": "FIXED"
+              },
+              {
+                "name": "预算概览",
+                "type": "TEXT",
+                "w": 262,
+                "h": 27,
+                "sizeH": "FILL",
+                "sizeV": "HUG"
+              },
+              {
+                "name": "¥ 1,500 / 人",
+                "type": "TEXT",
+                "w": 262,
+                "h": 39,
+                "sizeH": "FILL",
+                "sizeV": "HUG"
+              },
+              {
+                "name": "这是预算目标，不是已核算总价。",
+                "type": "TEXT",
+                "w": 262,
+                "h": 18,
+                "sizeH": "FILL",
+                "sizeV": "HUG"
+              },
+              {
+                "name": "Frame 224",
+                "type": "FRAME",
+                "w": 262,
+                "h": 42,
+                "layout": "VERTICAL",
+                "sizeH": "FILL",
+                "sizeV": "HUG"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "Frame 239",
+        "type": "FRAME",
+        "w": 1440,
+        "h": 48,
+        "layout": "HORIZONTAL",
+        "sizeH": "FILL",
+        "sizeV": "FIXED",
+        "children": [
+          {
+            "name": "草稿 / 还有开放、预约和费用信息待核实",
+            "type": "TEXT",
+            "w": 232,
+            "h": 20,
+            "sizeH": "HUG",
+            "sizeV": "HUG"
+          },
+          {
+            "name": "高德接口已实测；天气为设计示例",
+            "type": "TEXT",
+            "w": 180,
+            "h": 18,
+            "sizeH": "HUG",
+            "sizeV": "HUG"
+          }
+        ]
+      }
+    ]
+  }
+}

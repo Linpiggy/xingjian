@@ -1,0 +1,267 @@
+{
+  "name": "03 修改方案预览 / Desktop",
+  "id": "2:362",
+  "width": 720,
+  "height": 449,
+  "saved": "D:\\Dev\\Code\\project\\传智杯-AI-WEB\\design\\figma\\exports\\screen-03.png",
+  "measure": {
+    "name": "03 修改方案预览 / Desktop",
+    "type": "FRAME",
+    "w": 1440,
+    "h": 897,
+    "layout": "VERTICAL",
+    "sizeH": "FIXED",
+    "sizeV": "HUG",
+    "children": [
+      {
+        "name": "Header",
+        "type": "FRAME",
+        "w": 1440,
+        "h": 72,
+        "layout": "HORIZONTAL",
+        "sizeH": "FILL",
+        "sizeV": "FIXED",
+        "children": [
+          {
+            "name": "Frame 327",
+            "type": "FRAME",
+            "w": 90,
+            "h": 36,
+            "layout": "HORIZONTAL",
+            "sizeH": "HUG",
+            "sizeV": "HUG",
+            "children": [
+              {
+                "name": "Frame 325",
+                "type": "FRAME",
+                "w": 36,
+                "h": 36,
+                "layout": "HORIZONTAL",
+                "sizeH": "FIXED",
+                "sizeV": "FIXED"
+              },
+              {
+                "name": "行间",
+                "type": "TEXT",
+                "w": 44,
+                "h": 33,
+                "sizeH": "HUG",
+                "sizeV": "HUG"
+              }
+            ]
+          },
+          {
+            "name": "Frame 331",
+            "type": "FRAME",
+            "w": 232,
+            "h": 21,
+            "layout": "HORIZONTAL",
+            "sizeH": "HUG",
+            "sizeV": "HUG",
+            "children": [
+              {
+                "name": "旅行规划",
+                "type": "TEXT",
+                "w": 56,
+                "h": 21,
+                "sizeH": "HUG",
+                "sizeV": "HUG"
+              },
+              {
+                "name": "我的行程",
+                "type": "TEXT",
+                "w": 56,
+                "h": 21,
+                "sizeH": "HUG",
+                "sizeV": "HUG"
+              },
+              {
+                "name": "使用说明",
+                "type": "TEXT",
+                "w": 56,
+                "h": 21,
+                "sizeH": "HUG",
+                "sizeV": "HUG"
+              }
+            ]
+          },
+          {
+            "name": "Button / 新建计划",
+            "type": "FRAME",
+            "w": 98,
+            "h": 48,
+            "layout": "HORIZONTAL",
+            "sizeH": "HUG",
+            "sizeV": "FIXED",
+            "children": [
+              {
+                "name": "新建计划",
+                "type": "TEXT",
+                "w": 56,
+                "h": 21,
+                "sizeH": "HUG",
+                "sizeV": "HUG"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "Frame 243",
+        "type": "FRAME",
+        "w": 1440,
+        "h": 156,
+        "layout": "VERTICAL",
+        "sizeH": "FILL",
+        "sizeV": "HUG",
+        "children": [
+          {
+            "name": "先看变化，再决定。",
+            "type": "TEXT",
+            "w": 1280,
+            "h": 48,
+            "sizeH": "FILL",
+            "sizeV": "HUG"
+          },
+          {
+            "name": "雨天备选只是一份提案，不会自动改动已保存的计划。",
+            "type": "TEXT",
+            "w": 1280,
+            "h": 24,
+            "sizeH": "FILL",
+            "sizeV": "HUG"
+          }
+        ]
+      },
+      {
+        "name": "Frame 335",
+        "type": "FRAME",
+        "w": 1440,
+        "h": 669,
+        "layout": "HORIZONTAL",
+        "sizeH": "FILL",
+        "sizeV": "HUG",
+        "children": [
+          {
+            "name": "Frame 260",
+            "type": "FRAME",
+            "w": 460,
+            "h": 508,
+            "layout": "VERTICAL",
+            "sizeH": "FIXED",
+            "sizeV": "HUG",
+            "children": [
+              {
+                "name": "Frame 245",
+                "type": "FRAME",
+                "w": 102,
+                "h": 36,
+                "layout": "HORIZONTAL",
+                "sizeH": "HUG",
+                "sizeV": "FIXED"
+              },
+              {
+                "name": "Frame 248",
+                "type": "FRAME",
+                "w": 410,
+                "h": 78,
+                "layout": "VERTICAL",
+                "sizeH": "FILL",
+                "sizeV": "HUG"
+              },
+              {
+                "name": "天气按小雨示例设计，和风天气未实测。",
+                "type": "TEXT",
+                "w": 410,
+                "h": 21,
+                "sizeH": "FILL",
+                "sizeV": "HUG"
+              },
+              {
+                "name": "Frame 250",
+                "type": "FRAME",
+                "w": 410,
+                "h": 1,
+                "layout": "HORIZONTAL",
+                "sizeH": "FILL",
+                "sizeV": "FIXED"
+              },
+              {
+                "name": "这次修改",
+                "type": "TEXT",
+                "w": 410,
+                "h": 27,
+                "sizeH": "FILL",
+                "sizeV": "HUG"
+              },
+              {
+                "name": "Frame 255",
+                "type": "FRAME",
+                "w": 410,
+                "h": 63,
+                "layout": "VERTICAL",
+                "sizeH": "FILL",
+                "sizeV": "HUG"
+              },
+              {
+                "name": "Frame 258",
+                "type": "FRAME",
+                "w": 410,
+                "h": 44,
+                "layout": "HORIZONTAL",
+                "sizeH": "FILL",
+                "sizeV": "HUG"
+              },
+              {
+                "name": "调整后仍属于待核实草稿，不标记为可执行方案。",
+                "type": "TEXT",
+                "w": 410,
+                "h": 20,
+                "sizeH": "FILL",
+                "sizeV": "HUG"
+              }
+            ]
+          },
+          {
+            "name": "Frame 324",
+            "type": "FRAME",
+            "w": 720,
+            "h": 621,
+            "layout": "VERTICAL",
+            "sizeH": "FIXED",
+            "sizeV": "HUG",
+            "children": [
+              {
+                "name": "Frame 315",
+                "type": "FRAME",
+                "w": 720,
+                "h": 481,
+                "layout": "HORIZONTAL",
+                "sizeH": "FILL",
+                "sizeV": "HUG"
+              },
+              {
+                "name": "Frame 318",
+                "type": "FRAME",
+                "w": 720,
+                "h": 44,
+                "layout": "HORIZONTAL",
+                "sizeH": "FILL",
+                "sizeV": "HUG"
+              },
+              {
+                "name": "Frame 323",
+                "type": "FRAME",
+                "w": 720,
+                "h": 48,
+                "layout": "HORIZONTAL",
+                "sizeH": "FILL",
+                "sizeV": "HUG"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

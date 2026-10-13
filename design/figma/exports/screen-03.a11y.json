@@ -1,0 +1,25 @@
+{
+  "score": "A+",
+  "level": "AA",
+  "summary": {
+    "textNodes": 46,
+    "interactiveElements": 3,
+    "errors": 0,
+    "warnings": 0
+  },
+  "breakdown": {
+    "contrast": {
+      "issues": 0,
+      "errors": 0
+    },
+    "text": {
+      "issues": 0,
+      "errors": 0
+    },
+    "touch": {
+      "issues": 0,
+      "errors": 0
+    }
+  },
+  "issues": []
+}

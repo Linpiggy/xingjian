@@ -1,0 +1,53 @@
+{
+  "name": "State / 空行程",
+  "id": "5:685",
+  "width": 210,
+  "height": 95,
+  "saved": "D:\\Dev\\Code\\project\\传智杯-AI-WEB\\design\\figma\\exports\\state-empty.png",
+  "measure": {
+    "name": "State / 空行程",
+    "type": "COMPONENT",
+    "w": 420,
+    "h": 189,
+    "layout": "VERTICAL",
+    "sizeH": "FIXED",
+    "sizeV": "HUG",
+    "children": [
+      {
+        "name": "还没有行程",
+        "type": "TEXT",
+        "w": 370,
+        "h": 30,
+        "sizeH": "FILL",
+        "sizeV": "HUG"
+      },
+      {
+        "name": "选择目的地和日期，再生成一份可以编辑的计划。",
+        "type": "TEXT",
+        "w": 370,
+        "h": 21,
+        "sizeH": "FILL",
+        "sizeV": "HUG"
+      },
+      {
+        "name": "Button / 新建计划",
+        "type": "FRAME",
+        "w": 370,
+        "h": 48,
+        "layout": "HORIZONTAL",
+        "sizeH": "FILL",
+        "sizeV": "FIXED",
+        "children": [
+          {
+            "name": "新建计划",
+            "type": "TEXT",
+            "w": 56,
+            "h": 21,
+            "sizeH": "HUG",
+            "sizeV": "HUG"
+          }
+        ]
+      }
+    ]
+  }
+}
