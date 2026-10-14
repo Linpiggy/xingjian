@@ -5,9 +5,9 @@ import type { Day } from "@/domain/models";
 import { initializeMap, type MapFailure } from "./initialize-map";
 
 const failureMessages: Record<MapFailure, string> = {
-  sdk_failed: "地图脚本加载失败，请检查网络与 JS Key 配置。",
-  sdk_timeout: "地图脚本加载超时，请检查网络后重试。",
-  basemap_timeout: "地图脚本已加载，但底图未就绪。请检查安全码、域名限制和安全代理。",
+  sdk_failed: "地图加载失败，请检查网络后重试。",
+  sdk_timeout: "地图加载超时，请检查网络后重试。",
+  basemap_timeout: "底图加载超时，请稍后重试。",
   initialization_failed: "地图初始化失败，行程草稿仍保留。",
 };
 
@@ -112,16 +112,14 @@ export function RouteMap({
       {!configured ? (
         <div className="map-state">
           <MapPin size={36} aria-hidden="true" />
-          <h3>真实地图未配置</h3>
-          <p>需要独立的高德 JS API Key 和服务端安全密钥。</p>
-          <p>不会用示意图代替真实底图。已返回的真实路段可在左侧查看耗时与距离。</p>
-          <small>在 .env.local 配置后重启应用。</small>
+          <h3>地图暂不可用</h3>
+          <p>你的行程已保留，仍可在行程中查看步行耗时与距离。</p>
         </div>
       ) : failed ? (
         <div className="map-state">
           <h3>地图加载失败</h3>
           <p>{failureMessages[failed]}</p>
-          <p>行程草稿仍保留，不会用示意图替代底图。</p>
+          <p>行程已保留，你可以继续查看地点详情。</p>
           <button
             className="button"
             onClick={() => {

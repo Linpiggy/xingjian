@@ -3,6 +3,7 @@ import { useState, type FormEvent, type ReactNode } from "react";
 import { ArrowRight, Info } from "lucide-react";
 import type { PlaceCandidate, TripInput } from "@/domain/models";
 import { PlacePicker } from "./place-picker";
+import { TripSummary } from "./trip-summary";
 import { tripInputSchema } from "@/lib/contracts";
 import { parseYuanFen } from "@/lib/money";
 
@@ -52,6 +53,8 @@ export function TripForm({
   const [city, setCity] = useState("杭州");
   const [dayCount, setDayCount] = useState("2");
   const [budget, setBudget] = useState("1500");
+  const [departureDate, setDepartureDate] = useState(startDate);
+  const [travelers, setTravelers] = useState("2");
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const data = new FormData(event.currentTarget);
@@ -77,7 +80,9 @@ export function TripForm({
         next[String(issue.path[0])] ??= issue.message;
       }
       setErrors(next);
-      document.getElementById(Object.keys(next)[0])?.focus();
+      const first = Object.keys(next)[0];
+      const field = document.getElementById(first);
+      (field ?? document.getElementById("selected-places"))?.focus();
       return;
     }
     setErrors({});
@@ -95,7 +100,7 @@ export function TripForm({
               <Field
                 name="city"
                 label="目的地城市"
-                help="杭州是可修改的示例城市。"
+                help="输入本次旅行的目的地。"
                 error={errors.city}
               >
                 <input
@@ -121,14 +126,15 @@ export function TripForm({
               <Field
                 name="startDate"
                 label="出行日期"
-                help="开放、预约与天气仍需核实。"
+                help="选择开始旅行的日期。"
                 error={errors.startDate}
               >
                 <input
                   id="startDate"
                   name="startDate"
                   type="date"
-                  defaultValue={startDate}
+                  value={departureDate}
+                  onChange={(event) => setDepartureDate(event.target.value)}
                   aria-invalid={!!errors.startDate}
                   aria-describedby={describe("startDate")}
                 />
@@ -136,7 +142,7 @@ export function TripForm({
               <Field
                 name="dayCount"
                 label="旅行天数"
-                help="本轮支持单城市 2-3 日。"
+                help="安排同一城市的 2-3 天旅行。"
                 error={errors.dayCount}
               >
                 <select
@@ -144,6 +150,8 @@ export function TripForm({
                   name="dayCount"
                   value={dayCount}
                   onChange={(event) => setDayCount(event.target.value)}
+                  aria-invalid={!!errors.dayCount}
+                  aria-describedby={describe("dayCount")}
                 >
                   <option value="2">2 天</option>
                   <option value="3">3 天</option>
@@ -161,7 +169,8 @@ export function TripForm({
                   type="number"
                   min={1}
                   max={8}
-                  defaultValue={2}
+                  value={travelers}
+                  onChange={(event) => setTravelers(event.target.value)}
                   aria-invalid={!!errors.travelers}
                   aria-describedby={describe("travelers")}
                 />
@@ -194,7 +203,15 @@ export function TripForm({
               dayCount={Number(dayCount)}
               budgetPerPersonFen={parseYuanFen(budget)}
               selected={selected}
-              onChange={setSelected}
+              onChange={(places) => {
+                setSelected(places);
+                setErrors((current) => {
+                  const next = { ...current };
+                  delete next.keywords;
+                  delete next.selections;
+                  return next;
+                });
+              }}
               error={errors.keywords ?? errors.selections}
               mapKey={mapKey}
               mapsConfigured={mapsConfigured}
@@ -238,10 +255,7 @@ export function TripForm({
           </fieldset>
           <div className="notice">
             <Info size={18} aria-hidden="true" />
-            <p>
-              自定义搜索与 AI
-              推荐可以混合添加。生成时重新核对地点与步行路线；开放、预约、餐饮与完整预算仍待核实。
-            </p>
+            <p>搜索与 AI 推荐可以混合添加。生成后请确认地点、开放时间与预约要求。</p>
           </div>
           {error && (
             <div role="alert" aria-label="行程查询失败" className="notice danger">
@@ -264,23 +278,14 @@ export function TripForm({
           )}
         </form>
       </section>
-      <aside className="panel form-note">
-        <h2>一份可以核实的计划</h2>
-        <p>先获取真实地点和交通，再补齐完整行程。</p>
-        <hr />
-        <h3>本轮已经能做</h3>
-        <ul>
-          <li>搜索选择、地图点选与 AI 推荐</li>
-          <li>查询真实地点和步行耗时</li>
-          <li>切换每天的行程，查看地点来源</li>
-          <li>地图 Key 配置后绘制真实路线</li>
-        </ul>
-        <div className="notice">
-          <p>
-            缺信息就显示未知。开放、预约、餐饮、返程与完整预算尚未校验，草稿不能当作已确认的出行方案。
-          </p>
-        </div>
-      </aside>
+      <TripSummary
+        city={city}
+        departureDate={departureDate}
+        dayCount={Number(dayCount)}
+        travelers={travelers}
+        budgetPerPersonFen={parseYuanFen(budget)}
+        selected={selected}
+      />
     </div>
   );
 }

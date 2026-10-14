@@ -71,7 +71,7 @@ test("form validation, successful draft, selection and missing map config", asyn
         .getByRole("heading", { name: "测试景点二" }),
     ).toBeVisible();
   }
-  await expect(page.getByRole("heading", { name: "真实地图未配置" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "地图暂不可用" })).toBeVisible();
   expect(
     await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
   ).toBe(true);

@@ -5,7 +5,9 @@ export async function requestJson<T>(
   schema: ZodType<T>,
   options?: RequestInit,
 ): Promise<T> {
-  const response = await fetch(url, { ...options, signal: AbortSignal.timeout(60_000) });
+  const timeout = AbortSignal.timeout(60_000);
+  const signal = options?.signal ? AbortSignal.any([options.signal, timeout]) : timeout;
+  const response = await fetch(url, { ...options, signal });
   const data: unknown = await response.json();
   if (!response.ok) {
     const message =

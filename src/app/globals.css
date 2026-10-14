@@ -188,9 +188,79 @@ li + li {
   gap: 24px;
   align-items: start;
 }
-.form-note > p {
+.trip-summary {
+  position: sticky;
+  top: 96px;
+}
+.summary-destination {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 24px 0;
+  font-size: 22px;
+  font-weight: 650;
+  overflow-wrap: anywhere;
+}
+.summary-destination svg {
+  color: var(--primary);
+  flex-shrink: 0;
+}
+.summary-destination span {
+  margin-left: auto;
+  padding: 4px 10px;
+  border-radius: 8px;
+  background: var(--soft);
+  font-size: 13px;
+}
+.summary-facts {
+  margin: 0;
+}
+.summary-facts > div {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 12px;
+  margin: 14px 0;
+}
+.summary-facts dt {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   color: var(--muted);
-  margin-top: 10px;
+  font-size: 12px;
+}
+.summary-facts dd {
+  margin: 0;
+  text-align: right;
+  overflow-wrap: anywhere;
+  font-variant-numeric: tabular-nums;
+}
+.summary-days {
+  list-style: none;
+  padding: 0;
+  margin: 20px 0;
+}
+.summary-days > li {
+  margin: 18px 0;
+  padding-left: 14px;
+  border-left: 2px solid var(--border);
+}
+.summary-days ul {
+  list-style: none;
+  padding: 0;
+  margin: 8px 0 0;
+}
+.summary-days ul li {
+  margin: 6px 0;
+  overflow-wrap: anywhere;
+}
+.summary-empty {
+  padding: 16px 0;
+  color: var(--muted);
+}
+.summary-reminder {
+  margin-top: 24px;
 }
 fieldset {
   border: 0;
@@ -469,6 +539,64 @@ legend {
   background: var(--primary);
   color: var(--on-primary);
 }
+.itinerary-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+.stop-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 8px 0 14px;
+}
+.stop-actions .button {
+  padding: 8px 10px;
+  font-size: 12px;
+}
+.stop-actions [aria-pressed="true"] {
+  color: var(--primary);
+  border-color: var(--primary);
+  background: var(--soft);
+}
+.details-dialog.edit-dialog {
+  width: min(720px, calc(100% - 24px));
+}
+.edit-place-name {
+  margin: 18px 0;
+  font-size: 16px;
+  font-weight: 650;
+}
+.edit-comparison {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 24px;
+  margin: 20px 0;
+}
+.edit-preview-day {
+  margin-top: 14px;
+}
+.edit-preview-day ol {
+  padding-left: 20px;
+}
+.edit-preview-day li {
+  margin: 10px 0;
+  overflow-wrap: anywhere;
+}
+.edit-preview-day small {
+  display: block;
+  color: var(--muted);
+}
+.edit-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 20px;
+}
 .timeline {
   margin: 18px 0;
   padding: 0;
@@ -622,6 +750,42 @@ legend {
   min-height: 44px;
   margin-top: 8px;
 }
+.budget-panel {
+  margin-top: 24px;
+}
+.budget-facts {
+  margin: 18px 0;
+}
+.budget-facts > div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 9px 0;
+}
+.budget-facts dt {
+  color: var(--muted);
+}
+.budget-facts dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+.budget-toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  margin: 18px 0;
+}
+.budget-toggle input {
+  width: 20px;
+  height: 20px;
+  accent-color: var(--primary);
+}
+.budget-inputs {
+  display: grid;
+  gap: 20px;
+}
 .budget-number {
   font-size: 23px;
   font-weight: 700;
@@ -701,6 +865,16 @@ legend {
   .form-layout {
     grid-template-columns: 1fr;
     gap: 20px;
+  }
+  .trip-summary {
+    position: static;
+  }
+  .edit-comparison {
+    grid-template-columns: 1fr;
+    gap: 18px;
+  }
+  .edit-actions .button {
+    width: 100%;
   }
   .field-grid {
     grid-template-columns: 1fr;

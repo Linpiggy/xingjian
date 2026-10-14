@@ -1,7 +1,7 @@
 "use client";
-import { useCallback, useRef } from "react";
+import { useCallback, useRef, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
-import { Compass, Footprints, Info, MapPin, Plus, X, CloudOff } from "lucide-react";
+import { Compass, Footprints, Info, MapPin, Plus, X } from "lucide-react";
 import type { Draft, Place, TripInput } from "@/domain/models";
 import { formatMinute } from "@/domain/draft";
 import { planResponseSchema } from "@/lib/contracts";
@@ -9,14 +9,11 @@ import { TripForm } from "@/features/trip-form/trip-form";
 import { RouteMap } from "@/features/map/route-map";
 import { useWideScreen } from "@/features/map/use-wide-screen";
 import { usePlannerUi } from "./ui-store";
+import { useDraftEditor } from "./editor-store";
+import { EditDialog } from "./edit-dialog";
+import { BudgetPanel } from "./budget-panel";
+import { summarizeBudget } from "@/domain/budget";
 
-function money(fen: number) {
-  return new Intl.NumberFormat("zh-CN", {
-    style: "currency",
-    currency: "CNY",
-    maximumFractionDigits: 2,
-  }).format(fen / 100);
-}
 function PlaceDetails({ place }: { place: Place }) {
   return (
     <>
@@ -65,13 +62,13 @@ function PlaceDetails({ place }: { place: Place }) {
         target="_blank"
         rel="noreferrer"
       >
-        查看接口来源说明
+        查看高德数据说明
       </a>
     </>
   );
 }
 function Workspace({
-  draft,
+  draft: initialDraft,
   mapKey,
   mapsConfigured,
 }: {
@@ -80,6 +77,21 @@ function Workspace({
   mapsConfigured: boolean;
 }) {
   const ui = usePlannerUi();
+  const editor = useDraftEditor((state) => state.current);
+  const draft = editor?.draft ?? initialDraft;
+  const [editing, setEditing] = useState<{
+    placeId: string;
+    initialIndex?: number;
+  } | null>(null);
+  const [editError, setEditError] = useState<string | null>(null);
+  function toggleLock(id: string, kind: "position" | "time") {
+    try {
+      useDraftEditor.getState().toggleLock(id, kind);
+      setEditError(null);
+    } catch (cause) {
+      setEditError(cause instanceof Error ? cause.message : "未能修改锁定设置。");
+    }
+  }
   const wideScreen = useWideScreen();
   const dialog = useRef<HTMLDialogElement>(null);
   const select = ui.select;
@@ -104,6 +116,10 @@ function Workspace({
   const selected =
     day.items.find((item) => item.place.id === ui.selectedId)?.place ??
     day.items[0]?.place;
+  const budgetOver =
+    editor &&
+    summarizeBudget(editor.budget, draft.input.travelers, draft.input.budgetPerPersonFen)
+      .status === "over";
   const fixtures = draft.days.some((d) =>
     d.items.some((item) => item.place.source.kind === "fixture"),
   );
@@ -120,7 +136,11 @@ function Workspace({
           </p>
         </div>
         <span className="status-tag">
-          {draft.status === "infeasible" ? "存在时间冲突" : "待核实草稿"}
+          {draft.status === "infeasible"
+            ? "存在时间冲突"
+            : budgetOver
+              ? "预算估算超目标"
+              : "待核实草稿"}
         </span>
       </div>
       {fixtures && (
@@ -150,7 +170,30 @@ function Workspace({
       </div>
       <div className="workspace-grid" data-view={ui.mobileTab}>
         <section className="panel itinerary-panel" aria-label="每日行程">
-          <h2>每日行程</h2>
+          <div className="itinerary-heading">
+            <h2>每日行程</h2>
+            <button
+              type="button"
+              className="button"
+              disabled={!editor?.previous}
+              onClick={() => {
+                try {
+                  useDraftEditor.getState().undo();
+                  setEditError(null);
+                } catch (cause) {
+                  setEditError(cause instanceof Error ? cause.message : "未能撤销修改。");
+                }
+              }}
+            >
+              撤销修改
+            </button>
+          </div>
+          <p className="small muted">位置锁固定当天和顺序，时间锁固定开始时间。</p>
+          {editError && (
+            <p className="notice danger" role="alert" aria-label="锁定修改失败">
+              {editError}
+            </p>
+          )}
           <div className="day-tabs" role="group" aria-label="选择旅行日期">
             {draft.days.map((d, index) => (
               <button
@@ -168,7 +211,20 @@ function Workspace({
             {day.items.map((item, index) => {
               const leg = day.legs[index - 1];
               return (
-                <li key={item.place.id}>
+                <li
+                  key={item.place.id}
+                  onDragOver={(event) => event.preventDefault()}
+                  onDrop={(event) => {
+                    event.preventDefault();
+                    const id = event.dataTransfer.getData("text/x-travel-place");
+                    if (
+                      id !== item.place.id &&
+                      day.items.some((stop) => stop.place.id === id)
+                    ) {
+                      setEditing({ placeId: id, initialIndex: index });
+                    }
+                  }}
+                >
                   {index > 0 && (
                     <div className={`travel-leg ${leg?.route ? "" : "error-text"}`}>
                       <Footprints size={16} aria-hidden="true" />
@@ -182,6 +238,11 @@ function Workspace({
                   <button
                     className={`stop-card ${selected?.id === item.place.id ? "selected" : ""}`}
                     aria-pressed={selected?.id === item.place.id}
+                    draggable={!editor?.locks[item.place.id]?.position}
+                    onDragStart={(event) => {
+                      event.dataTransfer.setData("text/x-travel-place", item.place.id);
+                      event.dataTransfer.effectAllowed = "move";
+                    }}
                     onClick={() => selectPlace(item.place.id)}
                   >
                     <span className="stop-time">{formatMinute(item.startMinute)}</span>
@@ -190,6 +251,39 @@ function Workspace({
                       <small>停留 {item.stayMinutes} 分钟（用户估算）</small>
                     </span>
                   </button>
+                  <div
+                    className="stop-actions"
+                    role="group"
+                    aria-label={`调整${item.place.name}`}
+                  >
+                    <button
+                      id={`edit-stop-${item.place.id}`}
+                      type="button"
+                      className="button"
+                      onClick={() => setEditing({ placeId: item.place.id })}
+                    >
+                      调整
+                    </button>
+                    <button
+                      type="button"
+                      className="button"
+                      aria-pressed={!!editor?.locks[item.place.id]?.position}
+                      onClick={() => toggleLock(item.place.id, "position")}
+                    >
+                      {editor?.locks[item.place.id]?.position ? "位置已锁" : "锁定位置"}
+                    </button>
+                    <button
+                      type="button"
+                      className="button"
+                      aria-pressed={!!editor?.locks[item.place.id]?.time}
+                      disabled={
+                        item.startMinute === null && !editor?.locks[item.place.id]?.time
+                      }
+                      onClick={() => toggleLock(item.place.id, "time")}
+                    >
+                      {editor?.locks[item.place.id]?.time ? "时间已锁" : "锁定时间"}
+                    </button>
+                  </div>
                 </li>
               );
             })}
@@ -201,14 +295,14 @@ function Workspace({
           ))}
           <div className="incomplete">
             <h3>午餐与晚餐待安排</h3>
-            <p>本轮未自动选择餐厅，不把空档当作完整行程。</p>
+            <p>请预留用餐时间，并确认餐厅位置与营业时间。</p>
           </div>
           <p className="small muted">{draft.notices[1]}</p>
         </section>
         <section className="panel map-panel">
           <div>
-            <h2>当天真实路线</h2>
-            <p className="small muted">点位与路线使用 GCJ-02；不绘制虚构连线。</p>
+            <h2>当天路线</h2>
+            <p className="small muted">点击地图上的编号，查看地点详情。</p>
           </div>
           {wideScreen || ui.mobileTab === "map" ? (
             <RouteMap
@@ -225,10 +319,6 @@ function Workspace({
               </div>
             </div>
           )}
-          <div className="notice">
-            <CloudOff size={18} aria-hidden="true" />
-            <p>天气未接入。没有实际预报，不推断雨天方案。</p>
-          </div>
           {day.legs.some((leg) => leg.route && !leg.route.segments.length) && (
             <p className="notice warning">部分路段缺少路线点串，未在地图上绘制。</p>
           )}
@@ -241,14 +331,9 @@ function Workspace({
         <aside className="panel details-sidebar" aria-label="地点详情">
           <h2>地点详情</h2>
           {selected ? <PlaceDetails place={selected} /> : <p>选择一个地点查看详情。</p>}
-          <hr />
-          <h3>预算目标</h3>
-          <p className="budget-number">{money(draft.input.budgetPerPersonFen)} / 人</p>
-          <p className="small muted">
-            住宿、餐饮、门票和交通费用尚未汇总；这不是预计实际支出。
-          </p>
         </aside>
       </div>
+      {editor && <BudgetPanel state={editor} />}
       <dialog
         ref={dialog}
         className="details-dialog"
@@ -266,9 +351,16 @@ function Workspace({
         </div>
         {selected && <PlaceDetails place={selected} />}
       </dialog>
+      {editing && editor && (
+        <EditDialog
+          state={editor}
+          placeId={editing.placeId}
+          initialIndex={editing.initialIndex}
+          onClose={() => setEditing(null)}
+        />
+      )}
       <footer className="workspace-footer">
-        <span>本页草稿，尚未保存</span>
-        <span>拖拽、锁定、修改预览与分享将在后续阶段实现</span>
+        <span>当前行程仅保留在此页面，刷新后清空。</span>
       </footer>
     </>
   );
@@ -308,13 +400,17 @@ export function Planner({
       }
       return result.data.draft;
     },
-    onSuccess: () => resetUi(),
+    onSuccess: (draft) => {
+      useDraftEditor.getState().start(draft);
+      resetUi();
+    },
   });
   function newPlan() {
     if (mutation.data && !window.confirm("当前草稿未保存，确定清空并新建计划吗？")) {
       return;
     }
     mutation.reset();
+    useDraftEditor.getState().reset();
     resetUi();
   }
   return (
@@ -343,7 +439,7 @@ export function Planner({
           <>
             <div className="page-heading">
               <h1>把想去的地方，排进合适的一天。</h1>
-              <p>先从真实地点和路线开始。未知的信息，留待核实。</p>
+              <p>选择目的地和想去的地方，安排每天的行程。</p>
             </div>
             <TripForm
               startDate={startDate}

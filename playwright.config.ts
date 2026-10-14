@@ -34,6 +34,11 @@ export default defineConfig({
     timeout: 120_000,
     env: {
       TRAVEL_E2E: "1",
+      DATABASE_URL: "",
+      QWEATHER_API_HOST: "",
+      QWEATHER_API_KEY: "",
+      QWEATHER_JWT: "",
+      QWEATHER_PRIVATE_KEY: "",
       NEXT_PUBLIC_AMAP_JS_KEY: "",
       AMAP_JS_SECURITY_CODE: "",
       AMAP_WEB_SERVICE_KEY: "",

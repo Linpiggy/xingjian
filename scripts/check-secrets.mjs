@@ -22,7 +22,16 @@ for (const line of example.split(/\r?\n/)) {
 }
 const secrets = [];
 const nonSecretSettings = new Set(["OPENAI_BASE_URL", "OPENAI_MODEL"]);
-for (const key of ["OPENAI_API_KEY", "DEEPSEEK_API_KEY"]) {
+for (const key of [
+  "OPENAI_API_KEY",
+  "DEEPSEEK_API_KEY",
+  "AMAP_WEB_SERVICE_KEY",
+  "AMAP_JS_SECURITY_CODE",
+  "DATABASE_URL",
+  "QWEATHER_API_KEY",
+  "QWEATHER_JWT",
+  "QWEATHER_PRIVATE_KEY",
+]) {
   if (process.env[key]) {
     secrets.push(Buffer.from(process.env[key]));
   }

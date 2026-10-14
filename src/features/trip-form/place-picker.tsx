@@ -86,7 +86,7 @@ export function PlacePicker({
       return;
     }
     if (selected.length >= 6) {
-      setLocalError("本轮最多六个地点，请先移除一个再添加。");
+      setLocalError("最多选择六个地点，请先移除一个再添加。");
       return;
     }
     onChange([...selected, candidate]);
@@ -240,7 +240,7 @@ export function PlacePicker({
               <Sparkles size={16} aria-hidden="true" />
               {recommend.isPending ? "AI 正在推荐" : "获取 AI 推荐"}
             </button>
-            <small>最多三项兴趣；真实模型从高德候选推荐，会消耗接口配额。</small>
+            <small>最多三项兴趣；每次推荐会使用模型额度，结果可自由添加。</small>
           </div>
           {recommend.isPending && (
             <p role="status">先获取真实候选，再由模型选择。不会覆盖已选清单。</p>
@@ -265,7 +265,14 @@ export function PlacePicker({
         suggestions.some((candidate) => candidate.place.source.kind === "fixture")) && (
         <p className="notice warning">测试 fixture 候选，不是真实查询或推荐。</p>
       )}
-      <div className="selected-places" aria-label="已选地点清单">
+      <div
+        id="selected-places"
+        className="selected-places"
+        role="region"
+        aria-label="已选地点清单"
+        aria-describedby={localError || error ? "place-list-error" : undefined}
+        tabIndex={-1}
+      >
         <h3>已选 {selected.length} / 6 个地点</h3>
         {selected.length ? (
           <ol>
@@ -301,7 +308,12 @@ export function PlacePicker({
         )}
       </div>
       {(localError || error) && (
-        <p role="alert" aria-label="地点清单提示" className="error-text">
+        <p
+          id="place-list-error"
+          role="alert"
+          aria-label="地点清单提示"
+          className="error-text"
+        >
           {localError || error}
         </p>
       )}

@@ -233,7 +233,9 @@ try {
   await dialog
     .getByText("正在加载真实地图。", { exact: true })
     .waitFor({ state: "hidden", timeout: 25_000 });
-  if (await dialog.getByRole("heading", { name: /未配置|加载失败/ }).isVisible()) {
+  if (
+    await dialog.getByRole("heading", { name: /暂不可用|未配置|加载失败/ }).isVisible()
+  ) {
     report.map = { status: "failed", reason: "map_not_ready" };
     throw new Error("Map did not become ready; no retry permitted.");
   }

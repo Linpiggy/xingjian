@@ -14,6 +14,21 @@ describe("typed browser JSON requests (mock only)", () => {
       4,
     );
   });
+  it("combines caller cancellation with the bounded timeout", async () => {
+    const controller = new AbortController();
+    const fetchMock = vi.fn(async (_url: string, options: RequestInit) => {
+      controller.abort();
+      expect(options.signal?.aborted).toBe(true);
+      throw new DOMException("Cancelled", "AbortError");
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(
+      requestJson("/api/places", placesResponseSchema, {
+        signal: controller.signal,
+      }),
+    ).rejects.toThrow("Cancelled");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
   it("rejects malformed success responses without fabricating places", async () => {
     vi.stubGlobal(
       "fetch",

@@ -57,7 +57,7 @@ export const tripInputSchema = z
       .number({ error: "请填写同行人数" })
       .int({ error: "同行人数须为整数" })
       .min(1, "至少一位旅客")
-      .max(8, "本轮最多支持八位旅客"),
+      .max(8, "同行人数最多八人"),
     budgetPerPersonFen: z
       .number({ error: "请填写每人预算" })
       .int({ error: "金额最多两位小数" })
@@ -66,7 +66,7 @@ export const tripInputSchema = z
     keywords: z
       .array(z.string().trim().min(1).max(60))
       .min(2, "请至少选择两个地点")
-      .max(6, "本轮最多支持六个地点"),
+      .max(6, "最多选择六个地点"),
     selections: z.array(selectionSchema).min(2).max(6).optional(),
     stayMinutes: z
       .number({ error: "请填写停留时间" })
@@ -155,6 +155,30 @@ export const aiChoicesSchema = z.strictObject({
     .min(2)
     .max(6),
 });
+const expenseEstimateSchema = z
+  .strictObject({
+    amountFen: z.number().int().min(0).max(10_000_000).nullable(),
+    basis: z.enum(["per_person", "trip"]),
+    source: z
+      .strictObject({ kind: z.literal("user"), recordedAt: z.iso.datetime() })
+      .nullable(),
+  })
+  .superRefine((entry, context) => {
+    if ((entry.amountFen === null) !== (entry.source === null)) {
+      context.addIssue({ code: "custom", message: "费用与手动估算来源不一致" });
+    }
+  });
+export const budgetEstimateSchema = z.strictObject({
+  includeIntercity: z.boolean(),
+  items: z.strictObject({
+    intercity: expenseEstimateSchema,
+    local: expenseEstimateSchema,
+    lodging: expenseEstimateSchema,
+    meals: expenseEstimateSchema,
+    tickets: expenseEstimateSchema,
+  }),
+});
+
 export const recommendationsResponseSchema = z.object({
   recommendations: z
     .array(candidateSchema.extend({ reason: z.string().max(160) }))

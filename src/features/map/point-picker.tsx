@@ -132,22 +132,22 @@ export function PointPicker({
         </button>
       </div>
       <p className="muted">
-        点击地图选择位置，再填写名称。不会将自定义点伪装成已核实的高德 POI。
+        点击地图选择位置，再填写名称。自定义地点的位置与入口请自行确认。
       </p>
       <div className="map-stage" role="region" aria-label="自定义点选地图">
         <div className="map-canvas" ref={canvas} />
         {!configured ? (
           <div className="map-state">
-            <h3>地图未配置，暂不能选点</h3>
-            <p>请配置独立 JS Key 与服务端安全码，搜索添加仍可使用。</p>
+            <h3>地图暂不可用，无法选点</h3>
+            <p>请通过搜索添加地点，已选清单不受影响。</p>
           </div>
         ) : failure ? (
           <div className="map-state">
             <h3>选点地图加载失败</h3>
             <p>
               {failure === "basemap_timeout"
-                ? "脚本已加载，但底图未就绪，请检查安全码与代理。"
-                : "请检查网络与 JS Key 后重试。"}
+                ? "底图加载超时，请稍后重试。"
+                : "请检查网络后重试，也可关闭地图并搜索添加地点。"}
             </p>
             <button
               type="button"

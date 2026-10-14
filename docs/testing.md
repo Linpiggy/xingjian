@@ -178,3 +178,92 @@
 - 额外独立检查生产的 14 个客户端 JS 文件及当前 HTTP 200 HTML，对四类已配置私密值做精确比较，无命中；未将私密值传入浏览器 evaluate 或打印。
 - 证据：`docs/evidence/amap-js-smoke-2026-10-13.json` 写后回读通过，截图在忽略目录 `test-results/live-basemap.png`／`live-point-picker.png`；不提交完整商家数据。前轮空白证据保留，未改历史。
 - 结论：明确宽高消除了本例中 SDK relative 定位的容器坍缩，桌面真实底图／点选添加代表性验收通过。真实窄屏 SDK、工作台 marker／polyline 联动尚未另行实测；不等于所有城市／设备覆盖或 P，上线权益、完整费用、餐饮、天气与持久化仍待实现／确认。
+
+## 检查 21：面向旅行的文案与实时摘要
+
+- 按用户要求，移除表单侧栏“本轮已经能做”、工作台待开发功能、天气未接入占位及地图环境配置教程。改为目的地／日期／人数／预算目标的实时摘要与每日地点预览；分组复用 `groupPlaces`，不产生新的地点、模型或路线调用，也不预测未知的行程时间。
+- 保留 fixture 醒目标识、用户点未核实、预约／门票未知、午晚餐待安排、预算非报价与刷新丢失提醒。地图未配置仍不加载 SDK、不造底图，错误显示用户可以采取的操作；未配置与加载失败在内部和界面分支仍独立。
+- 修复 AI 模式提交空清单时焦点找不到搜索输入的问题：聚焦带错误说明的已选清单区域；修改清单后清理过时的清单错误。原有地图 dialog 的 Esc／焦点断言保留。
+- `npm run format`、`npm run check`（59 单测）、`NEXT_TELEMETRY_DISABLED=1 npm run build` 和 `npm run e2e` 全部通过；26 项 E2E、单 worker、0 retry。新增两端摘要输入联动／2-3 天分组／移除地点／空预算人数，以及无开发进度文案／AI 模式清单校验焦点的回归。
+- 独立查看桌面初始表单、桌面／窄屏已选摘要及桌面工作台 PNG：沿用 Figma Light，摘要和错误文本正常、无横向溢出。新增摘要用例捕获 pageerror／hydration error，结果为空；既有相应检查未删除。
+- 3100 离线服务清空全部地图／模型凭据，地点与推荐均用标注 fixture；没有运行真实 smoke、没有新的供应商实测或核验等级升级。真实窄屏地图与工作台路线专项验证仍待单独授权。
+
+## 检查 22：未保存草稿的编辑、锁定、局部路线与撤销
+
+- 新增纯领域编辑器与页面内会话版本：顺序／跨天／单点停留预览，确认重新计算，不信任被修改的预览对象；过期版本和不同新计划会话拒绝覆盖。位置锁固定当天与顺序，时间锁固定日期与开始时间；早到等待，晚到／未知交通不能保证锁定时拒绝确认。不自动均衡用户调整后的天数分组。
+- 增量路线按有向相邻地点识别，只查新增路段。预览不调用供应商，用户显式查询后才请求现有服务端 `/api/routes`；查询失败不改当前行程，部分成功的结果在当前弹窗内保留，显式重试只补剩余路段。不绘制虚构连线，不编造预算节省。
+- 桌面原生拖动与两端键盘按钮都进入预览，Esc／确认先原生关闭再卸载；关闭中止浏览器请求，迟到结果不覆盖。不能由此保证已开始的服务端供应商请求停止或免计费。单步撤销恢复上次页面快照并递增版本，不是完整数据库历史。
+- 首次 format、check（81 单测）、build 与 38 E2E 全通过，但独立 PNG 检查发现桌面预览宽度被后声明的通用 dialog 样式覆盖成 420px；已有绿色断言未覆盖此布局缺口。
+- 改为 `.details-dialog.edit-dialog` 精确覆盖，新增桌面宽度 >600px、窄屏 ≤390px 的断言；未删除原断言或增加 retry。再次完整运行 format、check（10 文件／81 单测）、build、38 E2E 均通过，1 worker／0 retry。
+- 回读源码与两端 PNG：桌面实际 720px、前后对比清晰；窄屏单列、内容滚动，确认按钮可访问；新增 12 项两端编辑 E2E 与 21 个领域用例、1 个客户端取消用例。pageerror／hydration 检查为空。全部供应商请求为标注 fixture 或无配置 HTTP，未运行真实 smoke。
+- 完成范围仅为页面内未保存草稿的编辑。服务端所有权／复验／事务、持久化／分享、餐饮、公交、天气、完整预算与跨城仍未完成；已建立 `docs/goal-checklist.md`，活跃目标不标记 complete。
+
+## 检查 23：分类费用估算 WIP，原生构建 worker 失败
+
+- 实现五类手动全程估算（跨城、市内交通、住宿、餐饮、门票）、每人／全体口径、未知与明确零、整数分汇总、可排除跨城、费用预览／确认／撤销、超额提醒与确认前知情勾选。手动来源／记录时间在数据中保留，不冒充实时价格，不让未知费用显示预算达标。
+- `npm run format` 与 `npm run check` 通过：11 文件、97 单测（新增 16 个预算领域／版本与 schema 用例）；已有编辑断言保留。构建编译与 TypeScript 通过，但静态页面生成（2/6）时原生 Next worker 退出：`code: 3221226505, signal: null`，命令最终非零。不是成功构建。
+- 命令链在 build 停止，新增 6 项预算 E2E 尚未执行，不能引用上轮 38 项通过推定预算界面可用；当前 UI 与本轮完整检查未验收。
+- 只读环境复核：Node v24.15.0、win32/x64、availableParallelism=20、总内存 16069 MiB、当时空闲 1228 MiB，多个 node 进程仍在运行。低空闲内存是线索，不是已证明崩溃根因；未输出进程环境／凭据，未关闭用户进程。
+- 先提交本次失败，再原样重跑一次 build；不改测试 retry／断言、不跳过静态页生成、不运行真实供应商。若同类失败重现，停止当前路径，按官方支持的有界构建资源配置或用户环境决定处理，不反复盲跑。
+
+## 检查 24：原样复跑出现明确内存分配失败
+
+- 代码与配置未修改，原样执行 `NEXT_TELEMETRY_DISABLED=1 npm run build && npm run e2e`。编译与 TypeScript 通过，在 9 workers 收集页面数据时失败：`FATAL ERROR: Zone Allocation failed - process out of memory`，随后 `uncaughtException Error: spawn UNKNOWN`／errno=-4094。E2E 再次未执行，没有把本轮写成通过。
+- Windows 只读内存复核显示 FreePhysicalMemory=1662372 KiB、FreeVirtualMemory=1261424 KiB、TotalVirtualMemorySize=53425808 KiB；属于明显资源压力线索。此次 V8 明确报告内存分配失败，但不据此断定检查 23 的全部崩溃根因。
+- 已停止无修改重跑。当前 Next 16.4.0 自带类型 `ExperimentalConfig.cpus`、配置默认值及 `build/index.js:getNumberOfWorkers` 均支持限制构建 worker，非凭旧版记忆设置。下一条有依据的替代路径仅限制为 2 workers，保留所有生成步骤与测试；若仍失败，停止并请求释放系统内存，不再盲试或关闭用户进程。
+
+## 检查 25：有界构建恢复，但费用预览窄屏滚动待修
+
+- 只调整 `next.config.ts:experimental.cpus=2`。读取当前 Next 内存指南／类型与源码后实施，回读配置，并从实际日志独立确认页面收集及静态生成使用 2 workers（6/6 完成）。未更换构建器、未跳过类型／页面、未关闭用户进程、未扩大 retry／timeout。
+- format／check 通过，11 文件 97 单测通过，生产 build 完成；3100 空凭据隔离 E2E 44/44 通过，1 worker、0 retry，捕获 pageerror／hydration。预算新增 6 用例验证五类口径、预览保持原值、确认／单步撤销、显式未知与零、1.10 精度、超额知情／取消跨城、关闭焦点恢复；未调用真实供应商。
+- 独立读取桌面／窄屏费用 PNG。桌面两列可读，窄屏单列无横向溢出；但窄屏由长录入表单切到预览时保留旧 dialog.scrollTop，标题和前几项被卷走。测试绿不代表此视觉项已通过，预算 UI 仍待修复滚动／焦点并补断言。
+- Windows 两次失败记录与 WIP 提交保留；限制 worker 在本次环境有效，不宣称证明所有历史异常根因或解决普遍内存问题。
+
+## 检查 26：费用预览滚动／焦点修复通过
+
+- 费用录入／预览切换后重置原生 dialog.scrollTop，并聚焦可程序化聚焦的标题，不新增 Tab 停靠点；返回填写保留已输值，Esc／确认恢复触发按钮焦点。
+- 预算 E2E 新增双端标题在 viewport 内／获得焦点、scrollTop=0、返回再预览与住宿输入保留断言；截图改为实际 viewport，避免 fullPage 放大页面影响 fixed dialog 的位置观察。
+- format／check 通过，11 文件 97 单测通过；生产 build 2 workers、静态生成 6/6 完成；隔离 E2E 44/44 通过，1 worker、0 retry，未修改 timeout／降低断言，新增流程无 pageerror／hydration。
+- 写后回读及桌面／窄屏 PNG 独立复核：桌面 720px 两列、窄屏 354px 单列，标题／关闭按钮及当前费用从顶部可见；长对比仍需纵向滚动，但无横向溢出，确认按钮可访问。本轮未运行真实／计费接口。
+- 五类手动费用估算的页面内预览、确认、知情超额、撤销闭环通过；仍不是实时报价、自动联动费用或持久化，全部目标仍未完成。
+
+## 检查 27：获授权的数据库依赖，功能回归通过／开发依赖审计未清零
+
+- 用户明确选择授权安装数据库依赖并提供本地 PostgreSQL；天气继续离线适配与界面，不授权新增真实天气／模型／地图测试。后续不再重复询问该选型。
+- 读取 npm registry 与 Drizzle 官方入门／约束／事务资料后，以 `--ignore-scripts --save-exact` 安装 drizzle-orm 0.45.4、pg 8.23.1、drizzle-kit 0.31.11、@types/pg 8.23.1；package.json、锁文件及 npm ls 独立核对版本／integrity。未启动 Studio、数据库或远程服务，未运行生命周期脚本／迁移，没有覆盖 .env.local。
+- .env.example 只增 DATABASE_URL 空占位；process.env 凭据扫描加入数据库、高德私密变量及后续天气私密变量，已有 .env.local 全私密扫描保留；写后回读，无值输出。
+- `npm audit` 报 9 项（5 high、4 moderate），不是审计通过。5 high 来自既有 eslint-config-next／Next ESLint plugin→fast-glob→micromatch→braces（HEAD 锁文件已含对应版本）；新增 4 moderate 来自 drizzle-kit→已弃用 esbuild-kit loader/core-utils→嵌套 esbuild 的开发 HTTP server 跨站读取公告 GHSA-67mh-4wv8-2f99。`npm audit --omit=dev` 实际为 0；这不等于开发依赖风险已解除。
+- 未采用 audit 建议的 `--force` 旧版降级（Next config 14.2.35／drizzle-kit 0.18.1），也未擅自改 beta 栈或跨版本 override。暂不运行该工具的 HTTP server／Studio，依赖告警仍是后续风险项，不能写成已修复。
+- format／check、97 单测、生产 build（2 workers）及隔离 44 E2E 全通过，1 worker、0 retry；供应商 0 新真实调用。此轮仅依赖／凭据保护回归，不证明 PostgreSQL 连接、表结构、事务、保存或分享实现完成。
+
+## 检查 28：数据库结构生成成功，静态测试类型失败
+
+- 新增 schema.ts 五表（匿名会话、计划、版本、提案、独立分享），摘要 token、版本复合键／外键、显式过期与 timestamptz、Asia/Shanghai、对象快照约束。分享快照不得复用完整编辑内容；来源许可必须在应用层写入前检查。仅声明结构，没有实现所有权／事务或插入真实数据。
+- 无凭据 drizzle.config.ts 与 `db:generate` 生成 0000 SQL、journal／snapshot；回读 SQL 独立确认 5 CREATE TABLE、4 FK、摘要 unique/check 和版本复合 PK 存在。未连接数据库、未 push／migrate、未创建真实表，CLI 成功不代表持久化完成。
+- E2E 服务环境补清空 DATABASE_URL 与后续天气配置，避免未来模块误接用户数据库；仍保留地图／模型空配置和 .next-e2e 隔离。
+- format、凭据／格式／lint 通过，typecheck 失败：新增测试直接读 column.withTimezone，当前 Drizzle 声明将该属性擦除为 PgColumn，TS2339 两处。单测、build、E2E 尚未执行，不引用上轮通过推定本轮成功。
+- 保存此失败后修正为公开 getSQLType() 与已生成 SQL 的语义断言，不用 any 或删时区检查；后续复测再记录。
+
+## 检查 29：结构定义／迁移幂等复核通过（非数据库集成）
+
+- 替换无法从 PgColumn 类型读取的内部属性断言，改用公开 getSQLType() 精确比较 timestamp with time zone；不删时区检查，不用 any／断言类型绕过契约。
+- format／check 通过，12 文件 101 单测（新增 4 个 schema／SQL 静态用例）通过；实际核对摘要列无原 token、非空唯一、强制显式 expiry、时区、复合 PK／FK、恢复版本顺序与生成 SQL 未 DROP。单测名称明确不是 PostgreSQL integration，不能据此声称权限／事务已通过。
+- 生产 build（2 workers，6/6）与隔离 44 E2E 全通过，1 worker、0 retry，无新增真实供应商调用。此轮没有 UI 功能变化，不重复做真实 SDK 验收。
+- 再执行 db:generate，实际为 No schema changes, nothing to migrate，未改变 SQL／snapshot／journal；不存在数据库连接或 DDL 执行。生成元数据仅描述表，不含用户记录或凭据。
+- 下一步是匿名权限、来源许可门禁、事务 repository／应用 API 与隔离数据库测试；完整保存／分享尚无实现，数据库是否准备就绪仅检查配置存在性，不打印连接串。开发依赖 9 项告警仍保留，未声称审计清零。
+
+## 检查 30：安全辅助模块通过单测／构建，E2E 服务原生启动失败
+
+- 新增 256-bit 随机规范 base64url 凭证、guest/share 域分离 SHA-256 摘要与恒时比较、HttpOnly／SameSite／生产 Secure Cookie 参数；不代表已发 Cookie 或实现会话所有权。
+- 新增保存许可默认拒绝门禁：供应商未有可信许可则拒绝；地点／路线分别许可；TTL 锚定原查询时间，版本变更不延长；生产 fixture 默认拒绝；显式有界用户数据可通过。测试许可文字明确是 test-only，不升级供应商到 P。
+- 独立严格分享 DTO 默认不复制名称、城市自由文本、地址／坐标、ID、预算、锁或选择；仅显式白名单的公共名称可出现，用户点始终隐藏；保留 fixture、未知／冲突状态及非报价说明。尚未建分享链接／页面。
+- format／check 通过，13 文件 118 单测（新增 17 个安全辅助用例）通过，生产 build 完成（2 workers，6/6）。E2E 服务启动失败：Process from config.webServer was not able to start, Exit code: 3221226505。浏览器用例执行 0 项，不是 44 项通过。
+- 随后只读复核显示空闲物理 6808580 KiB、虚拟 21863408 KiB，Node v24.15.0；此时资源比此前充足，不据此判断失败当时状态或将原生退出一概归于内存。未关闭用户进程、未连接数据库／供应商。
+- 先提交该失败，再在不改代码／timeout／retry 的前提下，带 pw:webserver 启动日志复验一次；如重现再依据日志选择一条有界替代路径，不能盲跑。
+
+## 检查 31：原样 E2E 服务复验通过，历史原生退出未定位
+
+- 不修改代码、retry 或 timeout，执行 `DEBUG=pw:webserver npm run e2e`；新服务启动 Ready in 524ms，实际 GET / 200 后完整 44/44 通过，1 worker、0 retry。结束时由 Playwright 正常终止隔离服务。
+- 初次 availability 检查 HTTP 502 后启动新服务，随后 200；没有用 reuseExistingServer 替代启动验证。无新增真实模型／地图／天气／数据库调用。
+- 当前安全辅助模块 118 单测／生产 build 已于检查 30 通过，此次独立补回浏览器回归；保留 30 的启动失败，不宣称原生退出根因已定位或以后不会复现。
+- 辅助模块不等于匿名所有权／服务端事务／分享链接。数据库配置仍未提供、来源许可仍未确认；先保持该实测路径阻塞，继续已获授权的离线天气模块。

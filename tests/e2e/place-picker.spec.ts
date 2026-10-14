@@ -114,7 +114,7 @@ test("map selection dialog blocks fabricated coordinates when configuration is m
   await page.getByRole("button", { name: "地图选点", exact: true }).click();
   await expect(page.getByRole("dialog", { name: "地图添加地点" })).toBeVisible();
   await expect(
-    page.getByRole("heading", { name: "地图未配置，暂不能选点" }),
+    page.getByRole("heading", { name: "地图暂不可用，无法选点" }),
   ).toBeVisible();
   await page.getByLabel("自定义地点名称").fill("测试用户点");
   await expect(

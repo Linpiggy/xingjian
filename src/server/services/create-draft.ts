@@ -16,8 +16,8 @@ export async function createDraft(
 ): Promise<Draft> {
   const places: Place[] = [];
   const notices = [
-    "这是路线草稿：尚未安排午晚餐，也未校验开放、预约、返程和完整费用。",
-    "按输入顺序分天；停留与缓冲时间来自你的设置，不是景区实测。",
+    "行程时间为估算。出行前请确认开放、预约、用餐、返程与费用。",
+    "地点按添加顺序分天；停留与缓冲时间采用你的设置。",
   ];
   for (const [index, keyword] of input.keywords.entries()) {
     const selection = input.selections?.[index];

@@ -24,6 +24,7 @@ export function makeDay(
   legs: Leg[],
   stayMinutes: number,
   bufferMinutes: number,
+  timing: Record<string, { stayMinutes?: number; fixedStartMinute?: number }> = {},
 ): Day {
   let cursor: number | null = 9 * 60;
   const issues: string[] = [];
@@ -37,14 +38,19 @@ export function makeDay(
         cursor += Math.ceil(leg.route.seconds / 60) + bufferMinutes;
       }
     }
+    const setting = timing[place.id];
+    const fixed = setting?.fixedStartMinute;
+    if (fixed !== undefined && cursor !== null && cursor <= fixed) {
+      cursor = fixed;
+    }
+    const duration = setting?.stayMinutes ?? stayMinutes;
     const startMinute = cursor;
-    const endMinute: number | null =
-      startMinute === null ? null : startMinute + stayMinutes;
+    const endMinute: number | null = startMinute === null ? null : startMinute + duration;
     cursor = endMinute;
     if (endMinute !== null && endMinute > 18 * 60) {
       issues.push("活动超过 18:00，请减少地点或调整停留时间。");
     }
-    return { place, startMinute, endMinute, stayMinutes };
+    return { place, startMinute, endMinute, stayMinutes: duration };
   });
   return { date, items, legs, issues: [...new Set(issues)] };
 }
