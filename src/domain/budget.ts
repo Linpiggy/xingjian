@@ -1,3 +1,47 @@
+import type { MealSetup } from "./meals";
+
+// Only complete dated lunch/dinner records, never a partial subtotal or a quote.
+export function plannedMealFareFen(
+  setup: MealSetup,
+  dates: readonly string[],
+): number | null {
+  if (
+    dates.length < 2 ||
+    dates.length > 3 ||
+    new Set(dates).size !== dates.length ||
+    setup.days.length !== dates.length
+  ) {
+    return null;
+  }
+  const seen = new Set<string>();
+  let total = 0;
+  for (const date of dates) {
+    const matches = setup.days.filter((day) => day.date === date);
+    if (matches.length !== 1 || matches[0].entries.length !== 2) {
+      return null;
+    }
+    for (const kind of ["lunch", "dinner"] as const) {
+      const entries = matches[0].entries.filter((entry) => entry.kind === kind);
+      if (entries.length !== 1 || seen.has(entries[0].id)) {
+        return null;
+      }
+      const entry = entries[0];
+      const amount = entry.meal.perPersonFen;
+      if (
+        amount === null ||
+        !Number.isSafeInteger(amount) ||
+        amount < 0 ||
+        amount > 10_000_000
+      ) {
+        return null;
+      }
+      seen.add(entry.id);
+      total += amount;
+    }
+  }
+  return total;
+}
+
 export const budgetCategories = [
   "intercity",
   "local",

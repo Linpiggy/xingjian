@@ -43,6 +43,24 @@ export function storageExpiry(
       leg.route ? [{ capability: "routes" as const, source: leg.route.source }] : [],
     ),
   ]);
+  sources.push(
+    ...Object.values(snapshot.intercity.connections).flatMap((connection) =>
+      connection ? [{ capability: "routes" as const, source: connection.source }] : [],
+    ),
+  );
+  sources.push(
+    ...snapshot.meals.days.flatMap((day) =>
+      day.entries.map((entry) => ({
+        capability: "places" as const,
+        source: entry.place.source,
+      })),
+    ),
+    ...snapshot.meals.connections.flatMap((connection) =>
+      connection.route
+        ? [{ capability: "routes" as const, source: connection.route.source }]
+        : [],
+    ),
+  );
   for (const { capability, source } of sources) {
     if (source.kind === "fixture") {
       if (!options.allowFixture) {

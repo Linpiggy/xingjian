@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   budgetCategories,
   emptyBudget,
+  plannedMealFareFen,
   summarizeBudget,
   type BudgetEstimate,
   type ExpenseEstimate,
@@ -17,12 +18,37 @@ import {
   undoEdit,
 } from "@/domain/editing";
 import { fixtureDraft, places, route } from "../fixtures/draft";
+import type { MealEntry, MealSetup } from "@/domain/meals";
 
 const source = { kind: "user" as const, recordedAt: "2026-10-14T00:00:00.000Z" };
 const entry = (
   amountFen: number,
   basis: ExpenseEstimate["basis"] = "per_person",
 ): ExpenseEstimate => ({ amountFen, basis, source });
+function pricedMeals(): MealSetup {
+  return {
+    days: fixtureDraft().days.map((day, dayIndex) => ({
+      date: day.date,
+      endMinute: 1260,
+      entries: (["lunch", "dinner"] as const).map((kind, index): MealEntry => ({
+        id: `activity:${kind}-${dayIndex}`,
+        kind,
+        place: structuredClone(places[0]),
+        afterPlaceId: day.items[0].place.id,
+        stayMinutes: 60,
+        window: { startMinute: kind === "lunch" ? 690 : 1050, endMinute: 1200 },
+        fixedStartMinute: null,
+        rules: null,
+        meal: {
+          perPersonFen: (dayIndex * 2 + index + 1) * 110,
+          dietaryCheck: "unknown",
+          source,
+        },
+      })),
+    })),
+    connections: [],
+  };
+}
 function complete(): BudgetEstimate {
   return {
     includeIntercity: true,
@@ -35,6 +61,63 @@ function complete(): BudgetEstimate {
     },
   };
 }
+
+describe("explicit all-trip lunch/dinner budget prefill", () => {
+  const dates = ["2026-10-17", "2026-10-18"];
+  it("adds integer fen once per distinct activity, even at the same POI, without mutating inputs", () => {
+    const setup = pricedMeals();
+    const before = structuredClone(setup);
+    expect(plannedMealFareFen(setup, dates)).toBe(1100);
+    const budget = emptyBudget();
+    budget.items.meals = entry(plannedMealFareFen(setup, dates)!);
+    expect(summarizeBudget(budget, 2, 150000).knownTotalFen).toBe(2200);
+    expect(setup).toEqual(before);
+  });
+  it("requires every date and exactly one lunch and dinner, never a known partial subtotal", () => {
+    const setup = pricedMeals();
+    expect(
+      plannedMealFareFen({ ...setup, days: setup.days.slice(0, 1) }, dates),
+    ).toBeNull();
+    expect(plannedMealFareFen(setup, [dates[0], dates[0]])).toBeNull();
+    expect(plannedMealFareFen(setup, [dates[0], "2026-10-19"])).toBeNull();
+    setup.days[1].entries[1].meal.perPersonFen = null;
+    expect(plannedMealFareFen(setup, dates)).toBeNull();
+    setup.days[1].entries[1].meal.perPersonFen = 0;
+    setup.days[1].entries[1].kind = "lunch";
+    expect(plannedMealFareFen(setup, dates)).toBeNull();
+  });
+  it("accepts explicit zero and three-day trips, but rejects duplicate activity identities", () => {
+    const setup = pricedMeals();
+    for (const day of setup.days) {
+      for (const meal of day.entries) {
+        meal.meal.perPersonFen = 0;
+      }
+    }
+    expect(plannedMealFareFen(setup, dates)).toBe(0);
+    const extra = structuredClone(setup.days[1]);
+    extra.date = "2026-10-19";
+    extra.entries[0].id = "activity:lunch-third";
+    extra.entries[1].id = "activity:dinner-third";
+    setup.days.push(extra);
+    expect(plannedMealFareFen(setup, [...dates, extra.date])).toBe(0);
+    extra.entries[0].id = setup.days[0].entries[0].id;
+    expect(plannedMealFareFen(setup, [...dates, extra.date])).toBeNull();
+  });
+  it("returns the full over-limit sum without clipping or treating invalid fen as prices", () => {
+    const setup = pricedMeals();
+    for (const day of setup.days) {
+      for (const meal of day.entries) {
+        meal.meal.perPersonFen = 6_000_000;
+      }
+    }
+    expect(plannedMealFareFen(setup, dates)).toBe(24_000_000);
+    for (const amount of [-1, 1.5, Infinity, NaN, 10_000_001]) {
+      setup.days[0].entries[0].meal.perPersonFen = amount;
+      expect(plannedMealFareFen(setup, dates)).toBeNull();
+    }
+    expect(plannedMealFareFen(setup, [])).toBeNull();
+  });
+});
 
 describe("integer-fen, all-category manual estimates (not provider prices)", () => {
   it("keeps missing fees null and does not certify an empty budget as within target", () => {

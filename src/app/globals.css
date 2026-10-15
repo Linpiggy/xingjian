@@ -750,6 +750,70 @@ legend {
   min-height: 44px;
   margin-top: 8px;
 }
+.intercity-panel,
+.weather-panel {
+  margin-top: 24px;
+}
+.intercity-item {
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+  overflow-wrap: anywhere;
+}
+.intercity-group input {
+  min-width: 0;
+}
+.meal-group input,
+.meal-group select,
+.meal-dialog input {
+  min-width: 0;
+  max-width: 100%;
+}
+.meal-group {
+  margin-block: 24px;
+}
+.meal-search {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 20px;
+  justify-items: start;
+}
+.meal-search .field,
+.meal-candidates {
+  width: 100%;
+}
+.meal-candidates {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.meal-candidates li,
+.meal-preview-list li {
+  padding-block: 12px;
+  border-bottom: 1px solid var(--border);
+  overflow-wrap: anywhere;
+}
+.meal-preview-list {
+  padding-left: 20px;
+}
+.meal-panel p {
+  overflow-wrap: anywhere;
+}
+.weather-panel .panel-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.weather-periods {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 24px;
+  padding: 16px 0;
+  border-block: 1px solid var(--border);
+}
+.weather-source p {
+  overflow-wrap: anywhere;
+}
 .budget-panel {
   margin-top: 24px;
 }
@@ -770,17 +834,24 @@ legend {
   margin: 0;
   font-variant-numeric: tabular-nums;
 }
-.budget-toggle {
+.budget-toggle,
+.weather-confirm {
   display: flex;
   align-items: center;
   gap: 10px;
   min-height: 44px;
   margin: 18px 0;
 }
-.budget-toggle input {
+.budget-toggle input,
+.weather-confirm input {
   width: 20px;
   height: 20px;
   accent-color: var(--primary);
+}
+.budget-fare-import {
+  display: grid;
+  justify-items: start;
+  gap: 8px;
 }
 .budget-inputs {
   display: grid;
@@ -841,6 +912,13 @@ legend {
   }
 }
 @media (max-width: 767px) {
+  .weather-periods {
+    grid-template-columns: 1fr;
+  }
+  .weather-panel .panel-heading {
+    flex-direction: column;
+    align-items: flex-start;
+  }
   .site-header {
     height: 64px;
     padding: 0 16px;

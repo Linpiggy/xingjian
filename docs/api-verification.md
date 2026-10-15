@@ -139,3 +139,16 @@ Figma 阶段的路线示意、行程时间和天气可使用明确标注的示�
 用户已确认 JS 安全码控制台重置并更新本地。第一次地图实测 SDK／代理成功、complete 已触发，但空画布与点击失败；证据保留。补明确容器宽高后，用户单独授权仅地图复验，1 次地点搜索、1 次 JS 地图初始化、0 次模型调用；真实 SDK 将定位设为 relative，容器仍为 710×360，底图实际可见、署名保留、点击产生 GCJ-02 marker 并以用户来源加入清单，达到代表性 A。见 [JS 底图与点选摘要](evidence/amap-js-smoke-2026-10-13.json)。
 
 桌面样本成功不代表真实窄屏／工作台路线绘制均已验收；所有供应商仍未达到 P，不用网络成功状态代替视觉与交互证据。
+
+## 8. 每日天气契约复核（2026-10-14，D／离线授权）
+
+用户明确选择先做离线适配与界面，不授权真实天气请求。Tavily 提取因 api.tavily.com 代理连接异常失败（首次管道仅显示空 results，复核原始输出确认 error／exit 4）；停止该路径。改为只读直接获取官方公开页面，daily／authentication／api-host／glossary／metadata／error-code 均 HTTP 200；猜测的 configuration/location 页 404，不作为证据。文本临时保存于忽略的 test-results 并回读，没有天气业务调用、账号登录或凭据输出。
+
+- 每日接口确认为 `/weather/v1/daily/{latitude}/{longitude}`，经纬度最多两位小数，1—10 天、默认 7；可用 `localTime=true`。响应是 metadata＋days，不沿用 v7 的 code/daily/温度字符串结构。
+- 每天含 forecastStartTime／forecastEndTime（结束不含），可含 daytime（当地 07—19）和 nighttime（19—次日07）、温度 value/unit、precipitation 的 amount/probability/type。昼夜仍是日级分段，不推出某个游览小时一定下雨。
+- [术语表](https://dev.qweather.com/docs/resource/glossary/)明确：中国大陆用 GCJ-02，其余地区 WGS-84。当前大陆地图坐标不做逆转换；非大陆不能不加判断地套用此查询路径。API 路径 latitude 在前，与旧 location=经度,纬度不同。
+- [元数据](https://dev.qweather.com/docs/resource/metadata/)要求 metadata.attributions 与数据共同显示；tag 用于追溯。daily 页面未列数据更新时间字段，不能把本地查询时间冒充供应商更新时间。
+- Host 是账号独立地址，并是身份认证的一部分，不使用将逐步停止的公共 Host，也不把真实 Host 输出给页面／日志。JWT 与 API Key 均支持 API，不同时使用；Key 只放 X-QW-Api-Key Header。JWT 先支持用户本地预生成 token，不为此安装 SDK／生成账号或私钥；API Key 自 2027-01-01 有额外每日限制。
+- [错误文档](https://dev.qweather.com/docs/resource/error-code/)使用 HTTP 状态与 error 对象；401／403／429 不自动重试，响应 detail 不直接展示。HTTP 200 的错误对象或坏结构仍拒绝。
+
+以上仅 D。账号 Host／版本／认证、实际响应覆盖、公开展示／存储许可和费用仍待确认，未升级为 A／P，不能用公开 JSON 示例作为真实预报。

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import { X } from "lucide-react";
 import { z } from "zod";
 import { formatMinute } from "@/domain/draft";
+import { deriveMealTrip, stopIdentity } from "@/domain/meals";
 import type { WalkingRoute } from "@/domain/models";
 import {
   previewEdit,
@@ -15,6 +16,7 @@ import { walkingSchema } from "@/lib/contracts";
 import { requestJson } from "@/lib/client-api";
 import { useDraftEditor } from "./editor-store";
 import { usePlannerUi } from "./ui-store";
+import { IntercityView } from "./intercity-panel";
 
 const routeResponseSchema = z.object({ route: walkingSchema });
 
@@ -236,8 +238,11 @@ export function EditDialog({
           <p className="small muted">确认前，当前行程保持不变。</p>
           <div className="edit-comparison">
             {[
-              { title: "当前安排", draft: state.draft },
-              { title: "调整后", draft: proposal.draft },
+              {
+                title: "当前安排",
+                draft: deriveMealTrip(state.draft, state.locks, state.meals).draft,
+              },
+              { title: "调整后", draft: proposal.effectiveDraft },
             ].map(({ title, draft }) => (
               <div key={title}>
                 <h3>{title}</h3>
@@ -246,7 +251,7 @@ export function EditDialog({
                     <strong>第 {index + 1} 天</strong>
                     <ol>
                       {day.items.map((item, itemIndex) => (
-                        <li key={item.place.id}>
+                        <li key={stopIdentity(item)}>
                           <span>{item.place.name}</span>
                           <small>
                             {formatMinute(item.startMinute)} -{" "}
@@ -266,13 +271,19 @@ export function EditDialog({
             ))}
           </div>
           <p className="notice">预算目标不变，实际费用仍需核实。</p>
+          {state.intercity.segments.length > 0 && (
+            <section className="spacing" aria-label="修改后跨城校验">
+              <h3>修改后跨城校验</h3>
+              <IntercityView draft={proposal.effectiveDraft} setup={state.intercity} />
+            </section>
+          )}
           {proposal.conflicts.map((conflict) => (
             <p key={conflict} className="notice warning" role="status">
               {conflict}
             </p>
           ))}
-          {proposal.draft.days.flatMap((day) =>
-            day.issues.map((issue) => (
+          {proposal.effectiveDraft.days.flatMap((day) =>
+            [...new Set(day.issues)].map((issue) => (
               <p key={`${day.date}-${issue}`} className="small error-text">
                 {day.date}：{issue}
               </p>
@@ -320,7 +331,7 @@ export function EditDialog({
                 disabled={
                   pending ||
                   proposal.conflicts.length > 0 ||
-                  proposal.draft.status === "infeasible"
+                  proposal.effectiveDraft.status === "infeasible"
                 }
                 onClick={confirm}
               >

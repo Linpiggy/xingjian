@@ -2,9 +2,18 @@
 
 import { create } from "zustand";
 import type { Draft } from "@/domain/models";
+import { intercitySetupSchema } from "@/lib/intercity-contracts";
+import {
+  mealSetupSchema,
+  mealReservationReleasesSchema,
+} from "@/lib/meal-setup-contracts";
 import {
   commitEdit,
   commitBudget,
+  commitIntercity,
+  commitMeals,
+  type MealProposal,
+  type IntercityProposal,
   createEditState,
   toggleStopLock,
   undoEdit,
@@ -19,6 +28,8 @@ type EditorStore = {
   reset: () => void;
   confirm: (proposal: EditProposal) => void;
   confirmBudget: (proposal: BudgetProposal) => void;
+  confirmIntercity: (proposal: IntercityProposal, acknowledgeConflict: boolean) => void;
+  confirmMeals: (proposal: MealProposal) => void;
   toggleLock: (id: string, kind: "position" | "time") => void;
   undo: () => void;
 };
@@ -39,6 +50,29 @@ export const useDraftEditor = create<EditorStore>((set, get) => ({
   },
   confirmBudget: (proposal) => {
     set({ current: commitBudget(required(get().current), proposal) });
+  },
+  confirmIntercity: (proposal, acknowledgeConflict) => {
+    const setup = intercitySetupSchema.parse(proposal.setup);
+    set({
+      current: commitIntercity(
+        required(get().current),
+        { ...proposal, setup },
+        acknowledgeConflict,
+      ),
+    });
+  },
+  confirmMeals: (proposal) => {
+    const setup = mealSetupSchema.parse(proposal.setup);
+    const reservationReleases = mealReservationReleasesSchema.parse(
+      proposal.reservationReleases,
+    );
+    set({
+      current: commitMeals(required(get().current), {
+        ...proposal,
+        setup,
+        reservationReleases,
+      }),
+    });
   },
   toggleLock: (id, kind) => {
     set({ current: toggleStopLock(required(get().current), id, kind) });

@@ -1,6 +1,28 @@
 import { makeDay, makeDraft } from "./draft";
 import type { Coordinate, Draft, Leg, WalkingRoute } from "./models";
 import { emptyBudget, summarizeBudget, type BudgetEstimate } from "./budget";
+import {
+  activeMealConnections,
+  applyVisitConnections,
+  deferredVisitRoute,
+  deriveMealTrip,
+  emptyMeals,
+  mergeMealConnections,
+  visitActivityId,
+  type MealSetup,
+  type MealTripView,
+} from "./meals";
+import {
+  emptyIntercity,
+  evaluateIntercity,
+  type IntercitySetup,
+  type IntercityReport,
+} from "./intercity";
+
+import {
+  reservationReleaseConflicts,
+  type MealReservationRelease,
+} from "./meal-reservations";
 
 export type StopLock = {
   position?: { dayIndex: number; index: number };
@@ -10,6 +32,8 @@ export type EditSnapshot = {
   draft: Draft;
   locks: Record<string, StopLock>;
   budget: BudgetEstimate;
+  intercity: IntercitySetup;
+  meals: MealSetup;
 };
 export type EditState = EditSnapshot & {
   sessionId: string;
@@ -25,6 +49,8 @@ export type StopChange = {
 export type RouteGap = {
   fromId: string;
   toId: string;
+  fromActivityId: string;
+  toActivityId: string;
   origin: Coordinate;
   destination: Coordinate;
 };
@@ -33,6 +59,8 @@ export type EditProposal = {
   baseVersion: number;
   operation: StopChange;
   draft: Draft;
+  effectiveDraft: Draft;
+  meals: MealSetup;
   gaps: RouteGap[];
   routes: WalkingRoute[] | null;
   conflicts: string[];
@@ -45,6 +73,8 @@ export function createEditState(draft: Draft, sessionId: string): EditState {
     version: 0,
     locks: {},
     budget: emptyBudget(),
+    intercity: emptyIntercity(),
+    meals: emptyMeals(),
     previous: null,
   };
 }
@@ -57,7 +87,9 @@ function assertVersion(state: EditState, proposal: EditProposal) {
 
 function locate(draft: Draft, placeId: string) {
   for (const [dayIndex, day] of draft.days.entries()) {
-    const index = day.items.findIndex((item) => item.place.id === placeId);
+    const index = day.items.findIndex(
+      (item) => item.place.id === placeId && (item.purpose ?? "visit") === "visit",
+    );
     if (index !== -1) {
       return { dayIndex, index, item: day.items[index] };
     }
@@ -113,7 +145,6 @@ function buildProposal(
       .flatMap((day) => day.legs)
       .map((leg) => [pairKey(leg.fromId, leg.toId), leg]),
   );
-  const gaps: RouteGap[] = [];
   const days = groups.map((items, dayIndex) => {
     const legs: Leg[] = items.slice(1).map((item, index) => {
       const from = items[index].place;
@@ -122,18 +153,11 @@ function buildProposal(
       if (old) {
         return old;
       }
-      const routeIndex = gaps.length;
-      gaps.push({
-        fromId: from.id,
-        toId: to.id,
-        origin: from.location,
-        destination: to.location,
-      });
       return {
         fromId: from.id,
         toId: to.id,
-        route: resolvedRoutes?.[routeIndex] ?? null,
-        error: resolvedRoutes?.[routeIndex] ? null : "路线待重新查询",
+        route: null,
+        error: deferredVisitRoute,
       };
     });
     const timing = Object.fromEntries(
@@ -154,9 +178,6 @@ function buildProposal(
       timing,
     );
   });
-  if (resolvedRoutes !== null && resolvedRoutes.length !== gaps.length) {
-    throw new Error("路线结果与受影响路段不一致，未应用修改。");
-  }
   const oldItems = draft.days.flatMap((day) => day.items);
   const selectionById = new Map(
     oldItems.map((item, index) => [item.place.id, draft.input.selections?.[index]]),
@@ -179,11 +200,41 @@ function buildProposal(
   };
   const notices = [...draft.notices];
   notices[1] = "按你的调整保留日期与顺序；停留与缓冲时间采用你的设置。";
-  const candidate = makeDraft(input, days, notices);
+  let candidate = makeDraft(input, days, notices);
+  const initial = deriveMealTrip(candidate, locks, state.meals, false);
+  const activityPlaces = new Map(
+    initial.draft.days.flatMap((day) =>
+      day.items.map(
+        (item) =>
+          [item.activityId ?? visitActivityId(item.place.id), item.place] as const,
+      ),
+    ),
+  );
+  const gaps: RouteGap[] = initial.gaps.map((gap) => ({
+    fromId: activityPlaces.get(gap.fromId)!.id,
+    toId: activityPlaces.get(gap.toId)!.id,
+    fromActivityId: gap.fromId,
+    toActivityId: gap.toId,
+    origin: [...gap.origin],
+    destination: [...gap.destination],
+  }));
+  if (resolvedRoutes !== null && resolvedRoutes.length !== gaps.length) {
+    throw new Error("路线结果与受影响路段不一致，未应用修改。");
+  }
+  const meals =
+    resolvedRoutes === null
+      ? state.meals
+      : mergeMealConnections(state.meals, initial.gaps, resolvedRoutes);
+  candidate = applyVisitConnections(candidate, locks, meals.connections);
   const ready = gaps.length === 0 || resolvedRoutes !== null;
-  const conflicts: string[] = [];
+  const mealView = deriveMealTrip(candidate, locks, meals, ready);
+  const effectiveDraft = mealView.draft;
+  const conflicts: string[] = [...mealView.conflicts];
+  if (ready && mealView.gaps.length) {
+    conflicts.push("用餐影响的路线已变化，请先重新预览餐次并查询局部接驳。");
+  }
   for (const [id, lock] of Object.entries(locks)) {
-    const next = locate(candidate, id);
+    const next = locate(effectiveDraft, id);
     if (
       lock.position &&
       (next.dayIndex !== lock.position.dayIndex || next.index !== lock.position.index)
@@ -192,20 +243,31 @@ function buildProposal(
     }
     if (
       lock.time &&
-      (candidate.days[next.dayIndex].date !== lock.time.date ||
+      (effectiveDraft.days[next.dayIndex].date !== lock.time.date ||
         (ready && next.item.startMinute !== lock.time.minute))
     ) {
       conflicts.push(`无法保证“${next.item.place.name}”的锁定时间，请调整安排或先解锁。`);
     }
   }
+  const boundary = evaluateIntercity(
+    effectiveDraft,
+    state.intercity.segments,
+    state.intercity.connections,
+  );
+  if (state.intercity.segments.length && boundary.status === "infeasible") {
+    conflicts.push("修改与已录入的到达／返程约束冲突，请调整安排或先修正班次。");
+  }
   if (conflicts.length) {
     candidate.status = "infeasible";
+    effectiveDraft.status = "infeasible";
   }
   return {
     sessionId: state.sessionId,
     baseVersion: state.version,
     operation,
     draft: candidate,
+    effectiveDraft,
+    meals,
     gaps,
     routes: ready ? (resolvedRoutes ?? []) : null,
     conflicts,
@@ -231,12 +293,13 @@ export function commitEdit(state: EditState, proposal: EditProposal): EditState 
     throw new Error("请先查询受影响的路线，再确认修改。");
   }
   const checked = resolveEdit(state, proposal, proposal.routes);
-  if (checked.conflicts.length || checked.draft.status === "infeasible") {
+  if (checked.conflicts.length || checked.effectiveDraft.status === "infeasible") {
     throw new Error("修改存在时间或锁定冲突，当前行程保持不变。");
   }
   return {
     ...state,
     draft: checked.draft,
+    meals: activeMealConnections(checked.meals, checked.effectiveDraft),
     version: state.version + 1,
     previous: snapshot(state),
   };
@@ -247,7 +310,10 @@ export function toggleStopLock(
   placeId: string,
   kind: "position" | "time",
 ): EditState {
-  const current = locate(state.draft, placeId);
+  const current = locate(
+    deriveMealTrip(state.draft, state.locks, state.meals).draft,
+    placeId,
+  );
   const lock = { ...state.locks[placeId] };
   if (lock[kind]) {
     delete lock[kind];
@@ -271,7 +337,13 @@ export function toggleStopLock(
 }
 
 function snapshot(state: EditState): EditSnapshot {
-  return { draft: state.draft, locks: state.locks, budget: state.budget };
+  return {
+    draft: state.draft,
+    locks: state.locks,
+    budget: state.budget,
+    intercity: state.intercity,
+    meals: state.meals,
+  };
 }
 
 export type BudgetProposal = {
@@ -301,6 +373,141 @@ export function commitBudget(state: EditState, proposal: BudgetProposal): EditSt
   return {
     ...state,
     budget: proposal.budget,
+    version: state.version + 1,
+    previous: snapshot(state),
+  };
+}
+
+export type IntercityProposal = {
+  sessionId: string;
+  baseVersion: number;
+  setup: IntercitySetup;
+  report: IntercityReport;
+};
+
+export function previewIntercity(
+  state: EditState,
+  setup: IntercitySetup,
+): IntercityProposal {
+  const copy = structuredClone(setup);
+  return {
+    sessionId: state.sessionId,
+    baseVersion: state.version,
+    setup: copy,
+    report: evaluateIntercity(
+      deriveMealTrip(state.draft, state.locks, state.meals).draft,
+      copy.segments,
+      copy.connections,
+    ),
+  };
+}
+
+export function commitIntercity(
+  state: EditState,
+  proposal: IntercityProposal,
+  acknowledgeConflict = false,
+): EditState {
+  if (proposal.sessionId !== state.sessionId || proposal.baseVersion !== state.version) {
+    throw new Error("行程已变化，请重新预览跨城安排。");
+  }
+  const checked = previewIntercity(state, proposal.setup);
+  if (checked.report.status === "infeasible" && !acknowledgeConflict) {
+    throw new Error("跨城安排存在冲突；请先确认仅记录含冲突的草稿。");
+  }
+  return {
+    ...state,
+    intercity: checked.setup,
+    version: state.version + 1,
+    previous: snapshot(state),
+  };
+}
+
+export type MealProposal = {
+  sessionId: string;
+  baseVersion: number;
+  setup: MealSetup;
+  reservationReleases: MealReservationRelease[];
+  view: MealTripView;
+};
+
+export function previewMeals(
+  state: EditState,
+  setup: MealSetup,
+  reservationReleases: MealReservationRelease[] = [],
+): MealProposal {
+  const copy = structuredClone(setup);
+  const releases = structuredClone(reservationReleases);
+  const conflicts = reservationReleaseConflicts(state.meals, copy, releases);
+  let view = deriveMealTrip(structuredClone(state.draft), state.locks, copy, false);
+  if (view.gaps.length === 0) {
+    view = deriveMealTrip(structuredClone(state.draft), state.locks, copy);
+  }
+  const boundary = evaluateIntercity(
+    view.draft,
+    state.intercity.segments,
+    state.intercity.connections,
+  );
+  if (state.intercity.segments.length && boundary.status === "infeasible") {
+    view.conflicts.push("用餐安排与已录入的到达／返程约束冲突。");
+    view.draft.status = "infeasible";
+  }
+  if (conflicts.length) {
+    view.conflicts.push(...conflicts);
+    view.draft.status = "infeasible";
+  }
+  return {
+    sessionId: state.sessionId,
+    baseVersion: state.version,
+    setup: copy,
+    reservationReleases: releases,
+    view,
+  };
+}
+
+export function resolveMeals(
+  state: EditState,
+  proposal: MealProposal,
+  routes: WalkingRoute[],
+): MealProposal {
+  if (proposal.sessionId !== state.sessionId || proposal.baseVersion !== state.version) {
+    throw new Error("行程已变化，请重新预览用餐安排。");
+  }
+  const checked = previewMeals(state, proposal.setup, proposal.reservationReleases);
+  assertReservationReleases(state, checked);
+  return previewMeals(
+    state,
+    mergeMealConnections(checked.setup, checked.view.gaps, routes),
+    checked.reservationReleases,
+  );
+}
+
+function assertReservationReleases(state: EditState, proposal: MealProposal) {
+  const conflicts = reservationReleaseConflicts(
+    state.meals,
+    proposal.setup,
+    proposal.reservationReleases,
+  );
+  if (conflicts.length) {
+    throw new Error(conflicts.join(" "));
+  }
+}
+
+export function commitMeals(state: EditState, proposal: MealProposal): EditState {
+  if (proposal.sessionId !== state.sessionId || proposal.baseVersion !== state.version) {
+    throw new Error("行程已变化，请重新预览用餐安排。");
+  }
+  const checked = previewMeals(state, proposal.setup, proposal.reservationReleases);
+  assertReservationReleases(state, checked);
+  if (checked.view.gaps.length) {
+    throw new Error("请先查询用餐影响的路线，再确认修改。");
+  }
+  if (checked.view.conflicts.length || checked.view.draft.status === "infeasible") {
+    throw new Error("用餐安排存在时间或锁定冲突，当前行程保持不变。");
+  }
+  return {
+    ...state,
+    draft: applyVisitConnections(state.draft, state.locks, checked.setup.connections),
+    meals: activeMealConnections(checked.setup, checked.view.draft),
     version: state.version + 1,
     previous: snapshot(state),
   };

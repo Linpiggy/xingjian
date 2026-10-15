@@ -1,5 +1,7 @@
 import { z } from "zod";
 import type { EditSnapshot } from "@/domain/editing";
+import { deriveMealTrip } from "@/domain/meals";
+import { evaluateIntercity } from "@/domain/intercity";
 
 const minute = z.number().int().nonnegative().nullable();
 export const shareSnapshotSchema = z.strictObject({
@@ -25,7 +27,7 @@ export const shareSnapshotSchema = z.strictObject({
             }),
           )
           .min(1)
-          .max(6),
+          .max(8),
       }),
     )
     .min(2)
@@ -42,16 +44,24 @@ export function buildShareSnapshot(
   publicPlaceIds: readonly string[] = [],
 ): ShareSnapshot {
   const approved = new Set(publicPlaceIds);
+  const { draft } = deriveMealTrip(snapshot.draft, snapshot.locks, snapshot.meals);
   return shareSnapshotSchema.parse({
     title: "旅行行程",
     timeZone: "Asia/Shanghai",
-    status: snapshot.draft.status,
-    fixture: snapshot.draft.days.some(
+    status:
+      evaluateIntercity(
+        draft,
+        snapshot.intercity.segments,
+        snapshot.intercity.connections,
+      ).status === "infeasible"
+        ? "infeasible"
+        : draft.status,
+    fixture: draft.days.some(
       (day) =>
         day.items.some((item) => item.place.source.kind === "fixture") ||
         day.legs.some((leg) => leg.route?.source.kind === "fixture"),
     ),
-    days: snapshot.draft.days.map((day) => ({
+    days: draft.days.map((day) => ({
       date: day.date,
       issueCount: day.issues.length,
       items: day.items.map((item, index) => {

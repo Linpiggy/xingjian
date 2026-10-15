@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { Compass, Footprints, Info, MapPin, Plus, X } from "lucide-react";
 import type { Draft, Place, TripInput } from "@/domain/models";
@@ -12,9 +12,15 @@ import { usePlannerUi } from "./ui-store";
 import { useDraftEditor } from "./editor-store";
 import { EditDialog } from "./edit-dialog";
 import { BudgetPanel } from "./budget-panel";
+import { WeatherPanel } from "./weather-panel";
+import { IntercityPanel } from "./intercity-panel";
+import { evaluateIntercity } from "@/domain/intercity";
 import { summarizeBudget } from "@/domain/budget";
+import { deriveMealTrip, stopIdentity, type MealEntry } from "@/domain/meals";
+import { MealPanel } from "./meal-panel";
+import { VenueFacts } from "./venue-rules-fields";
 
-function PlaceDetails({ place }: { place: Place }) {
+function PlaceDetails({ place, meal }: { place: Place; meal?: MealEntry }) {
   return (
     <>
       <div className="detail-place">
@@ -51,7 +57,32 @@ function PlaceDetails({ place }: { place: Place }) {
         <dd>尚未核实</dd>
         <dt>门票价格</dt>
         <dd>未知，不代表免费</dd>
+        {meal && (
+          <>
+            <dt>用户餐费估算</dt>
+            <dd>
+              {meal.meal.perPersonFen === null
+                ? "未知，不按零元计算"
+                : `¥${(meal.meal.perPersonFen / 100).toFixed(2)} / 人，非实时报价`}
+            </dd>
+            <dt>饮食核对</dt>
+            <dd>
+              {meal.meal.dietaryCheck === "unknown"
+                ? "尚未核对"
+                : meal.meal.dietaryCheck === "user_conflict"
+                  ? "用户记录了饮食冲突"
+                  : "用户已核对，仍须向商家确认过敏安全"}
+            </dd>
+            <dt>餐费／饮食记录</dt>
+            <dd>
+              <time dateTime={meal.meal.source.recordedAt}>
+                {meal.meal.source.recordedAt}
+              </time>
+            </dd>
+          </>
+        )}
       </dl>
+      {meal && <VenueFacts entries={[meal]} label="所选餐次营业预约" />}
       <div className="notice">
         <Info size={18} aria-hidden="true" />
         <p>营业描述不等于出行日开放保证；预约与费用需另行确认。</p>
@@ -78,7 +109,13 @@ function Workspace({
 }) {
   const ui = usePlannerUi();
   const editor = useDraftEditor((state) => state.current);
-  const draft = editor?.draft ?? initialDraft;
+  const draft = useMemo(
+    () =>
+      editor
+        ? deriveMealTrip(editor.draft, editor.locks, editor.meals).draft
+        : initialDraft,
+    [editor, initialDraft],
+  );
   const [editing, setEditing] = useState<{
     placeId: string;
     initialIndex?: number;
@@ -113,15 +150,24 @@ function Workspace({
       </section>
     );
   }
-  const selected =
-    day.items.find((item) => item.place.id === ui.selectedId)?.place ??
-    day.items[0]?.place;
+  const selectedStop =
+    day.items.find((item) => stopIdentity(item) === ui.selectedId) ?? day.items[0];
+  const selected = selectedStop?.place;
+  const selectedKey = selectedStop ? stopIdentity(selectedStop) : null;
+  const selectedMeal = editor?.meals.days
+    .flatMap((setting) => setting.entries)
+    .find((entry) => entry.id === selectedKey);
   const budgetOver =
     editor &&
     summarizeBudget(editor.budget, draft.input.travelers, draft.input.budgetPerPersonFen)
       .status === "over";
-  const fixtures = draft.days.some((d) =>
-    d.items.some((item) => item.place.source.kind === "fixture"),
+  const intercityReport = editor
+    ? evaluateIntercity(draft, editor.intercity.segments, editor.intercity.connections)
+    : null;
+  const fixtures = draft.days.some(
+    (d) =>
+      d.items.some((item) => item.place.source.kind === "fixture") ||
+      d.legs.some((leg) => leg.route?.source.kind === "fixture"),
   );
   return (
     <>
@@ -136,7 +182,7 @@ function Workspace({
           </p>
         </div>
         <span className="status-tag">
-          {draft.status === "infeasible"
+          {draft.status === "infeasible" || intercityReport?.status === "infeasible"
             ? "存在时间冲突"
             : budgetOver
               ? "预算估算超目标"
@@ -210,18 +256,30 @@ function Workspace({
           <ol className="timeline">
             {day.items.map((item, index) => {
               const leg = day.legs[index - 1];
+              const isVisit = (item.purpose ?? "visit") === "visit";
+              const key = stopIdentity(item);
               return (
                 <li
-                  key={item.place.id}
-                  onDragOver={(event) => event.preventDefault()}
+                  key={key}
+                  onDragOver={(event) => {
+                    if (isVisit) {
+                      event.preventDefault();
+                    }
+                  }}
                   onDrop={(event) => {
                     event.preventDefault();
                     const id = event.dataTransfer.getData("text/x-travel-place");
                     if (
+                      isVisit &&
                       id !== item.place.id &&
-                      day.items.some((stop) => stop.place.id === id)
+                      editor?.draft.days[ui.dayIndex].items.some(
+                        (stop) => stop.place.id === id,
+                      )
                     ) {
-                      setEditing({ placeId: id, initialIndex: index });
+                      const visitIndex = editor.draft.days[ui.dayIndex].items.findIndex(
+                        (stop) => stop.place.id === item.place.id,
+                      );
+                      setEditing({ placeId: id, initialIndex: visitIndex });
                     }
                   }}
                 >
@@ -236,67 +294,69 @@ function Workspace({
                     </div>
                   )}
                   <button
-                    className={`stop-card ${selected?.id === item.place.id ? "selected" : ""}`}
-                    aria-pressed={selected?.id === item.place.id}
-                    draggable={!editor?.locks[item.place.id]?.position}
+                    className={`stop-card ${selectedKey === key ? "selected" : ""}`}
+                    aria-pressed={selectedKey === key}
+                    draggable={isVisit && !editor?.locks[item.place.id]?.position}
                     onDragStart={(event) => {
                       event.dataTransfer.setData("text/x-travel-place", item.place.id);
                       event.dataTransfer.effectAllowed = "move";
                     }}
-                    onClick={() => selectPlace(item.place.id)}
+                    onClick={() => selectPlace(key)}
                   >
                     <span className="stop-time">{formatMinute(item.startMinute)}</span>
                     <span>
-                      <strong>{item.place.name}</strong>
+                      <strong>
+                        {isVisit ? "" : item.purpose === "lunch" ? "午餐 · " : "晚餐 · "}
+                        {item.place.name}
+                      </strong>
                       <small>停留 {item.stayMinutes} 分钟（用户估算）</small>
                     </span>
                   </button>
-                  <div
-                    className="stop-actions"
-                    role="group"
-                    aria-label={`调整${item.place.name}`}
-                  >
-                    <button
-                      id={`edit-stop-${item.place.id}`}
-                      type="button"
-                      className="button"
-                      onClick={() => setEditing({ placeId: item.place.id })}
+                  {isVisit && (
+                    <div
+                      className="stop-actions"
+                      role="group"
+                      aria-label={`调整${item.place.name}`}
                     >
-                      调整
-                    </button>
-                    <button
-                      type="button"
-                      className="button"
-                      aria-pressed={!!editor?.locks[item.place.id]?.position}
-                      onClick={() => toggleLock(item.place.id, "position")}
-                    >
-                      {editor?.locks[item.place.id]?.position ? "位置已锁" : "锁定位置"}
-                    </button>
-                    <button
-                      type="button"
-                      className="button"
-                      aria-pressed={!!editor?.locks[item.place.id]?.time}
-                      disabled={
-                        item.startMinute === null && !editor?.locks[item.place.id]?.time
-                      }
-                      onClick={() => toggleLock(item.place.id, "time")}
-                    >
-                      {editor?.locks[item.place.id]?.time ? "时间已锁" : "锁定时间"}
-                    </button>
-                  </div>
+                      <button
+                        id={`edit-stop-${item.place.id}`}
+                        type="button"
+                        className="button"
+                        onClick={() => setEditing({ placeId: item.place.id })}
+                      >
+                        调整
+                      </button>
+                      <button
+                        type="button"
+                        className="button"
+                        aria-pressed={!!editor?.locks[item.place.id]?.position}
+                        onClick={() => toggleLock(item.place.id, "position")}
+                      >
+                        {editor?.locks[item.place.id]?.position ? "位置已锁" : "锁定位置"}
+                      </button>
+                      <button
+                        type="button"
+                        className="button"
+                        aria-pressed={!!editor?.locks[item.place.id]?.time}
+                        disabled={
+                          item.startMinute === null && !editor?.locks[item.place.id]?.time
+                        }
+                        onClick={() => toggleLock(item.place.id, "time")}
+                      >
+                        {editor?.locks[item.place.id]?.time ? "时间已锁" : "锁定时间"}
+                      </button>
+                    </div>
+                  )}
                 </li>
               );
             })}
           </ol>
-          {day.issues.map((issue) => (
+          {[...new Set(day.issues)].map((issue) => (
             <p className="notice warning" key={issue} role="status">
               {issue}
             </p>
           ))}
-          <div className="incomplete">
-            <h3>午餐与晚餐待安排</h3>
-            <p>请预留用餐时间，并确认餐厅位置与营业时间。</p>
-          </div>
+          {editor && <MealPanel key={day.date} state={editor} dayIndex={ui.dayIndex} />}
           <p className="small muted">{draft.notices[1]}</p>
         </section>
         <section className="panel map-panel">
@@ -307,7 +367,7 @@ function Workspace({
           {wideScreen || ui.mobileTab === "map" ? (
             <RouteMap
               day={day}
-              selectedId={selected?.id ?? null}
+              selectedId={selectedKey}
               onSelect={selectPlace}
               mapKey={mapKey}
               configured={mapsConfigured}
@@ -330,9 +390,21 @@ function Workspace({
         </section>
         <aside className="panel details-sidebar" aria-label="地点详情">
           <h2>地点详情</h2>
-          {selected ? <PlaceDetails place={selected} /> : <p>选择一个地点查看详情。</p>}
+          {selected ? (
+            <PlaceDetails place={selected} meal={selectedMeal} />
+          ) : (
+            <p>选择一个地点查看详情。</p>
+          )}
         </aside>
       </div>
+      {editor && <IntercityPanel state={editor} />}
+      {day.items[0] && (
+        <WeatherPanel
+          key={`${day.date}:${day.items[0].place.id}:${day.items[0].place.location.join(",")}`}
+          date={day.date}
+          place={day.items[0].place}
+        />
+      )}
       {editor && <BudgetPanel state={editor} />}
       <dialog
         ref={dialog}
@@ -349,7 +421,7 @@ function Workspace({
             <X size={20} />
           </button>
         </div>
-        {selected && <PlaceDetails place={selected} />}
+        {selected && <PlaceDetails place={selected} meal={selectedMeal} />}
       </dialog>
       {editing && editor && (
         <EditDialog

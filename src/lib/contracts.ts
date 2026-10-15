@@ -116,6 +116,8 @@ const daySchema = z.object({
   date: z.iso.date(),
   items: z.array(
     z.object({
+      activityId: z.string().optional(),
+      purpose: z.enum(["visit", "lunch", "dinner"]).optional(),
       place: placeSchema,
       startMinute: z.number().nullable(),
       endMinute: z.number().nullable(),

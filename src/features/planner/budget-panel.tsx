@@ -4,12 +4,14 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import { X } from "lucide-react";
 import {
   budgetCategories,
+  plannedMealFareFen,
   summarizeBudget,
   type BudgetCategory,
   type BudgetEstimate,
   type ExpenseEstimate,
 } from "@/domain/budget";
 import { previewBudget, type BudgetProposal, type EditState } from "@/domain/editing";
+import { roundTripFareFen } from "@/domain/intercity";
 import { budgetEstimateSchema } from "@/lib/contracts";
 import { parseYuanFen } from "@/lib/money";
 import { useDraftEditor } from "./editor-store";
@@ -85,7 +87,19 @@ function BudgetView({ estimate, state }: { estimate: BudgetEstimate; state: Edit
   );
 }
 
-function BudgetDialog({ state, onClose }: { state: EditState; onClose: () => void }) {
+function BudgetDialog({
+  state: initialState,
+  onClose,
+}: {
+  state: EditState;
+  onClose: () => void;
+}) {
+  const [state] = useState(initialState);
+  const fare = roundTripFareFen(state.intercity.segments);
+  const mealFare = plannedMealFareFen(
+    state.meals,
+    state.draft.days.map((day) => day.date),
+  );
   const [values, setValues] = useState(
     () =>
       Object.fromEntries(
@@ -136,7 +150,11 @@ function BudgetDialog({ state, onClose }: { state: EditState; onClose: () => voi
     setError(null);
     try {
       const current = useDraftEditor.getState().current;
-      if (!current || current.sessionId !== state.sessionId) {
+      if (
+        !current ||
+        current.sessionId !== state.sessionId ||
+        current.version !== state.version
+      ) {
         throw new Error("当前行程已变化，请重新打开费用估算。");
       }
       const items = Object.fromEntries(
@@ -225,6 +243,83 @@ function BudgetDialog({ state, onClose }: { state: EditState; onClose: () => voi
             />
             计入跨城往返
           </label>
+          {state.intercity.segments.length > 0 && (
+            <div
+              className="notice spacing budget-fare-import"
+              role="group"
+              aria-label="两程票价预填"
+            >
+              <button
+                type="button"
+                className="button secondary"
+                disabled={fare === null || fare > 10_000_000}
+                onClick={() => {
+                  if (fare === null || fare > 10_000_000) {
+                    return;
+                  }
+                  setError(null);
+                  setValues({
+                    ...values,
+                    intercity: { amount: (fare / 100).toFixed(2), basis: "per_person" },
+                  });
+                  dialog.current
+                    ?.querySelector<HTMLInputElement>("#cost-intercity")
+                    ?.focus();
+                }}
+              >
+                使用已录入两程票价
+              </button>
+              <p className="small muted spacing">
+                {fare === null
+                  ? "到达与返程票价尚未齐全，不能把已知部分当作完整往返费用。"
+                  : fare > 10_000_000
+                    ? "两程每人合计超出单项十万元上限，不能预填。"
+                    : `已录入两程每人票价合计 ${money(fare)}，仅为人工估算。`}
+              </p>
+              <p className="small muted">
+                仅预填跨城金额与每人口径；预览确认后替换原估算，不重复相加，其他费用与是否计入保持不变。班次改动不会自动同步费用。
+              </p>
+            </div>
+          )}
+          {state.meals.days.length > 0 && (
+            <div
+              className="notice spacing budget-fare-import"
+              role="group"
+              aria-label="全程午晚餐预填"
+            >
+              <button
+                type="button"
+                className="button secondary"
+                disabled={mealFare === null || mealFare > 10_000_000}
+                onClick={() => {
+                  if (mealFare === null || mealFare > 10_000_000) {
+                    return;
+                  }
+                  setError(null);
+                  setValues({
+                    ...values,
+                    meals: { amount: (mealFare / 100).toFixed(2), basis: "per_person" },
+                  });
+                  dialog.current?.querySelector<HTMLInputElement>("#cost-meals")?.focus();
+                }}
+              >
+                使用全程午晚餐估算
+              </button>
+              <p className="small muted">
+                {mealFare === null
+                  ? "全程午晚餐或餐费尚未齐全，不能把部分合计当作全程餐费；未知不按零元。"
+                  : mealFare > 10_000_000
+                    ? "全程午晚餐每人合计超出单项十万元上限，不能预填或截断金额。"
+                    : `已录入全程午晚餐每人合计 ${money(mealFare)}，仅为用户估算；明确零元不代表免费。`}
+              </p>
+              <p className="small muted">
+                仅预填餐饮金额与每人口径，预览确认后一次替换原估算，不重复相加；其他费用和跨城计入范围不变。换店或改餐费不会自动同步预算。
+              </p>
+              <p className="small muted">
+                本合计只含已安排的午晚餐，不含早餐、零食和饮品；如有其他餐饮开销，请在餐饮估算中另行补齐。
+              </p>
+            </div>
+          )}
           <div className="budget-inputs">
             {budgetCategories.map((category) => (
               <div key={category} className="field-grid">

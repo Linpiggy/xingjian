@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import { MapPin, RotateCw } from "lucide-react";
 import type { Day } from "@/domain/models";
+import { stopIdentity } from "@/domain/meals";
 import { initializeMap, type MapFailure } from "./initialize-map";
 
 const failureMessages: Record<MapFailure, string> = {
@@ -71,8 +72,8 @@ export function RouteMap({
       element.textContent = String(index + 1);
       element.title = item.place.name;
       element.setAttribute("aria-label", `选中地点：${item.place.name}`);
-      element.addEventListener("click", () => onSelect(item.place.id));
-      buttons.current.push({ id: item.place.id, element });
+      element.addEventListener("click", () => onSelect(stopIdentity(item)));
+      buttons.current.push({ id: stopIdentity(item), element });
       map.add(
         new sdk.Marker({
           position: item.place.location,

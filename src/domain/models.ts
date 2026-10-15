@@ -43,6 +43,8 @@ export type Leg = {
   error: string | null;
 };
 export type Stop = {
+  activityId?: string;
+  purpose?: "visit" | "lunch" | "dinner";
   place: Place;
   startMinute: number | null;
   endMinute: number | null;
