@@ -36,7 +36,7 @@ async function openDraft(page: Page, sameVenue = false) {
   await page.route("**/api/plans", (request) =>
     request.fulfill({ json: { draft: fixtureDraft() } }),
   );
-  await page.goto("/");
+  await page.goto("/manual");
   await addFixturePlaces(page);
   await page.getByRole("button", { name: "生成路线草稿" }).click();
   await page.route("**/api/places?*", (request) =>

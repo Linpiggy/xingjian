@@ -3,6 +3,7 @@
 import { create } from "zustand";
 import type { Draft } from "@/domain/models";
 import { intercitySetupSchema } from "@/lib/intercity-contracts";
+import { venueRulesSchema } from "@/lib/venue-contracts";
 import {
   mealSetupSchema,
   mealReservationReleasesSchema,
@@ -12,6 +13,8 @@ import {
   commitBudget,
   commitIntercity,
   commitMeals,
+  commitVisitRules,
+  type VisitRulesProposal,
   type MealProposal,
   type IntercityProposal,
   createEditState,
@@ -30,6 +33,7 @@ type EditorStore = {
   confirmBudget: (proposal: BudgetProposal) => void;
   confirmIntercity: (proposal: IntercityProposal, acknowledgeConflict: boolean) => void;
   confirmMeals: (proposal: MealProposal) => void;
+  confirmVisitRules: (proposal: VisitRulesProposal) => void;
   toggleLock: (id: string, kind: "position" | "time") => void;
   undo: () => void;
 };
@@ -71,6 +75,19 @@ export const useDraftEditor = create<EditorStore>((set, get) => ({
         ...proposal,
         setup,
         reservationReleases,
+      }),
+    });
+  },
+  confirmVisitRules: (proposal) => {
+    const rules = venueRulesSchema.nullable().parse(proposal.rules);
+    const releases = mealReservationReleasesSchema.parse(
+      proposal.release === null ? [] : [proposal.release],
+    );
+    set({
+      current: commitVisitRules(required(get().current), {
+        ...proposal,
+        rules,
+        release: releases[0] ?? null,
       }),
     });
   },

@@ -19,7 +19,7 @@ async function openDraft(page: Page) {
   await page.route("**/api/plans", (request) =>
     request.fulfill({ json: { draft: fixtureDraft() } }),
   );
-  await page.goto("/");
+  await page.goto("/manual");
   await addFixturePlaces(page);
   await page.getByRole("button", { name: "生成路线草稿" }).click();
   await expect(page.getByRole("heading", { name: "测试城市2日路线草稿" })).toBeVisible();

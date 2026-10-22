@@ -14,7 +14,7 @@ test("travel summary reflects inputs and the same daily grouping as the draft", 
       errors.push("Hydration warning detected");
     }
   });
-  await page.goto("/");
+  await page.goto("/manual");
   const summary = page.getByRole("complementary", { name: "旅行摘要" });
   await expect(summary).toContainText("添加想去的地点");
   await page.getByLabel("目的地城市").fill("苏州");
@@ -62,7 +62,7 @@ test("pages show travel guidance, not a development roadmap, and AI validation s
   await page.route("**/api/recommendations", (route) =>
     route.fulfill({ json: fixtureRecommendations() }),
   );
-  await page.goto("/");
+  await page.goto("/manual");
   await expect(page.locator("body")).not.toContainText(roadmapCopy);
   await page.getByRole("button", { name: "AI 智能推荐" }).click();
   await page.getByRole("button", { name: "生成路线草稿" }).click();

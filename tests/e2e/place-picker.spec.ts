@@ -25,7 +25,7 @@ test("explicit search choices send POI IDs in the user's order", async ({ page }
     ).toEqual([places[2].id, places[0].id]);
     return route.fulfill({ json: { draft: fixtureDraft() } });
   });
-  await page.goto("/");
+  await page.goto("/manual");
   await searchFixture(page);
   await page.getByRole("button", { name: `添加${places[2].name}` }).click();
   await page.getByRole("button", { name: `添加${places[0].name}` }).click();
@@ -49,7 +49,7 @@ test("AI suggestions coexist with search choices and require explicit addition",
     expect(input.selections).toBeUndefined();
     return route.fulfill({ json: fixtureRecommendations() });
   });
-  await page.goto("/");
+  await page.goto("/manual");
   await searchFixture(page);
   await page.getByRole("button", { name: `添加${places[0].name}` }).click();
   await page.getByRole("button", { name: "AI 智能推荐" }).click();
@@ -84,7 +84,7 @@ test("AI failure keeps custom choices and never inserts fallback suggestions", a
         : { json: fixtureRecommendations() },
     );
   });
-  await page.goto("/");
+  await page.goto("/manual");
   await searchFixture(page);
   await page.getByRole("button", { name: `添加${places[0].name}` }).click();
   await page.getByRole("button", { name: "AI 智能推荐" }).click();
@@ -106,7 +106,7 @@ test("AI failure keeps custom choices and never inserts fallback suggestions", a
 test("map selection dialog blocks fabricated coordinates when configuration is missing", async ({
   page,
 }, testInfo) => {
-  await page.goto("/");
+  await page.goto("/manual");
   await expect(
     page.getByRole("button", { name: "地图选点", exact: true }),
   ).toBeDisabled();
@@ -136,7 +136,7 @@ test("map selection dialog blocks fabricated coordinates when configuration is m
 test("changing city requires confirmation and invalidates old search candidates", async ({
   page,
 }) => {
-  await page.goto("/");
+  await page.goto("/manual");
   await searchFixture(page);
   await page.getByRole("button", { name: `添加${places[0].name}` }).click();
   page.once("dialog", (dialog) => dialog.dismiss());

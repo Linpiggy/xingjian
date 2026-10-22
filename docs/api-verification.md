@@ -152,3 +152,14 @@ Figma 阶段的路线示意、行程时间和天气可使用明确标注的示�
 - [错误文档](https://dev.qweather.com/docs/resource/error-code/)使用 HTTP 状态与 error 对象；401／403／429 不自动重试，响应 detail 不直接展示。HTTP 200 的错误对象或坏结构仍拒绝。
 
 以上仅 D。账号 Host／版本／认证、实际响应覆盖、公开展示／存储许可和费用仍待确认，未升级为 A／P，不能用公开 JSON 示例作为真实预报。
+
+## 9. 美团／大众点评图片来源复核（D，未接业务接口）
+
+用户希望最终图文优先使用美团／大众点评等官方接口，而非自行选定开放图库。本次检索并抽取官方公开页面，未登录、注册、调用业务工具或下载商家图片。
+
+- [个人开发者入口说明](https://developer.meituan.com/)仍写“实名认证即开通，免费接入 MCP/Skills”。这只确认有个人入驻入口，不证明任意门店照片、点评图片、个人网站多用户调用或独立网页展示已经获权。个人控制台公开抽取失败；[MCP 目录](https://developer.meituan.com/ai-hub/mcp-list)的搜索缓存显示 10 项、重新抽取显示 0 项，动态状态不一致，不能据此断言具体工具可用或平台没有服务。
+- [企业版到餐 API 文档](https://h5.dianping.com/app/bep-docs/sky-doc/canyinopenapi/daocan_api.html)明确列出 `/openapi/daocanPoi/list` 的 `defaultpic`（缩略图）、`/openapi/daocanPoi/detail` 的 `defaultPic`（图片）、`/openapi/daocanPoi/reviewList` 的 `photo_urls`（评论图片）。因此企业到餐存在图片字段达到 D；该文档要求平台分配 token／sign／aesKey／entId 并联系取得测试与正式账号，不是个人拿普通 Key 即可调用的公开图库。示例图片未下载、未作为应用素材或真实数据使用。
+- [合作中心概述](https://developer.meituan.com/docs/biz/comm-dev-summary)描述面向符合要求的合作伙伴、服务商和应用；[API 文档目录](https://developer.meituan.com/docs/api)可见商家经营及需业务授权的接口。商家上传图片／管理商品的权限不等于查询任意商户图库；到餐图片也不证明覆盖城市封面或所有景点。
+- 尚未确认：本项目个人资格与具体工具、返回图片字段及尺寸／有效期、调用额度与费用、面向独立旅行网页的展示及署名、直链或代理方式、缓存／保存／分享快照权限、UGC 图片再展示授权。拿到可访问 URL 不等于这些权限已满足，不能默认盗链、爬取详情页或购买非官方抓取服务。
+
+接入门禁：由用户在个人控制台确认可用工具／API 与用途条款，提供不含凭据的工具名称、字段说明和权限截图；若个人接口不覆盖图片，再确认企业合作资格或替代素材，不自行切换供应商。凭据仅本地配置，账号验证另行授权。当前图片能力只记 D，A／P 均未达到，生产图片接入保持关闭。

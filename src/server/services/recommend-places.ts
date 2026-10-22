@@ -4,6 +4,7 @@ import type {
   RecommendationModel,
 } from "@/server/ai/openai-compatible";
 import { ProviderError } from "@/server/providers/errors";
+import { withAiBudget } from "@/server/ai/budget";
 
 const searchTerms = {
   自然风光: "公园",
@@ -11,26 +12,13 @@ const searchTerms = {
   城市漫步: "历史街区",
   当地美食: "特色餐厅",
 };
-let active = false;
-let started: number[] = [];
 
 export async function recommendPlaces(
   input: RecommendationInput,
   places: PlaceProvider,
   ai: RecommendationModel,
 ) {
-  const now = Date.now();
-  started = started.filter((time) => now - time < 60_000);
-  if (active || started.length >= 3) {
-    throw new ProviderError(
-      "unavailable",
-      "AI 推荐请求过于频繁，请稍后重试。",
-      "rate_limited",
-    );
-  }
-  active = true;
-  started.push(now);
-  try {
+  return withAiBudget(async () => {
     const candidates: PlaceCandidate[] = [];
     for (const interest of new Set(input.interests)) {
       const keyword = searchTerms[interest];
@@ -75,7 +63,5 @@ export async function recommendPlaces(
       model: ai.model,
       queriedAt: new Date().toISOString(),
     };
-  } finally {
-    active = false;
-  }
+  });
 }

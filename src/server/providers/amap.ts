@@ -65,7 +65,11 @@ export class AmapProvider implements PlaceProvider, RouteProvider {
     private readonly key: string,
     private readonly transport: typeof fetch = fetch,
   ) {}
-  private async request(path: string, params: Record<string, string>): Promise<unknown> {
+  private async request(
+    path: string,
+    params: Record<string, string>,
+    signal?: AbortSignal,
+  ): Promise<unknown> {
     if (!this.key) {
       throw new ProviderError("not_configured", "请在本地配置高德 Web 服务 Key。");
     }
@@ -76,7 +80,9 @@ export class AmapProvider implements PlaceProvider, RouteProvider {
         const response = await this.transport(url, {
           cache: "no-store",
           redirect: "error",
-          signal: AbortSignal.timeout(8000),
+          signal: signal
+            ? AbortSignal.any([signal, AbortSignal.timeout(8000)])
+            : AbortSignal.timeout(8000),
         });
         if (!response.ok) {
           throw new ProviderError(
@@ -126,14 +132,18 @@ export class AmapProvider implements PlaceProvider, RouteProvider {
       }
     });
   }
-  async search(city: string, keyword: string): Promise<Place[]> {
-    const raw = await this.request("/v5/place/text", {
-      keywords: keyword,
-      region: city,
-      city_limit: "true",
-      page_size: "5",
-      show_fields: "business",
-    });
+  async search(city: string, keyword: string, signal?: AbortSignal): Promise<Place[]> {
+    const raw = await this.request(
+      "/v5/place/text",
+      {
+        keywords: keyword,
+        region: city,
+        city_limit: "true",
+        page_size: "5",
+        show_fields: "business",
+      },
+      signal,
+    );
     const parsed = searchResponse.safeParse(raw);
     if (!parsed.success) {
       throw new ProviderError("unavailable", "高德地点响应格式异常。");
@@ -155,12 +165,20 @@ export class AmapProvider implements PlaceProvider, RouteProvider {
         : [];
     });
   }
-  async walking(origin: Coordinate, destination: Coordinate): Promise<WalkingRoute> {
-    const raw = await this.request("/v5/direction/walking", {
-      origin: origin.join(","),
-      destination: destination.join(","),
-      show_fields: "cost,polyline",
-    });
+  async walking(
+    origin: Coordinate,
+    destination: Coordinate,
+    signal?: AbortSignal,
+  ): Promise<WalkingRoute> {
+    const raw = await this.request(
+      "/v5/direction/walking",
+      {
+        origin: origin.join(","),
+        destination: destination.join(","),
+        show_fields: "cost,polyline",
+      },
+      signal,
+    );
     const parsed = routeResponse.safeParse(raw);
     if (!parsed.success) {
       throw new ProviderError("unavailable", "高德路线响应格式异常。");

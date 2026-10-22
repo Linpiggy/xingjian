@@ -1,6 +1,7 @@
 "use client";
 import { useCallback, useMemo, useRef, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
+import Link from "next/link";
 import { Compass, Footprints, Info, MapPin, Plus, X } from "lucide-react";
 import type { Draft, Place, TripInput } from "@/domain/models";
 import { formatMinute } from "@/domain/draft";
@@ -494,7 +495,9 @@ export function Planner({
           </span>
           行间
         </span>
-        <span className="header-description">旅行规划</span>
+        <Link className="header-description" href="/">
+          完整 AI 规划
+        </Link>
         <button className="button" disabled={mutation.isPending} onClick={newPlan}>
           <Plus size={18} aria-hidden="true" />
           新建计划

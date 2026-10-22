@@ -1,3 +1,5 @@
+import type { VenueRules } from "./meal-planning";
+
 export type Coordinate = [number, number];
 export type Source = (
   { kind: "provider" | "fixture"; provider: "amap" } | { kind: "user"; provider: "user" }
@@ -44,7 +46,8 @@ export type Leg = {
 };
 export type Stop = {
   activityId?: string;
-  purpose?: "visit" | "lunch" | "dinner";
+  purpose?: "visit" | "breakfast" | "lunch" | "dinner";
+  venueRules?: VenueRules | null;
   place: Place;
   startMinute: number | null;
   endMinute: number | null;

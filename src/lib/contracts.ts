@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { venueRulesSchema } from "./venue-contracts";
 
 export const coordinateSchema = z.tuple([
   z.number().min(-180).max(180),
@@ -117,7 +118,8 @@ const daySchema = z.object({
   items: z.array(
     z.object({
       activityId: z.string().optional(),
-      purpose: z.enum(["visit", "lunch", "dinner"]).optional(),
+      purpose: z.enum(["visit", "breakfast", "lunch", "dinner"]).optional(),
+      venueRules: venueRulesSchema.nullable().optional(),
       place: placeSchema,
       startMinute: z.number().nullable(),
       endMinute: z.number().nullable(),

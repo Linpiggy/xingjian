@@ -1,4 +1,4 @@
-import type { Day, Draft, Leg, Place, TripInput } from "./models";
+import type { Day, Draft, Leg, Place, TripInput, Stop } from "./models";
 
 export function addDays(date: string, offset: number): string {
   const time = new Date(`${date}T00:00:00Z`);
@@ -24,7 +24,10 @@ export function makeDay(
   legs: Leg[],
   stayMinutes: number,
   bufferMinutes: number,
-  timing: Record<string, { stayMinutes?: number; fixedStartMinute?: number }> = {},
+  timing: Record<
+    string,
+    { stayMinutes?: number; fixedStartMinute?: number; venueRules?: Stop["venueRules"] }
+  > = {},
 ): Day {
   let cursor: number | null = 9 * 60;
   const issues: string[] = [];
@@ -50,7 +53,15 @@ export function makeDay(
     if (endMinute !== null && endMinute > 18 * 60) {
       issues.push("活动超过 18:00，请减少地点或调整停留时间。");
     }
-    return { place, startMinute, endMinute, stayMinutes: duration };
+    return {
+      place,
+      startMinute,
+      endMinute,
+      stayMinutes: duration,
+      ...(setting?.venueRules !== undefined
+        ? { venueRules: structuredClone(setting.venueRules) }
+        : {}),
+    };
   });
   return { date, items, legs, issues: [...new Set(issues)] };
 }

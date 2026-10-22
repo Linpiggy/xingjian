@@ -4,6 +4,7 @@ import { makeDay, makeDraft } from "./draft";
 import type { WalkingRoute } from "./models";
 import {
   scheduleMealDay,
+  scheduleVisitDay,
   type ActivityLeg,
   type DayActivity,
   type MealDayPlan,
@@ -111,6 +112,7 @@ export function applyVisitConnections(
         {
           stayMinutes: item.stayMinutes,
           fixedStartMinute: locks[item.place.id]?.time?.minute,
+          venueRules: item.venueRules,
         },
       ]),
     );
@@ -158,14 +160,33 @@ export function deriveMealTrip(
   const hasDeferred = draft.days.some((day) =>
     day.legs.some((leg) => leg.route === null && leg.error === deferredVisitRoute),
   );
-  if (setup.days.length === 0 && !hasDeferred && Object.keys(locks).length === 0) {
+  const hasVisitRules = draft.days.some((day) =>
+    day.items.some((item) => item.venueRules != null),
+  );
+  if (
+    setup.days.length === 0 &&
+    !hasDeferred &&
+    !hasVisitRules &&
+    Object.keys(locks).length === 0
+  ) {
     return { draft, plans: [], gaps: [], conflicts: [] };
   }
   const result = structuredClone(draft);
   const plans: MealDayPlan[] = [];
   const gaps: MealRouteGap[] = [];
   const conflicts: string[] = [];
-  for (const setting of setup.days) {
+  const settings = [
+    ...setup.days,
+    ...draft.days
+      .filter(
+        (day) =>
+          !setup.days.some((setting) => setting.date === day.date) &&
+          day.items.some((item) => item.venueRules != null),
+      )
+      .map((day) => ({ date: day.date, endMinute: 1080, entries: [] })),
+  ];
+  for (const setting of settings) {
+    const hasMeals = setup.days.some((day) => day.date === setting.date);
     const dayIndex = draft.days.findIndex((day) => day.date === setting.date);
     if (dayIndex === -1) {
       conflicts.push("用餐日期已不在当前行程中，请重新安排，不会自动删除餐次。");
@@ -191,7 +212,7 @@ export function deriveMealTrip(
         stayMinutes: item.stayMinutes,
         window: null,
         fixedStartMinute: locks[item.place.id]?.time?.minute ?? null,
-        rules: null,
+        rules: item.venueRules ?? null,
         meal: null,
       });
       append(item.place.id);
@@ -227,7 +248,7 @@ export function deriveMealTrip(
             )
           : null;
       const route = queried?.route ?? existing?.route ?? null;
-      if (route === null) {
+      if (route === null && (hasMeals || existing?.error === deferredVisitRoute)) {
         gaps.push({
           fromId: from.id,
           toId: to.id,
@@ -237,7 +258,7 @@ export function deriveMealTrip(
       }
       return { fromActivityId: from.id, toActivityId: to.id, route };
     });
-    const plan = scheduleMealDay({
+    const plan = (hasMeals ? scheduleMealDay : scheduleVisitDay)({
       date: day.date,
       timeZone: "Asia/Shanghai",
       startMinute: 540,
@@ -259,6 +280,9 @@ export function deriveMealTrip(
       startMinute: item.startMinute,
       endMinute: item.endMinute,
       stayMinutes: item.activity.stayMinutes,
+      ...(item.activity.kind === "visit" && item.activity.rules !== null
+        ? { venueRules: item.activity.rules }
+        : {}),
     }));
     result.days[dayIndex] = {
       date: day.date,
@@ -273,7 +297,7 @@ export function deriveMealTrip(
     };
   }
   for (const day of draft.days.filter(
-    (item) => !setup.days.some((setting) => setting.date === item.date),
+    (item) => !settings.some((setting) => setting.date === item.date),
   )) {
     for (const [index, leg] of day.legs.entries()) {
       if (leg.route === null && leg.error === deferredVisitRoute) {

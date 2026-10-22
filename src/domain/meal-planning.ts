@@ -15,7 +15,7 @@ export type VenueRules = {
 };
 export type DayActivity = {
   id: string;
-  kind: "visit" | "lunch" | "dinner";
+  kind: "visit" | "breakfast" | "lunch" | "dinner";
   place: Place;
   stayMinutes: number;
   window: MinuteWindow | null;
@@ -24,7 +24,7 @@ export type DayActivity = {
   meal: {
     perPersonFen: number | null;
     dietaryCheck: "unknown" | "user_checked" | "user_conflict";
-    source: { kind: "user"; recordedAt: string };
+    source: { kind: "user" | "unverified"; recordedAt: string };
   } | null;
 };
 export type ActivityLeg = {
@@ -84,6 +84,34 @@ function continuousOpening(windows: MinuteWindow[]): MinuteWindow[] {
 // Runtime contracts must validate inputs before calling this pure, ordered scheduler.
 // It never searches, picks restaurants, deletes a stop, or changes the supplied locks.
 export function scheduleMealDay(input: MealDayInput): MealDayPlan {
+  return scheduleDay(input, ["lunch", "dinner"]);
+}
+export function scheduleVisitDay(input: MealDayInput): MealDayPlan {
+  if (input.activities.some((activity) => activity.kind !== "visit")) {
+    throw new Error("景点日排程不能绕过正式午晚餐的数量校验。");
+  }
+  return scheduleDay(input, []);
+}
+export function scheduleAvailableDay(input: MealDayInput): MealDayPlan {
+  const windows = [
+    { kind: "breakfast" as const, start: 420, end: 600 },
+    { kind: "lunch" as const, start: 660, end: 840 },
+    { kind: "dinner" as const, start: 1020, end: 1260 },
+  ];
+  const required = windows
+    .filter(
+      (window) =>
+        Math.min(input.endMinute, window.end) -
+          Math.max(input.startMinute, window.start) >=
+        45,
+    )
+    .map((window) => window.kind);
+  return scheduleDay(input, required);
+}
+function scheduleDay(
+  input: MealDayInput,
+  requiredMeals: readonly ("breakfast" | "lunch" | "dinner")[],
+): MealDayPlan {
   const snapshot = structuredClone(input);
   const issues: PlanningIssue[] = [];
   const legs: ActivityLeg[] = [];
@@ -93,14 +121,14 @@ export function scheduleMealDay(input: MealDayInput): MealDayPlan {
     code: string,
     message: string,
   ) => issues.push({ activityId, severity, code, message });
-  for (const kind of ["lunch", "dinner"] as const) {
+  for (const kind of requiredMeals) {
     const count = snapshot.activities.filter((activity) => activity.kind === kind).length;
     if (count !== 1) {
       add(
         null,
         "conflict",
         "meal_count",
-        `${kind === "lunch" ? "午餐" : "晚餐"}须安排一个正式用餐地点，不会自动删除或补入地点。`,
+        `${kind === "breakfast" ? "早餐" : kind === "lunch" ? "午餐" : "晚餐"}须安排一个正式用餐地点，不会自动删除或补入地点。`,
       );
     }
   }
@@ -132,6 +160,14 @@ export function scheduleMealDay(input: MealDayInput): MealDayPlan {
       }
     }
     const validRules = activity.rules?.date === snapshot.date ? activity.rules : null;
+    if (activity.rules?.reservation.state === "confirmed" && !validRules) {
+      add(
+        id,
+        "conflict",
+        "reservation_date_conflict",
+        "已记录预约的适用日期与活动日期冲突，不会因跨天而静默忽略原预约。",
+      );
+    }
     if (!validRules) {
       add(
         id,

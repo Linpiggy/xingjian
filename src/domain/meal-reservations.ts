@@ -1,4 +1,5 @@
-import type { MealEntry, MealSetup } from "./meals";
+import type { MealSetup } from "./meals";
+import type { DayActivity } from "./meal-planning";
 
 // Canonical comparison keys, not signatures, permissions or merchant cancellation.
 export type MealReservationRelease = {
@@ -6,7 +7,10 @@ export type MealReservationRelease = {
   beforeKey: string;
   afterKey: string;
 };
-function reservationKey(date: string, entry: MealEntry): string {
+export function reservationKey(
+  date: string,
+  entry: Pick<DayActivity, "id" | "kind" | "place" | "rules" | "fixedStartMinute">,
+): string {
   const window = entry.rules?.reservation.entryWindow;
   return JSON.stringify([
     date,

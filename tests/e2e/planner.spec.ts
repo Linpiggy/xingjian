@@ -37,7 +37,7 @@ test("form validation, successful draft, selection and missing map config", asyn
   await page.route("**/api/plans", (route) =>
     route.fulfill({ json: { draft: fixtureDraft() } }),
   );
-  await page.goto("/");
+  await page.goto("/manual");
   await page.screenshot({
     path: `test-results/${testInfo.project.name}-form-light.png`,
     fullPage: true,
@@ -98,7 +98,7 @@ test("provider error preserves inputs and permits retry", async ({ page }) => {
         : { json: { draft: fixtureDraft() } },
     );
   });
-  await page.goto("/");
+  await page.goto("/manual");
   await page.getByLabel("目的地城市").fill("测试城市");
   await addFixturePlaces(page);
   await page.getByRole("button", { name: "生成路线草稿" }).click();
@@ -122,7 +122,7 @@ test("empty budget is rejected and decimal budget sends integer fen", async ({
     draft.input.budgetPerPersonFen = 110;
     return route.fulfill({ json: { draft } });
   });
-  await page.goto("/");
+  await page.goto("/manual");
   await page.getByLabel("每人预算（元）").fill("");
   await page.getByRole("button", { name: "生成路线草稿" }).click();
   await expect(page.getByText("请填写每人预算", { exact: true })).toBeVisible();
@@ -138,7 +138,7 @@ test("switching days and confirming new draft reset", async ({ page }) => {
   await page.route("**/api/plans", (route) =>
     route.fulfill({ json: { draft: fixtureDraft() } }),
   );
-  await page.goto("/");
+  await page.goto("/manual");
   await addFixturePlaces(page);
   await page.getByRole("button", { name: "生成路线草稿" }).click();
   await page.getByRole("button", { name: "第 2 天", exact: true }).click();

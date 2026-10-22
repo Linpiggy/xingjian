@@ -21,8 +21,11 @@ import {
 
 import {
   reservationReleaseConflicts,
+  reservationKey,
   type MealReservationRelease,
 } from "./meal-reservations";
+
+import type { VenueRules } from "./meal-planning";
 
 export type StopLock = {
   position?: { dayIndex: number; index: number };
@@ -166,6 +169,7 @@ function buildProposal(
         {
           stayMinutes: item.stayMinutes,
           fixedStartMinute: locks[item.place.id]?.time?.minute,
+          venueRules: item.venueRules,
         },
       ]),
     );
@@ -508,6 +512,110 @@ export function commitMeals(state: EditState, proposal: MealProposal): EditState
     ...state,
     draft: applyVisitConnections(state.draft, state.locks, checked.setup.connections),
     meals: activeMealConnections(checked.setup, checked.view.draft),
+    version: state.version + 1,
+    previous: snapshot(state),
+  };
+}
+
+export type VisitRulesProposal = {
+  sessionId: string;
+  baseVersion: number;
+  placeId: string;
+  rules: VenueRules | null;
+  release: MealReservationRelease | null;
+  requiredRelease: MealReservationRelease | null;
+  draft: Draft;
+  view: MealTripView;
+};
+export function previewVisitRules(
+  state: EditState,
+  placeId: string,
+  rules: VenueRules | null,
+  release: MealReservationRelease | null = null,
+): VisitRulesProposal {
+  const original = locate(state.draft, placeId);
+  const draft = structuredClone(state.draft);
+  const copy = structuredClone(rules);
+  draft.days[original.dayIndex].items[original.index].venueRules = copy;
+  const activity = {
+    id: visitActivityId(placeId),
+    kind: "visit" as const,
+    place: original.item.place,
+    fixedStartMinute: state.locks[placeId]?.time?.minute ?? null,
+  };
+  const date = state.draft.days[original.dayIndex].date;
+  const beforeKey = reservationKey(date, {
+    ...activity,
+    rules: original.item.venueRules ?? null,
+  });
+  const afterKey = reservationKey(date, { ...activity, rules: copy });
+  const requiredRelease =
+    original.item.venueRules?.reservation.state === "confirmed" && beforeKey !== afterKey
+      ? { activityId: activity.id, beforeKey, afterKey }
+      : null;
+  if (
+    release &&
+    (!requiredRelease ||
+      Object.keys(release).length !== 3 ||
+      release.activityId !== requiredRelease.activityId ||
+      release.beforeKey !== beforeKey ||
+      release.afterKey !== afterKey)
+  ) {
+    throw new Error("景点预约变更核对与当前修改不一致，请重新预览。");
+  }
+  const view = deriveMealTrip(draft, state.locks, state.meals);
+  if (requiredRelease && !release) {
+    view.conflicts.push(
+      "景点已记录预约将变更或移除，请针对当前修改明确核对；此操作不代为取消预约。",
+    );
+  }
+  if (
+    state.intercity.segments.length &&
+    evaluateIntercity(view.draft, state.intercity.segments, state.intercity.connections)
+      .status === "infeasible"
+  ) {
+    view.conflicts.push("景点规则修改与已录入的到达／返程约束冲突。");
+  }
+  if (view.conflicts.length) {
+    view.draft.status = "infeasible";
+  }
+  return {
+    sessionId: state.sessionId,
+    baseVersion: state.version,
+    placeId,
+    rules: copy,
+    release: structuredClone(release),
+    requiredRelease,
+    draft,
+    view,
+  };
+}
+export function commitVisitRules(
+  state: EditState,
+  proposal: VisitRulesProposal,
+): EditState {
+  if (state.sessionId !== proposal.sessionId || state.version !== proposal.baseVersion) {
+    throw new Error("行程已变化，请重新预览景点规则。");
+  }
+  const checked = previewVisitRules(
+    state,
+    proposal.placeId,
+    proposal.rules,
+    proposal.release,
+  );
+  if (checked.requiredRelease && !checked.release) {
+    throw new Error("景点预约变更须明确核对，当前规则保持不变。");
+  }
+  if (
+    checked.view.gaps.length ||
+    checked.view.conflicts.length ||
+    checked.view.draft.status === "infeasible"
+  ) {
+    throw new Error("景点规则存在时间、预约、锁定或接驳冲突，当前行程保持不变。");
+  }
+  return {
+    ...state,
+    draft: checked.draft,
     version: state.version + 1,
     previous: snapshot(state),
   };

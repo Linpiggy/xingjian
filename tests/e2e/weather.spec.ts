@@ -3,6 +3,7 @@ import { fixtureDraft } from "../fixtures/draft";
 import { fixtureWeather } from "../fixtures/weather";
 import { roundWeatherLocation } from "../../src/domain/weather";
 import { weatherInputSchema } from "../../src/lib/weather-contracts";
+import { addDays } from "../../src/domain/draft";
 import { addFixturePlaces } from "./fixtures";
 
 const messages = new WeakMap<Page, string[]>();
@@ -20,7 +21,7 @@ test.afterEach(({ page }) => expect(messages.get(page)).toEqual([]));
 const panel = (page: Page) => page.getByRole("region", { name: "当天天气" });
 async function openWorkspace(page: Page, draft = fixtureDraft()) {
   await page.route("**/api/plans", (route) => route.fulfill({ json: { draft } }));
-  await page.goto("/");
+  await page.goto("/manual");
   await addFixturePlaces(page);
   await page.getByRole("button", { name: "生成路线草稿" }).click();
   await expect(panel(page)).toBeVisible();
@@ -85,12 +86,23 @@ test("manual daily forecast displays sources and coarse rain risk without changi
 test("real no-credential weather handler stays unknown and does not substitute fixtures", async ({
   page,
 }) => {
-  await openWorkspace(page);
+  const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Shanghai" }).format(
+    new Date(),
+  );
+  const original = fixtureDraft();
+  const draft = structuredClone(original);
+  draft.input.startDate = addDays(today, 2);
+  for (const [index, day] of draft.days.entries()) {
+    day.date = addDays(draft.input.startDate, index);
+  }
+  expect(fixtureDraft()).toEqual(original);
+  await openWorkspace(page, draft);
   const response = page.waitForResponse((result) =>
     result.url().endsWith("/api/weather"),
   );
   await queryWeather(page);
   const result = await response;
+  expect(result.request().postDataJSON().date).toBe(draft.days[0].date);
   expect(result.status()).toBe(503);
   expect(result.headers()["cache-control"]).toBe("no-store");
   expect(await result.json()).toMatchObject({ code: "weather_not_configured" });

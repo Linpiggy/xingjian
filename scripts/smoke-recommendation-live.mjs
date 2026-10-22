@@ -128,7 +128,7 @@ try {
       );
     }
   });
-  await page.goto("http://127.0.0.1:3000", { waitUntil: "domcontentloaded" });
+  await page.goto("http://127.0.0.1:3000/manual", { waitUntil: "domcontentloaded" });
   const html = await page.content();
   if (privateValues.some((value) => html.includes(value))) {
     report.privacy.credentialsInClientText = true;
