@@ -26,6 +26,8 @@ import {
 import { tripBriefSchema } from "@/lib/trip-brief-contracts";
 import { parseYuanFen } from "@/lib/money";
 import type { PlanningRequestError } from "./request-itinerary";
+import type { SocialInspiration } from "@/domain/social-inspiration";
+import { SocialInspirationInput } from "./social-inspiration-input";
 
 const purposeVisuals = {
   local_life: { icon: Store, description: "街巷、市场与当地日常" },
@@ -47,6 +49,7 @@ export function BriefForm({
   onSubmit,
   onCancel,
   onBackToPlan,
+  onDraftChange,
 }: {
   startDate: string;
   initial: TripBrief | null;
@@ -58,6 +61,7 @@ export function BriefForm({
   onSubmit: (brief: TripBrief) => void;
   onCancel: () => void;
   onBackToPlan?: () => void;
+  onDraftChange?: () => void;
 }) {
   const [purpose, setPurpose] = useState<TripPurpose>(initial?.mainPurpose ?? "culture");
   const [secondary, setSecondary] = useState<TripPurpose[]>(
@@ -65,6 +69,10 @@ export function BriefForm({
   );
   const [validation, setValidation] = useState<string | null>(null);
   const [section, setSection] = useState(0);
+  const [socialInspiration, setSocialInspiration] = useState<
+    SocialInspiration | undefined
+  >(initial?.socialInspiration);
+  const [sourceBusy, setSourceBusy] = useState(false);
   const [summary, setSummary] = useState({
     city: initial?.destinationCity ?? "",
     date: initial?.startDate ?? startDate,
@@ -92,6 +100,10 @@ export function BriefForm({
   }
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (sourceBusy) {
+      setValidation("请等待本地笔记读取完成后再生成。");
+      return;
+    }
     const data = new FormData(event.currentTarget);
     const text = (name: string) => String(data.get(name) ?? "").trim();
     const number = (name: string) => (text(name) ? Number(text(name)) : NaN);
@@ -135,6 +147,7 @@ export function BriefForm({
         ...lines("restaurants").map((name) => ({ kind: "restaurant", name })),
       ],
       dietary: { avoid: lines("avoid"), allergies: lines("allergies") },
+      ...(socialInspiration ? { socialInspiration } : {}),
     });
     if (!parsed.success) {
       const issue = parsed.error.issues[0];
@@ -147,6 +160,7 @@ export function BriefForm({
         budget: "budget",
         mustVisit: "mustVisit",
         mustEat: "dishes",
+        socialInspiration: "socialInspiration",
         dietary: issue?.path[1] === "allergies" ? "allergies" : "avoid",
         availability:
           (
@@ -202,7 +216,7 @@ export function BriefForm({
       onSubmit={submit}
       onInput={trackInput}
       noValidate
-      aria-busy={pending}
+      aria-busy={pending || sourceBusy}
     >
       <div className="trip-form-layout">
         <div className="trip-form-sheet">
@@ -508,6 +522,22 @@ export function BriefForm({
                 </div>
               </details>
             </fieldset>
+            <fieldset disabled={pending}>
+              <legend>
+                带上社交旅行灵感 <small>选填</small>
+              </legend>
+              <SocialInspirationInput
+                city={summary.city}
+                value={socialInspiration}
+                pending={pending}
+                onChange={(value) => {
+                  setSocialInspiration(value);
+                  setValidation(null);
+                  onDraftChange?.();
+                }}
+                onBusyChange={setSourceBusy}
+              />
+            </fieldset>
           </div>
           <div className="trip-form-footer">
             <details className="trip-privacy">
@@ -554,7 +584,11 @@ export function BriefForm({
                 </button>
               </div>
             ) : (
-              <button type="submit" className="trip-generate" disabled={cooldown > 0}>
+              <button
+                type="submit"
+                className="trip-generate"
+                disabled={cooldown > 0 || sourceBusy}
+              >
                 生成我的完整方案 <ArrowRight size={18} aria-hidden="true" />
               </button>
             )}

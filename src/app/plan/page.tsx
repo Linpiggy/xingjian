@@ -1,17 +1,21 @@
-import { FullPlanner } from "@/features/itinerary/full-planner";
+import { PlanningWorkspace } from "@/features/itinerary/planning-workspace";
 import { todayInShanghai } from "@/server/today";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "新建规划 | 行间" };
-export default function NewPlanPage() {
+export const metadata = { title: "规划工作台 | 行间" };
+export default async function PlanPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ mode?: string | string[] }>;
+}) {
+  const { mode } = await searchParams;
   const mapKey = process.env.NEXT_PUBLIC_AMAP_JS_KEY ?? "";
   return (
-    <FullPlanner
-      key="new-plan"
-      view="new"
+    <PlanningWorkspace
       startDate={todayInShanghai()}
       mapKey={mapKey}
       mapsConfigured={Boolean(mapKey && process.env.AMAP_JS_SECURITY_CODE)}
+      initialMode={mode === "manual" ? "manual" : "ai"}
     />
   );
 }

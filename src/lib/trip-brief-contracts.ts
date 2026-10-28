@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { tripPurposes, type TripBrief } from "@/domain/trip-brief";
+import { socialInspirationSchema } from "./social-inspiration-contracts";
 
 const name = z.string().trim().min(1).max(60);
 const minute = z.number().int().min(0).max(1439);
@@ -49,8 +50,19 @@ export const tripBriefSchema: z.ZodType<TripBrief> = z
       avoid: z.array(name).max(10),
       allergies: z.array(name).max(10),
     }),
+    socialInspiration: socialInspirationSchema.optional(),
   })
   .superRefine((brief, context) => {
+    if (
+      brief.socialInspiration &&
+      key(brief.socialInspiration.city) !== key(brief.destinationCity)
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["socialInspiration"],
+        message: "社交资料适用城市与目的地不一致，请重新确认后应用。",
+      });
+    }
     if (
       brief.budget.basis === "total" &&
       brief.budget.amountFen > brief.travelers * 10_000_000

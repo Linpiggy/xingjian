@@ -1149,6 +1149,15 @@ button.trip-place-evidence:hover {
   margin-top: 12px;
   line-height: 1.9;
 }
+.trip-social-reference {
+  padding: 16px 0;
+  border-bottom: 1px solid var(--trip-line);
+}
+.trip-social-reference a {
+  color: var(--primary);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
 .trip-page-footnote {
   display: flex;
   align-items: flex-start;

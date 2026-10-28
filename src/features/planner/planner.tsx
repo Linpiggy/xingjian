@@ -103,10 +103,12 @@ function Workspace({
   draft: initialDraft,
   mapKey,
   mapsConfigured,
+  active = true,
 }: {
   draft: Draft;
   mapKey: string;
   mapsConfigured: boolean;
+  active?: boolean;
 }) {
   const ui = usePlannerUi();
   const editor = useDraftEditor((state) => state.current);
@@ -365,7 +367,7 @@ function Workspace({
             <h2>当天路线</h2>
             <p className="small muted">点击地图上的编号，查看地点详情。</p>
           </div>
-          {wideScreen || ui.mobileTab === "map" ? (
+          {active && (wideScreen || ui.mobileTab === "map") ? (
             <RouteMap
               day={day}
               selectedId={selectedKey}
@@ -442,11 +444,16 @@ export function Planner({
   startDate,
   mapKey,
   mapsConfigured,
+  embedded = false,
+  active = true,
 }: {
   startDate: string;
   mapKey: string;
   mapsConfigured: boolean;
+  embedded?: boolean;
+  active?: boolean;
 }) {
+  const Content = embedded ? "section" : "main";
   const resetUi = usePlannerUi((state) => state.reset);
   const mutation = useMutation({
     mutationFn: async (input: TripInput) => {
@@ -488,25 +495,40 @@ export function Planner({
   }
   return (
     <>
-      <header className="site-header">
-        <span className="brand">
-          <span className="brand-icon">
-            <Compass size={22} aria-hidden="true" />
+      {!embedded && (
+        <header className="site-header">
+          <span className="brand">
+            <span className="brand-icon">
+              <Compass size={22} aria-hidden="true" />
+            </span>
+            行间
           </span>
-          行间
-        </span>
-        <Link className="header-description" href="/">
-          完整 AI 规划
-        </Link>
-        <button className="button" disabled={mutation.isPending} onClick={newPlan}>
-          <Plus size={18} aria-hidden="true" />
-          新建计划
-        </button>
-      </header>
-      <main id="main" className={mutation.data ? "workspace-shell" : "form-shell"}>
+          <Link className="header-description" href="/plan">
+            完整 AI 规划
+          </Link>
+          <button className="button" disabled={mutation.isPending} onClick={newPlan}>
+            <Plus size={18} aria-hidden="true" />
+            新建计划
+          </button>
+        </header>
+      )}
+      {embedded && mutation.data && (
+        <div className="unified-manual-toolbar">
+          <p>手动路线草稿</p>
+          <button className="button" disabled={mutation.isPending} onClick={newPlan}>
+            <Plus size={18} aria-hidden="true" />
+            新建手动计划
+          </button>
+        </div>
+      )}
+      <Content
+        id={embedded ? "manual-main" : "main"}
+        className={mutation.data ? "workspace-shell" : "form-shell"}
+      >
         {mutation.data ? (
           <Workspace
             draft={mutation.data}
+            active={active}
             mapKey={mapKey}
             mapsConfigured={mapsConfigured}
           />
@@ -533,7 +555,7 @@ export function Planner({
             />
           </>
         )}
-      </main>
+      </Content>
     </>
   );
 }

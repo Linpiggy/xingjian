@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Compass, ArrowUpRight } from "lucide-react";
+import { Compass } from "lucide-react";
 import type { MouseEvent } from "react";
 
 export function TripSiteHeader({
@@ -25,13 +25,13 @@ export function TripSiteHeader({
   }
   const pathname = usePathname();
   const links = [
-    { href: "/explore", label: "首页" },
-    { href: "/plan", label: "新建规划" },
+    { href: "/", label: "首页" },
+    { href: "/plan", label: "规划工作台" },
     { href: "/itinerary", label: "当前行程" },
   ];
   return (
     <header className="trip-site-header">
-      <Link href="/explore" className="trip-brand" onClick={protectDraft}>
+      <Link href="/" className="trip-brand" onClick={protectDraft}>
         <Compass size={24} aria-hidden="true" />
         行间
       </Link>
@@ -44,7 +44,7 @@ export function TripSiteHeader({
             href={link.href}
             onClick={protectDraft}
             aria-current={
-              pathname === link.href || (pathname === "/" && link.href === "/plan")
+              pathname === link.href || (pathname === "/explore" && link.href === "/")
                 ? "page"
                 : undefined
             }
@@ -53,9 +53,6 @@ export function TripSiteHeader({
           </Link>
         ))}
       </nav>
-      <Link href="/manual" onClick={protectDraft}>
-        手动选点 <ArrowUpRight size={14} aria-hidden="true" />
-      </Link>
     </header>
   );
 }

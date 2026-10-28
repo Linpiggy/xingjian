@@ -9,6 +9,7 @@ import {
   fixtureItinerary,
 } from "../fixtures/itinerary";
 import { route } from "../fixtures/draft";
+import { fixtureSocialInspiration } from "../fixtures/social";
 
 beforeEach(() => {
   vi.resetModules();
@@ -40,6 +41,111 @@ async function service() {
   return (await import("@/server/services/create-itinerary")).createItinerary;
 }
 describe("complete itinerary orchestration, offline only", () => {
+  it("searches reviewed social places once across notes without adding hard requirements or model calls", async () => {
+    const { provider, model } = dependencies();
+    const brief = fixtureBrief();
+    brief.socialInspiration = fixtureSocialInspiration();
+    brief.socialInspiration.notes.push({
+      ...structuredClone(brief.socialInspiration.notes[0]),
+      noteId: "000000000000000000000002",
+    });
+    const plan = await (
+      await service()
+    )(brief, provider, model, new AbortController().signal);
+    for (const name of ["测试文化场馆1", "测试午餐店"]) {
+      expect(
+        vi.mocked(provider.search).mock.calls.filter((call) => call[1] === name),
+      ).toHaveLength(1);
+    }
+    expect(model.compose).toHaveBeenCalledOnce();
+    expect(provider.walking).toHaveBeenCalledTimes(8);
+    expect(plan.constraints).toEqual([]);
+    expect(plan.notices.join(" ")).toContain("未核实的旅行经验");
+    expect(plan.brief.socialInspiration).toEqual(brief.socialInspiration);
+  });
+  it("does not pass ambiguous social branches into the candidate pool or pretend a recommendation was required", async () => {
+    const { provider, model } = dependencies();
+    const brief = fixtureBrief();
+    brief.socialInspiration = fixtureSocialInspiration();
+    brief.socialInspiration.notes[0].places = [{ kind: "visit", name: "同名地点" }];
+    const normal = vi.mocked(provider.search).getMockImplementation()!;
+    const base = fixtureCandidates()[0].place;
+    vi.mocked(provider.search).mockImplementation(async (...args) =>
+      args[1] === "同名地点"
+        ? [1, 2].map((index) => ({
+            ...base,
+            name: "同名地点",
+            id: `ambiguous-social-${index}`,
+          }))
+        : normal(...args),
+    );
+    const plan = await (
+      await service()
+    )(brief, provider, model, new AbortController().signal);
+    expect(plan.notices.join(" ")).toContain("未匹配唯一公共地点");
+    expect(JSON.stringify(vi.mocked(model.compose).mock.calls[0][1])).not.toContain(
+      "ambiguous-social-",
+    );
+    expect(plan.constraints).toEqual([]);
+    expect(model.compose).toHaveBeenCalledOnce();
+  });
+  it("keeps an optional failed social lookup explicit without leaking the failure or retrying a query", async () => {
+    const { provider, model } = dependencies();
+    const brief = fixtureBrief();
+    brief.socialInspiration = fixtureSocialInspiration();
+    brief.socialInspiration.notes[0].places = [{ kind: "visit", name: "检索失败地点" }];
+    const normal = vi.mocked(provider.search).getMockImplementation()!;
+    vi.mocked(provider.search).mockImplementation(async (...args) => {
+      if (args[1] === "检索失败地点") {
+        throw new Error("fixture-sensitive-upstream-detail");
+      }
+      return normal(...args);
+    });
+    const plan = await (
+      await service()
+    )(brief, provider, model, new AbortController().signal);
+    expect(plan.notices.join(" ")).toContain("地点检索未完成");
+    expect(JSON.stringify(plan)).not.toContain("fixture-sensitive-upstream-detail");
+    expect(
+      vi.mocked(provider.search).mock.calls.filter((call) => call[1] === "检索失败地点"),
+    ).toHaveLength(1);
+    expect(model.compose).toHaveBeenCalledOnce();
+  });
+  it("rejects unconsented and wrong-city references before any search, route or model attempt", async () => {
+    for (const change of [{ consent: false }, { city: "另一城市" }]) {
+      const { provider, model } = dependencies();
+      const brief = {
+        ...fixtureBrief(),
+        socialInspiration: { ...fixtureSocialInspiration(), ...change },
+      };
+      await expect(
+        (await service())(
+          brief as unknown as ReturnType<typeof fixtureBrief>,
+          provider,
+          model,
+          new AbortController().signal,
+        ),
+      ).rejects.toThrow();
+      expect(provider.search).not.toHaveBeenCalled();
+      expect(provider.walking).not.toHaveBeenCalled();
+      expect(model.compose).not.toHaveBeenCalled();
+    }
+  });
+  it("preserves cancellation rather than turning an aborted social lookup into a fallback model call", async () => {
+    const { provider, model } = dependencies();
+    const brief = fixtureBrief();
+    brief.socialInspiration = fixtureSocialInspiration();
+    const controller = new AbortController();
+    vi.mocked(provider.search).mockImplementation(async () => {
+      controller.abort();
+      throw controller.signal.reason;
+    });
+    await expect(
+      (await service())(brief, provider, model, controller.signal),
+    ).rejects.toThrow();
+    expect(model.compose).not.toHaveBeenCalled();
+    expect(provider.walking).not.toHaveBeenCalled();
+  });
   it("generates without must lists, includes three meals and queries only true directed neighbours", async () => {
     const { provider, model } = dependencies();
     const brief = fixtureBrief();

@@ -59,7 +59,7 @@ for (const [days, travelers] of [
         body: `${JSON.stringify({ type: "progress", message: "正在核对真实邻段（fixture）" })}\n${JSON.stringify({ type: "result", plan: fixtureItinerary(brief) })}\n`,
       });
     });
-    await page.goto("/");
+    await page.goto("/plan");
     await expect(page.getByRole("heading", { name: "这次，想怎样旅行？" })).toBeVisible();
     await generate(page);
     await expect(page.getByRole("main").getByRole("alert")).toBeVisible();
@@ -184,7 +184,7 @@ test("new generated plans require confirmation and allow cancellation and versio
       body: JSON.stringify({ type: "result", plan }),
     });
   });
-  await page.goto("/");
+  await page.goto("/plan");
   await fill(page);
   await generate(page);
   await expect(page.getByRole("heading", { name: "原方案", exact: true })).toBeFocused();
@@ -252,7 +252,7 @@ test("stream failures and cancelled generation preserve the current plan and for
       finished();
     }
   });
-  await page.goto("/");
+  await page.goto("/plan");
   await fill(page);
   await generate(page);
   await expect(page.locator(".trip-app")).toHaveAttribute("data-plan-revision", "1");
@@ -278,7 +278,7 @@ test("stream failures and cancelled generation preserve the current plan and for
 test("the actual planning API enforces same origin and exposes missing configuration as unavailable, never fixtures", async ({
   page,
 }) => {
-  await page.goto("/");
+  await page.goto("/plan");
   const blocked = await page.request.post("/api/itineraries", {
     headers: { Origin: "https://example.invalid" },
     data: {},

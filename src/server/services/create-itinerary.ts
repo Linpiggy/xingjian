@@ -72,7 +72,11 @@ export async function createItinerary(
   return withItineraryBudget(async () => {
     const candidates: ItineraryCandidate[] = [];
     const searches = new Map<string, Place[]>();
-    async function search(query: string, kind: ItineraryCandidate["kind"]) {
+    async function search(
+      query: string,
+      kind: ItineraryCandidate["kind"],
+      exactOnly = false,
+    ) {
       signal.throwIfAborted();
       let found = searches.get(query);
       if (!found) {
@@ -82,7 +86,13 @@ export async function createItinerary(
           .filter((place) => place.source.kind !== "user");
         searches.set(query, found);
       }
-      for (const place of found) {
+      const usable = exactOnly
+        ? found.filter((place) => normalize(place.name) === normalize(query))
+        : found;
+      if (exactOnly && usable.length !== 1) {
+        return found;
+      }
+      for (const place of usable) {
         if (
           !candidates.some(
             (candidate) => candidate.kind === kind && candidate.place.id === place.id,
@@ -123,6 +133,39 @@ export async function createItinerary(
           );
         }
         foodVenues.set(request.name, exact[0].id);
+      }
+    }
+    const socialNotices: string[] = [];
+    const checkedSocialPlaces = new Set<string>();
+    for (const note of brief.socialInspiration?.notes ?? []) {
+      for (const place of note.places) {
+        const key = `${place.kind}:${normalize(place.name)}`;
+        if (checkedSocialPlaces.has(key)) {
+          continue;
+        }
+        checkedSocialPlaces.add(key);
+        progress(
+          "正在核对社交参考中经你确认的推荐地点，不把帖子当作路线或营业证据。",
+          "places",
+        );
+        try {
+          const exact = (await search(place.name, place.kind, true)).filter(
+            (found) => normalize(found.name) === normalize(place.name),
+          );
+          if (exact.length !== 1) {
+            socialNotices.push(
+              `社交推荐“${place.name}”未匹配唯一公共地点，不视为已核实或必去约束。`,
+            );
+          }
+        } catch (error) {
+          signal.throwIfAborted();
+          if (error instanceof ProviderError && error.status !== "unavailable") {
+            throw error;
+          }
+          socialNotices.push(
+            `社交推荐“${place.name}”的地点检索未完成；未用帖子补造坐标、时刻或价格。`,
+          );
+        }
       }
     }
     const visitQueries = [
@@ -432,6 +475,12 @@ export async function createItinerary(
         "费用图表示预算目标的分配建议，不是实际报价或预算达标证明；早餐、午晚餐按真实可用时段纳入。",
         "10 分钟为独立规划缓冲，不是排队、候车或路段耗时；未发送精确住宿字段和自定义地图点，请勿在偏好中填写票据或联系方式。",
         "方案暂存在本页，刷新会丢失。",
+        ...(brief.socialInspiration
+          ? [
+              "参考了用户选用的社交摘录，仅为未核实的旅行经验；来源列表不代表每处都已安排，地点、道路与营业／价格证据独立。",
+              ...socialNotices,
+            ]
+          : []),
       ],
     });
   });

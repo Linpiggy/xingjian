@@ -3,6 +3,8 @@
 
 核验日期：2026-10-12。用户已确认：先按公开文档验证结果创建架构文档与本地仓库，真实账号调用留待凭据配置后进行。
 
+最新方向更新（2026-10-28）：用户已取消美团／大众点评接入，改为评估 MediaCrawler 社交推荐数据；相关旧文档与 D 记录仅保留为历史调查，不再以美团权限作为当前接入前提。最新许可、数据结构及接入边界见第 13 节。
+
 ## 1. 验证等级与结论
 
 - **D（文档确认）**：官方／供应商公开页面说明存在该能力及其接入方式。
@@ -191,3 +193,28 @@ Figma 阶段的路线示意、行程时间和天气可使用明确标注的示�
 本次实测上限为 2 次地点搜索、1 次模型，0 路线／天气／地图 SDK／数据库、0 重试；仅调用一次显式脚本并保留唯一当天 attempt。[脱敏摘要](evidence/itinerary-model-smoke-2026-10-28.json)经回读确认：杭州仅接口测试城市，1 日／1 人；实际搜索 2、模型 1，HTTP200、finish_reason=stop、内容 827 字符、约 4949ms；合法 3 个景点及三餐候选，guides 仅 1 项。模型输出通过修复后的严格核心／候选校验，原实现会因缺少全部指南而拒绝；未保存原始地点／模型内容或私密凭据。
 
 这是一条真实 model-only 契约样本，不是网页完整生成／真实路线及排程验收，也不证明多日质量、账号所有错误场景或供应商 P 许可。实际上游限流本次未发生，Retry-After／冷却及错误分类使用离线测试，不为测试限流重复消耗配额。每日 attempt 不能删除重跑，后续真实调用另行授权。
+
+## 12. Tour-AI 技术参考（只读代码调查）
+
+已通过认证 gh 克隆 [dwsera/Tour-AI，04b8729](https://github.com/dwsera/Tour-AI/tree/04b8729af8e2e9fefb49d2086fb4aa25ee028196)，核对 README、package.json、Prisma schema、首页／创建页、AI／图片 API 与地图组件。实际依赖为 Next 15／React 19／TypeScript／Tailwind 3、Radix／Framer Motion 12／Lucide／Zustand；Prisma 6＋MySQL／TiDB、NextAuth 4、Resend。生成用 DashScope qwen-turbo，流式聊天用 qwen-max；Leaflet／React-Leaflet＋OSM 底图，高德用于逆地理及地点图片，另有第三方图片搜索备用。
+
+可参考首页背景与聚焦入口、分步选择、图文地点卡、侧栏导航和选中地图平移，不迁移当前技术栈。不能照搬可靠性逻辑：getTourismGuide 在 JSON 解析失败后用正则提取名称／描述，并默认补“免费”“30分钟”“地铁”；MapComponent 把地点坐标直接连接成虚线而非真实道路路线。图片搜索首个 POI／备用搜索与通用图库映射不能证明地点匹配或展示许可；图片代理接受任意 URL 并非可采用的安全边界。
+
+GitHub 未识别标准许可证，根目录未发现 LICENSE，README 明确仅学习／研究／非商业用途；本次只研究实现思想，不复用其代码、品牌或图片，不运行安装脚本、演示或业务接口。
+
+## 13. MediaCrawler 社交推荐来源（代码调查与离线导入，未采集）
+
+已认证 gh 克隆 [NanmiCoder/MediaCrawler，68d9ef1](https://github.com/NanmiCoder/MediaCrawler/tree/68d9ef1c1da22eab75940dfd7cec259907006538)，读取 LICENSE、README、pyproject.toml、存储指南、小红书导出实现与 API schema。它是采集工具，不提供旅行领域的 POI 核验或真实算路：
+
+- 技术：Python ≥3.11、Playwright／浏览器登录态、httpx、Pydantic、FastAPI／Uvicorn、SQLAlchemy；可选 WebUI 为 React 18／Vite／Tailwind／Zustand／TanStack Query。无需替换现有 Next／React／PostgreSQL 技术栈，也不把其整个 WebUI 或爬虫依赖嵌入本应用。
+- 数据：支持小红书、抖音、B站等平台；可导出 JSON、JSONL、CSV、Excel 及数据库。小红书内容包含 note_id、title、desc、time、last_update_time、tag_list、source_keyword、互动计数和 image_list；当前导出还含 xsec_token，note_url 也可带该值。接入必须白名单取字段、去掉令牌／登录态／作者标识，不原样传模型、提交 Git 或分享。
+- 许可：[NON-COMMERCIAL LEARNING LICENSE 1.1](https://github.com/NanmiCoder/MediaCrawler/blob/68d9ef1c1da22eab75940dfd7cec259907006538/LICENSE)仅授予非商业学习研究用途，要求保留版权／许可声明，禁止大规模采集或干扰平台；商业用途需作者书面同意。代码许可不自动授予平台访问、笔记转发或照片展示权，不能视为生产可无条件使用的通用接口。
+- 首轮采用边界：独立本地采集 → 导入合法公开且已获权的笔记 JSON／JSONL → 提取／审核推荐及来源时间 → 匹配高德候选 POI → 实际相邻路线 → 确定性排程与 AI 解释。推荐和作者经验标为社交来源／未核实，不把热度当可靠性，营业、票价、排队、过敏和路线时刻独立核对。多平台／图片展示／线上抓取任务不是导入 DTO 的默认权限。
+
+检查 101 已实现小红书 JSON／JSONL 本地文件适配与离线 UI／编排闭环（433 单测／194 双端 E2E／build），不是平台账号或真实笔记验收：
+
+- 浏览器最多解析 1 MiB／100 篇，白名单仅保留平台、24 位 noteId、标题、480 字符摘录、可未知的笔记自带时间与独立导入记录。最多选三篇，每篇可由用户确认两个景点／餐厅检索名称；不自动提取或强制用户先填地点。
+- Cookie、token、带令牌的原 note_url、作者结构字段、互动量和媒体不进入请求；规范来源链接仅由已校验 ID 构造，不含令牌，可能需平台内查看。正文只清理基础 URL／联系方式／提及，不能替代人工去标识与合法使用确认。
+- 资料绑定当前城市并须明确确认发送范围，只有应用后随显式生成交给服务端与当前模型；撤销同意即移除请求字段。最多六项推荐检索，经唯一精确匹配才补入公共候选，歧义／失败明确提示，不变成必去约束；仍只用一轮模型，源文本是数据而非工具指令。来源名单不是逐活动引用证明，更不是营业、价格或安全依据。
+
+未安装 Python 依赖、接管 Chrome、登录、发起平台采集或新增真实模型调用。采集城市／关键词／数量、内容使用权、多平台与照片展示仍未确认；只导入契约与明确 fixture 通过，实际平台文件、自动采集与生产许可未验，不读取或要求 Cookie／登录文件，不绕过验证码或访问控制。

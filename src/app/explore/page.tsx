@@ -30,7 +30,8 @@ export default function ExplorePage() {
               值得好好期待。
             </h1>
             <p className="travel-home-intro">
-              告诉我们想去的城市、能玩的时间与预算。把每天的吃玩和换地点安排好，再按你的想法慢慢调整。
+              可以把安排交给
+              AI，也可以亲自挑选想去的地点。在同一个工作台，把每天的吃玩、步行与停留，慢慢调成喜欢的样子。
             </p>
             <div className="travel-home-actions">
               <Link href="/plan" className="travel-home-start">
@@ -99,9 +100,9 @@ export default function ExplorePage() {
             <strong>回到你的旅行提案</strong>
             <ArrowRight size={20} aria-hidden="true" />
           </Link>
-          <Link href="/manual">
+          <Link href="/plan?mode=manual">
             <span>想亲自选择地点</span>
-            <strong>打开手动选点工作台</strong>
+            <strong>在工作台里手动选点</strong>
             <ArrowRight size={20} aria-hidden="true" />
           </Link>
         </section>

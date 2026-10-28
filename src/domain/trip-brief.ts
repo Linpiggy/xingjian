@@ -1,4 +1,5 @@
 import { addDays } from "./draft";
+import type { SocialInspiration } from "./social-inspiration";
 
 export const tripPurposes = [
   "local_life",
@@ -41,6 +42,7 @@ export type TripBrief = {
   mustVisit: string[];
   mustEat: { kind: "dish" | "restaurant"; name: string }[];
   dietary: { avoid: string[]; allergies: string[] };
+  socialInspiration?: SocialInspiration;
 };
 export type BriefDay = {
   date: string;

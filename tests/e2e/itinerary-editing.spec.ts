@@ -17,7 +17,7 @@ async function setup(page: Page, days = 2) {
       }),
     }),
   );
-  await page.goto("/");
+  await page.goto("/plan");
   await page.getByLabel("目的地城市").fill("测试城市");
   await page.getByLabel("旅行天数").fill(String(days));
   await page.getByLabel("同行人数").fill("20");

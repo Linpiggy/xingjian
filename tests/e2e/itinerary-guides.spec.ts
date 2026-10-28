@@ -22,7 +22,7 @@ async function setup(page: Page, legacy = false) {
       body: JSON.stringify({ type: "result", plan }),
     });
   });
-  await page.goto("/");
+  await page.goto("/plan");
   await page.getByLabel("目的地城市").fill("测试城市");
   await page.getByLabel("旅行天数").fill(legacy ? "1" : "14");
   await page.getByLabel("同行人数").fill("20");

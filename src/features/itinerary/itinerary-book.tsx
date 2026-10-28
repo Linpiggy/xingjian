@@ -16,6 +16,7 @@ import {
   GripVertical,
 } from "lucide-react";
 import type { Itinerary } from "@/domain/itinerary";
+import { socialNoteUrl } from "@/domain/social-inspiration";
 import type { Day } from "@/domain/models";
 import { formatMinute } from "@/domain/draft";
 import {
@@ -50,14 +51,16 @@ export function ItineraryBook({
   mapsConfigured,
   onEdit,
   onActivityChange,
+  active = true,
 }: {
   plan: Itinerary;
   mapKey: string;
   mapsConfigured: boolean;
   onEdit: () => void;
   onActivityChange?: (change: ItineraryChange) => void;
+  active?: boolean;
 }) {
-  const [active, setActive] = useState(0);
+  const [dayIndex, setDayIndex] = useState(0);
   const [selected, setSelected] = useState<string | null>(null);
   const [mapOpen, setMapOpen] = useState(false);
   const [detailId, setDetailId] = useState<string | null>(null);
@@ -82,7 +85,7 @@ export function ItineraryBook({
       document.getElementById("trip-day-heading")?.scrollIntoView({ block: "start" });
     }
   }, [mapOpen, wide]);
-  const currentDay = Math.min(active, plan.days.length - 1);
+  const currentDay = Math.min(dayIndex, plan.days.length - 1);
   const day = plan.days[currentDay];
   const schedule = day.schedule;
   const total = briefBudget(plan.brief).totalFen;
@@ -227,7 +230,7 @@ export function ItineraryBook({
               type="button"
               aria-current={currentDay === index ? "date" : undefined}
               onClick={() => {
-                setActive(index);
+                setDayIndex(index);
                 setSelected(null);
               }}
             >
@@ -426,7 +429,7 @@ export function ItineraryBook({
           )}
         </section>
         <aside className="trip-map-aside" aria-label="路线与费用概览">
-          {(wide || mapOpen) && mapDay.items.length > 0 && (
+          {active && (wide || mapOpen) && mapDay.items.length > 0 && (
             <section className="trip-map-panel">
               <div>
                 <h2>把今天放在地图上</h2>
@@ -539,6 +542,34 @@ export function ItineraryBook({
           AI 模型：{plan.model} · 生成时间：{plan.generatedAt}
         </p>
       </details>
+      {plan.brief.socialInspiration && (
+        <details className="trip-final-details" aria-label="社交参考来源">
+          <summary>
+            社交参考来源 · {plan.brief.socialInspiration.notes.length} 篇选用摘录
+          </summary>
+          <p>
+            这是用户选用、供模型参考的未核实经验，不是逐活动采用证明，也不确认营业、价格、过敏安全或图片使用权。规范链接不携带访问令牌，可能需在平台内查看。
+          </p>
+          {plan.brief.socialInspiration.notes.map((note) => (
+            <div className="trip-social-reference" key={note.noteId}>
+              <a href={socialNoteUrl(note)} target="_blank" rel="noreferrer noopener">
+                {note.title}
+              </a>
+              <p>{note.excerpt}</p>
+              <p>
+                笔记自带时间（未核实）：{note.publishedAt ?? "未知"} · 导入记录：
+                {note.importedAt}
+              </p>
+              {note.places.length > 0 && (
+                <p>
+                  用户希望检索的候选：{note.places.map((place) => place.name).join("、")}
+                  ；不代表全部已安排。
+                </p>
+              )}
+            </div>
+          ))}
+        </details>
+      )}
       {expenseOpen && onActivityChange && (
         <ItineraryExpenseDialog
           plan={plan}

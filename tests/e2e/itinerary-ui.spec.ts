@@ -16,7 +16,7 @@ async function proposal(page: Page, long = false) {
       body: JSON.stringify({ type: "result", plan }),
     });
   });
-  await page.goto("/");
+  await page.goto("/plan");
   await page.getByLabel("目的地城市").fill("测试城市");
   await page.getByLabel("旅行天数").fill("2");
   await page.getByLabel("我确认本次生成会使用模型与地图查询配额").check();
@@ -32,7 +32,7 @@ test("form sections preserve input and keep the live summary in sync without net
     calls += 1;
     return route.abort();
   });
-  await page.goto("/");
+  await page.goto("/plan");
   const summary = page.getByRole("complementary", { name: "本次旅行摘要" });
   await page.getByLabel("目的地城市").fill("苏州");
   await page.getByLabel("旅行天数").fill("5");
@@ -68,7 +68,7 @@ test("form sections preserve input and keep the live summary in sync without net
 test("validation returns to a hidden invalid field without dropping preferences", async ({
   page,
 }) => {
-  await page.goto("/");
+  await page.goto("/plan");
   await page.getByRole("button", { name: "偏好与必去", exact: true }).click();
   await page.getByLabel("必吃菜品").fill("测试菜品");
   await page.getByRole("button", { name: "生成我的完整方案" }).click();

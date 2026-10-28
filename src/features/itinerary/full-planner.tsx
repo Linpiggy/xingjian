@@ -22,11 +22,15 @@ export function FullPlanner({
   mapKey,
   mapsConfigured,
   view = "auto",
+  embedded = false,
+  active = true,
 }: {
   startDate: string;
   mapKey: string;
   mapsConfigured: boolean;
   view?: "auto" | "new" | "itinerary";
+  embedded?: boolean;
+  active?: boolean;
 }) {
   const router = useRouter();
   const { plan, review, previous, version } = useItineraryStore();
@@ -98,7 +102,7 @@ export function FullPlanner({
       dirty.current = false;
       setEditing(false);
       setProgress("");
-      if (view === "new") {
+      if (view === "new" && !embedded) {
         router.push("/itinerary");
       }
     } catch (cause) {
@@ -150,19 +154,29 @@ export function FullPlanner({
     }
   }
   const visible = review?.plan ?? plan;
+  const Content = embedded ? "section" : "main";
   return (
-    <div className="trip-app" data-plan-revision={version}>
-      <a className="skip-link" href="#trip-main">
-        跳到主要内容
-      </a>
-      <TripSiteHeader
-        beforeNavigate={() =>
-          !editing ||
-          !dirty.current ||
-          window.confirm("离开会丢弃本页尚未提交的需求，当前已生成方案不会删除。继续吗？")
-        }
-      />
-      <main
+    <div
+      className={embedded ? "itinerary-embedded" : "trip-app"}
+      data-plan-revision={version}
+    >
+      {!embedded && (
+        <>
+          <a className="skip-link" href="#trip-main">
+            跳到主要内容
+          </a>
+          <TripSiteHeader
+            beforeNavigate={() =>
+              !editing ||
+              !dirty.current ||
+              window.confirm(
+                "离开会丢弃本页尚未提交的需求，当前已生成方案不会删除。继续吗？",
+              )
+            }
+          />
+        </>
+      )}
+      <Content
         id="trip-main"
         className={editing ? "trip-entry" : "trip-result"}
         onInputCapture={() => {
@@ -198,6 +212,9 @@ export function FullPlanner({
                 failure={failure}
                 cooldown={cooldown}
                 onSubmit={generate}
+                onDraftChange={() => {
+                  dirty.current = true;
+                }}
                 onCancel={cancel}
                 onBackToPlan={
                   plan
@@ -206,7 +223,7 @@ export function FullPlanner({
                           cancel();
                         }
                         setEditing(false);
-                        if (view === "new") {
+                        if (view === "new" && !embedded) {
                           router.push("/itinerary");
                         }
                       }
@@ -310,6 +327,7 @@ export function FullPlanner({
               plan={visible}
               mapKey={mapKey}
               mapsConfigured={mapsConfigured}
+              active={active}
               onEdit={edit}
               onActivityChange={
                 review
@@ -337,7 +355,7 @@ export function FullPlanner({
             </Link>
           </section>
         )}
-      </main>
+      </Content>
     </div>
   );
 }

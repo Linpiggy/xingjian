@@ -36,7 +36,7 @@ for (const limited of [false, true]) {
           }) + "\n",
       });
     });
-    await page.goto("/");
+    await page.goto("/plan");
     await page.getByLabel("目的地城市").fill("测试城市");
     await page.getByLabel("旅行天数").fill("1");
     await page.getByLabel("我确认本次生成会使用模型与地图查询配额").check();
