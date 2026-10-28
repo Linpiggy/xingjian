@@ -67,6 +67,8 @@ describe("complete itinerary orchestration, offline only", () => {
       expect.any(AbortSignal),
     );
     expect(model.compose).toHaveBeenCalledOnce();
+    expect(plan.days[0].recommendations[1].guide?.experience).toContain("文化线索");
+    expect(plan.days[0].recommendations[0].guide?.tips[0]).toContain("过敏原");
     expect(plan.allocation.reduce((sum, item) => sum + item.targetFen, 0)).toBe(300000);
     expect(plan.fixture).toBe(true);
     expect(plan.status).toBe("unverified");
@@ -95,6 +97,20 @@ describe("complete itinerary orchestration, offline only", () => {
       expect(plan.days.every((day) => day.schedule?.items.length === 5)).toBe(true);
     },
   );
+  it("keeps a valid schedule and explicitly marks missing optional guides without another model call", async () => {
+    const { provider, model } = dependencies();
+    const outline = fixtureOutline();
+    delete outline.guides;
+    vi.mocked(model.compose).mockResolvedValue(outline);
+    const plan = await (
+      await service()
+    )(fixtureBrief(), provider, model, new AbortController().signal);
+    expect(plan.days[0].schedule?.items).toHaveLength(5);
+    expect(plan.days[0].notices.join("")).toContain("详细体验建议缺失");
+    expect(plan.days[0].recommendations.every((item) => !item.guide)).toBe(true);
+    expect(model.compose).toHaveBeenCalledOnce();
+    expect(provider.walking).toHaveBeenCalledTimes(8);
+  });
   it("preserves a no-activity arrival date without fabricating meals or activity times", async () => {
     const { provider, model } = dependencies();
     const brief = fixtureBrief();

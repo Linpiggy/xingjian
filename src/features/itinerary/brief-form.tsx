@@ -25,6 +25,7 @@ import {
 } from "@/domain/trip-brief";
 import { tripBriefSchema } from "@/lib/trip-brief-contracts";
 import { parseYuanFen } from "@/lib/money";
+import type { PlanningRequestError } from "./request-itinerary";
 
 const purposeVisuals = {
   local_life: { icon: Store, description: "街巷、市场与当地日常" },
@@ -41,6 +42,8 @@ export function BriefForm({
   pending,
   progress,
   error,
+  failure,
+  cooldown = 0,
   onSubmit,
   onCancel,
   onBackToPlan,
@@ -50,6 +53,8 @@ export function BriefForm({
   pending: boolean;
   progress: string;
   error: string | null;
+  failure?: PlanningRequestError | null;
+  cooldown?: number;
   onSubmit: (brief: TripBrief) => void;
   onCancel: () => void;
   onBackToPlan?: () => void;
@@ -521,6 +526,26 @@ export function BriefForm({
                 {validation || error}
               </p>
             )}
+            {error && failure && (
+              <details className="trip-disclosure trip-failure-details">
+                <summary>查看错误原因</summary>
+                <p>
+                  阶段：
+                  {failure.stage
+                    ? { places: "地点搜索", model: "AI 规划", routes: "路线与排程" }[
+                        failure.stage
+                      ]
+                    : "连接与响应"}
+                  {" · "}错误代码：{failure.code}
+                </p>
+                <p>未自动重试；再次生成可能消耗查询与模型额度，输入和原方案仍保留。</p>
+              </details>
+            )}
+            {cooldown > 0 && (
+              <p className="trip-operation-status" role="status">
+                请等待 {cooldown} 秒后手动重试，不会自动发送请求。
+              </p>
+            )}
             {pending ? (
               <div className="trip-pending">
                 <p role="status">{progress || "正在准备旅行方案…"}</p>
@@ -529,7 +554,7 @@ export function BriefForm({
                 </button>
               </div>
             ) : (
-              <button type="submit" className="trip-generate">
+              <button type="submit" className="trip-generate" disabled={cooldown > 0}>
                 生成我的完整方案 <ArrowRight size={18} aria-hidden="true" />
               </button>
             )}

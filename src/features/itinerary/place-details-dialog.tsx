@@ -6,11 +6,14 @@ import type { ScheduledActivity } from "@/domain/meal-planning";
 import { formatMinute } from "@/domain/draft";
 import type { ItineraryChange } from "@/domain/itinerary-editing";
 import { ItineraryVenueEditor } from "./itinerary-venue-editor";
+import type { ItineraryGuide } from "@/domain/itinerary";
+import { ItineraryPlaceGuide } from "./itinerary-place-guide";
 
 export function PlaceDetailsDialog({
   item,
   date,
   dish,
+  guide,
   onClose,
   onChange,
   moveDays,
@@ -19,6 +22,7 @@ export function PlaceDetailsDialog({
   item: ScheduledActivity;
   date: string;
   dish: string | null;
+  guide?: ItineraryGuide;
   onClose: () => void;
   onChange?: (change: ItineraryChange) => void;
   initialMoveOpen?: boolean;
@@ -178,6 +182,9 @@ export function PlaceDetailsDialog({
           {item.activity.stayMinutes} 分钟
           {dish ? `；菜品建议：${dish}，供应及饮食适配需向商家核实。` : "。"}
         </p>
+        {guide && (
+          <ItineraryPlaceGuide guide={guide} meal={item.activity.kind !== "visit"} />
+        )}
         {onChange && (
           <section className="trip-activity-edit" aria-label="调整此活动">
             <h3>调整此活动</h3>

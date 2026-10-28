@@ -78,13 +78,13 @@ describe("complete itinerary model boundary", () => {
     expect(payload.mustEat).toBeUndefined();
   });
   it("rejects malformed, truncated, oversized and credential-containing model responses", async () => {
-    for (const response of [
-      completion("bad JSON"),
-      completion("{}"),
-      completion(JSON.stringify(fixtureOutline()), "length"),
-      completion(config.key),
-      new Response("x".repeat(128001)),
-    ]) {
+    for (const [response, code] of [
+      [completion("bad JSON"), "ai_invalid_json"],
+      [completion("{}"), "ai_invalid_response"],
+      [completion(JSON.stringify(fixtureOutline()), "length"), "ai_output_truncated"],
+      [completion(config.key), "ai_invalid_response"],
+      [new Response("x".repeat(128001)), "ai_invalid_response"],
+    ] as const) {
       const transport = vi.fn<typeof fetch>().mockResolvedValue(response);
       await expect(
         new OpenAiItineraryModel(config, transport).compose(
@@ -92,7 +92,7 @@ describe("complete itinerary model boundary", () => {
           fixtureCandidates(),
           new AbortController().signal,
         ),
-      ).rejects.toMatchObject({ code: "ai_invalid_response" });
+      ).rejects.toMatchObject({ code });
     }
   });
   it("does not reflect raw HTTP errors or retry charged model requests", async () => {

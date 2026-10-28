@@ -70,6 +70,32 @@ export function fixtureOutline(brief = fixtureBrief()): ItineraryOutline {
     dish: `测试特色菜品${index + 1}`,
   });
   return {
+    guides: [
+      ...Array.from({ length: brief.dayCount * 2 }, (_, index) => `full-visit-${index}`),
+      "full-food-0",
+      "full-food-1",
+      "full-food-2",
+    ].map((placeId) => ({
+      placeId,
+      experience: placeId.startsWith("full-food")
+        ? "测试建议：把这餐作为步行之间的休息，先询问当天供应，再按人数选择小份搭配，保留交流与用餐的时间。"
+        : "测试建议：先了解现场导览，再选一条感兴趣的文化线索慢慢看；预留停下阅读与休息的时间，不必追求看完全部内容。",
+      highlights: [
+        placeId.startsWith("full-food")
+          ? "留意本地口味与个人偏好的差异"
+          : "围绕一条文化线索观察与记录",
+      ],
+      tips: [
+        placeId.startsWith("full-food")
+          ? "点餐前询问份量与过敏原处理，不能仅凭菜名判断。"
+          : "若现场有导览，先确认参观范围，再决定重点；摄影前核实现场规定。",
+      ],
+      checkBeforeGo: [
+        placeId.startsWith("full-food")
+          ? "当天菜单、营业及饮食适配尚待商家确认"
+          : "开放区域、预约要求与入场规则尚未核实",
+      ],
+    })),
     title: "在城市的文化与烟火之间",
     summary: "测试 fixture：用文化场馆串联街区，在三餐之间留出步行与休息的余地。",
     days: Array.from({ length: brief.dayCount }, (_, index) => ({
@@ -95,6 +121,9 @@ export function fixtureOutline(brief = fixtureBrief()): ItineraryOutline {
 export function fixtureItinerary(brief = fixtureBrief()): Itinerary {
   const outline = fixtureOutline(brief);
   const candidates = fixtureCandidates();
+  const guides = new Map(
+    outline.guides?.map(({ placeId, ...guide }) => [placeId, guide]),
+  );
   const days = briefDays(brief).map((day, index) => {
     const recommendation = outline.days[index];
     const activities: DayActivity[] = [];
@@ -125,7 +154,13 @@ export function fixtureItinerary(brief = fixtureBrief()): Itinerary {
                 source: { kind: "unverified", recordedAt: "2026-10-21T11:00:00Z" },
               },
       });
-      recommendations.push({ activityId: id, reason: choice.reason, dish });
+      const guide = guides.get(choice.placeId);
+      recommendations.push({
+        activityId: id,
+        reason: choice.reason,
+        dish,
+        ...(guide ? { guide: structuredClone(guide) } : {}),
+      });
     };
     if (day.activityWindow) {
       for (const [kind, start, end, visitIndex] of [

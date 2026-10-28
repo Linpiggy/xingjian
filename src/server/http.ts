@@ -89,15 +89,33 @@ export async function api(operation: () => Promise<Response>): Promise<Response>
       const status =
         error.status === "not_configured"
           ? 503
-          : error.code === "rate_limited"
+          : [
+                "rate_limited",
+                "ai_rate_limited",
+                "ai_local_rate_limited",
+                "ai_cooldown",
+              ].includes(error.code)
             ? 429
-            : ["no_place", "duplicate_place"].includes(error.code)
-              ? 422
-              : 502;
-      return json(
-        { code: error.code, message: error.message, providerStatus: error.status },
+            : ["generation_busy", "ai_busy"].includes(error.code)
+              ? 409
+              : ["no_place", "duplicate_place"].includes(error.code)
+                ? 422
+                : 502;
+      const response = json(
+        {
+          code: error.code,
+          message: error.message,
+          providerStatus: error.status,
+          ...(error.retryAfterSeconds
+            ? { retryAfterSeconds: error.retryAfterSeconds }
+            : {}),
+        },
         status,
       );
+      if (error.retryAfterSeconds) {
+        response.headers.set("Retry-After", String(error.retryAfterSeconds));
+      }
+      return response;
     }
     // Never serialize supplier URLs, secrets, raw responses or private stack traces.
     return json({ code: "unavailable", message: "服务暂时不可用，请稍后重试。" }, 503);

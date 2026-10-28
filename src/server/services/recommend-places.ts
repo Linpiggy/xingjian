@@ -4,7 +4,7 @@ import type {
   RecommendationModel,
 } from "@/server/ai/openai-compatible";
 import { ProviderError } from "@/server/providers/errors";
-import { withAiBudget } from "@/server/ai/budget";
+import { withAiBudget, withItineraryBudget } from "@/server/ai/budget";
 
 const searchTerms = {
   自然风光: "公园",
@@ -18,7 +18,7 @@ export async function recommendPlaces(
   places: PlaceProvider,
   ai: RecommendationModel,
 ) {
-  return withAiBudget(async () => {
+  return withItineraryBudget(async () => {
     const candidates: PlaceCandidate[] = [];
     for (const interest of new Set(input.interests)) {
       const keyword = searchTerms[interest];
@@ -38,7 +38,7 @@ export async function recommendPlaces(
         "no_place",
       );
     }
-    const choices = await ai.select(input, candidates);
+    const choices = await withAiBudget(() => ai.select(input, candidates));
     const ids = new Set(choices.map((choice) => choice.placeId));
     if (
       ids.size !== choices.length ||

@@ -181,6 +181,7 @@ export function ItineraryBook({
   return (
     <div className={`trip-book${mapOpen ? " is-map-open" : ""}`}>
       <section className="trip-cover" aria-label="完整旅行方案总览">
+        <p className="trip-cover-city">{plan.brief.destinationCity} · 旅行提案</p>
         <div className="trip-cover-meta">
           <span>{tripPurposeLabels[plan.brief.mainPurpose]}</span>
           <span>
@@ -267,14 +268,14 @@ export function ItineraryBook({
               ))}
             </details>
           )}
-          <ol className="trip-timeline">
+          <ol className="trip-timeline" key={day.date}>
             {schedule?.items.map((item, index) => {
               const recommendation = day.recommendations.find(
                 (value) => value.activityId === item.activity.id,
               );
               const leg = index > 0 ? schedule.legs[index - 1] : null;
               return (
-                <li key={item.activity.id}>
+                <li key={item.activity.id} style={{ animationDelay: `${index * 35}ms` }}>
                   {leg && (
                     <p className="trip-transfer">
                       <Footprints size={14} aria-hidden="true" />
@@ -381,6 +382,14 @@ export function ItineraryBook({
                       </p>
                     )}
                     <p className="trip-reason">{recommendation?.reason}</p>
+                    {recommendation?.guide && (
+                      <p className="trip-experience">
+                        <span>
+                          AI {item.activity.kind === "visit" ? "游玩" : "用餐"}建议
+                        </span>
+                        {recommendation.guide.experience}
+                      </p>
+                    )}
                     <button
                       type="button"
                       className="trip-place-evidence"
@@ -392,7 +401,10 @@ export function ItineraryBook({
                         setDetailId(item.activity.id);
                       }}
                     >
-                      地址、来源与核实事项 <ChevronRight size={12} aria-hidden="true" />
+                      {recommendation?.guide
+                        ? "详细建议、地址与核实事项"
+                        : "地址、来源与核实事项"}{" "}
+                      <ChevronRight size={12} aria-hidden="true" />
                     </button>
                   </article>
                 </li>
@@ -544,6 +556,7 @@ export function ItineraryBook({
           dish={
             day.recommendations.find((item) => item.activityId === detailId)?.dish ?? null
           }
+          guide={day.recommendations.find((item) => item.activityId === detailId)?.guide}
           onClose={closeDetails}
           initialMoveOpen={detailMoveOpen}
           onChange={

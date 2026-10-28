@@ -3,11 +3,13 @@
 import { useEffect, useRef, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { TripSiteHeader } from "./trip-site-header";
 import { Compass, Check, RotateCcw, ArrowUpRight } from "lucide-react";
 import type { TripBrief } from "@/domain/trip-brief";
 import { BriefForm } from "./brief-form";
 import { ItineraryBook } from "./itinerary-book";
-import { requestItinerary } from "./request-itinerary";
+import { requestItinerary, PlanningRequestError } from "./request-itinerary";
 import { useItineraryStore } from "./itinerary-store";
 import "./itinerary.css";
 import { ItineraryChangePreview } from "./itinerary-change-preview";
@@ -19,19 +21,33 @@ export function FullPlanner({
   startDate,
   mapKey,
   mapsConfigured,
+  view = "auto",
 }: {
   startDate: string;
   mapKey: string;
   mapsConfigured: boolean;
+  view?: "auto" | "new" | "itinerary";
 }) {
+  const router = useRouter();
   const { plan, review, previous, version } = useItineraryStore();
   const [editing, setEditing] = useState(
-    () => useItineraryStore.getState().plan === null,
+    () =>
+      view === "new" || (view === "auto" && useItineraryStore.getState().plan === null),
   );
   const [pending, setPending] = useState(false);
   const [progress, setProgress] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [failure, setFailure] = useState<PlanningRequestError | null>(null);
+  const [cooldown, setCooldown] = useState(0);
   const controller = useRef<AbortController | null>(null);
+  const dirty = useRef(false);
+  useEffect(() => {
+    if (cooldown <= 0) {
+      return;
+    }
+    const timer = setTimeout(() => setCooldown((value) => Math.max(0, value - 1)), 1000);
+    return () => clearTimeout(timer);
+  }, [cooldown]);
   const mutation = useMutation({
     mutationFn: ({ brief, signal }: { brief: TripBrief; signal: AbortSignal }) =>
       requestItinerary(brief, signal, (message) => {
@@ -57,12 +73,21 @@ export function FullPlanner({
     }
   }, [editing, plan, reviewId, activityReview]);
   async function generate(brief: TripBrief) {
-    controller.current?.abort();
+    if (controller.current || cooldown > 0) {
+      return;
+    }
+    if (useItineraryStore.getState().review) {
+      setError(
+        "当前仍有尚未确认的预览，请先返回当前方案确认或放弃，再生成；本次未发起请求。",
+      );
+      return;
+    }
     const request = new AbortController();
     controller.current = request;
     const baseVersion = useItineraryStore.getState().version;
     setPending(true);
     setError(null);
+    setFailure(null);
     setProgress("正在准备公开候选与完整旅行方案…");
     try {
       const result = await mutation.mutateAsync({ brief, signal: request.signal });
@@ -70,14 +95,24 @@ export function FullPlanner({
         return;
       }
       useItineraryStore.getState().receive(result, baseVersion);
+      dirty.current = false;
       setEditing(false);
       setProgress("");
+      if (view === "new") {
+        router.push("/itinerary");
+      }
     } catch (cause) {
       if (!request.signal.aborted) {
+        setProgress("");
         setError(cause instanceof Error ? cause.message : "方案生成失败，请重试。");
+        if (cause instanceof PlanningRequestError) {
+          setFailure(cause);
+          setCooldown(cause.retryAfterSeconds ?? 0);
+        }
       }
     } finally {
       if (controller.current === request) {
+        controller.current = null;
         setPending(false);
         mutation.reset();
       }
@@ -95,8 +130,12 @@ export function FullPlanner({
       return;
     }
     useItineraryStore.getState().cancelReview();
+    dirty.current = false;
     setEditing(true);
     setError(null);
+    if (view === "itinerary") {
+      router.push("/plan");
+    }
   }
   function confirm() {
     try {
@@ -116,18 +155,31 @@ export function FullPlanner({
       <a className="skip-link" href="#trip-main">
         跳到主要内容
       </a>
-      <header className="trip-site-header">
-        <Link href="/" className="trip-brand">
-          <Compass size={24} aria-hidden="true" />
-          行间
-        </Link>
-        <span className="trip-header-divider" aria-hidden="true" />
-        <span>旅行规划工作台</span>
-        <Link href="/manual">
-          手动选点 <ArrowUpRight size={14} aria-hidden="true" />
-        </Link>
-      </header>
-      <main id="trip-main" className={editing ? "trip-entry" : "trip-result"}>
+      <TripSiteHeader
+        beforeNavigate={() =>
+          !editing ||
+          !dirty.current ||
+          window.confirm("离开会丢弃本页尚未提交的需求，当前已生成方案不会删除。继续吗？")
+        }
+      />
+      <main
+        id="trip-main"
+        className={editing ? "trip-entry" : "trip-result"}
+        onInputCapture={() => {
+          if (editing) {
+            dirty.current = true;
+          }
+        }}
+        onClickCapture={(event) => {
+          if (
+            editing &&
+            event.target instanceof Element &&
+            event.target.closest(".trip-purpose-grid button")
+          ) {
+            dirty.current = true;
+          }
+        }}
+      >
         {editing ? (
           <>
             <div className="trip-entry-heading">
@@ -143,6 +195,8 @@ export function FullPlanner({
                 pending={pending}
                 progress={progress}
                 error={error}
+                failure={failure}
+                cooldown={cooldown}
                 onSubmit={generate}
                 onCancel={cancel}
                 onBackToPlan={
@@ -152,6 +206,9 @@ export function FullPlanner({
                           cancel();
                         }
                         setEditing(false);
+                        if (view === "new") {
+                          router.push("/itinerary");
+                        }
                       }
                     : undefined
                 }
@@ -264,7 +321,22 @@ export function FullPlanner({
               }
             />
           </>
-        ) : null}
+        ) : (
+          <section
+            className="trip-empty-itinerary"
+            aria-labelledby="empty-itinerary-heading"
+          >
+            <Compass size={48} strokeWidth={1.2} aria-hidden="true" />
+            <p>你的旅行提案</p>
+            <h1 id="empty-itinerary-heading">还没有当前行程</h1>
+            <p>
+              从一个目的地开始，安排每天的游览、三餐和地点间步行。已有方案仅在当前页面会话内保留，刷新会清空。
+            </p>
+            <Link href="/plan" className="button primary">
+              新建旅行规划 <ArrowUpRight size={16} aria-hidden="true" />
+            </Link>
+          </section>
+        )}
       </main>
     </div>
   );

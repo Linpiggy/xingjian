@@ -8,12 +8,12 @@ import {
   type TripBrief,
   type TripPurpose,
 } from "@/domain/trip-brief";
-import type { Itinerary, ItineraryCandidate } from "@/domain/itinerary";
+import type { Itinerary, ItineraryCandidate, ItineraryStage } from "@/domain/itinerary";
 import { itinerarySchema, itineraryOutlineSchema } from "@/lib/itinerary-contracts";
 import { tripBriefSchema } from "@/lib/trip-brief-contracts";
 import { placeSchema, walkingSchema } from "@/lib/contracts";
 import type { ItineraryModel } from "@/server/ai/itinerary-model";
-import { withAiBudget } from "@/server/ai/budget";
+import { withAiBudget, withItineraryBudget } from "@/server/ai/budget";
 import { providerWaitMs } from "@/server/providers/budget";
 import { ProviderError } from "@/server/providers/errors";
 
@@ -35,12 +35,16 @@ const queries: Record<TripPurpose, string[]> = {
 };
 const normalize = (text: string) =>
   text.normalize("NFKC").trim().toLocaleLowerCase("zh-CN");
-async function turn(signal: AbortSignal, progress: (message: string) => void) {
+async function turn(
+  signal: AbortSignal,
+  progress: (message: string, stage?: ItineraryStage) => void,
+  stage: ItineraryStage,
+) {
   signal.throwIfAborted();
   let wait = providerWaitMs();
   while (wait > 0) {
     if (wait > 1000) {
-      progress("正在等待地图查询额度，已完成的安排保留。");
+      progress("正在等待地图查询额度，已完成的安排保留。", stage);
     }
     await new Promise<void>((resolve, reject) => {
       const abort = () => {
@@ -62,17 +66,17 @@ export async function createItinerary(
   provider: ItineraryProvider,
   ai: ItineraryModel,
   signal: AbortSignal,
-  progress: (message: string) => void = () => {},
+  progress: (message: string, stage?: ItineraryStage) => void = () => {},
 ): Promise<Itinerary> {
   const brief = tripBriefSchema.parse(raw);
-  return withAiBudget(async () => {
+  return withItineraryBudget(async () => {
     const candidates: ItineraryCandidate[] = [];
     const searches = new Map<string, Place[]>();
     async function search(query: string, kind: ItineraryCandidate["kind"]) {
       signal.throwIfAborted();
       let found = searches.get(query);
       if (!found) {
-        await turn(signal, progress);
+        await turn(signal, progress, "places");
         found = (await provider.search(brief.destinationCity, query, signal))
           .map((place) => placeSchema.parse(place))
           .filter((place) => place.source.kind !== "user");
@@ -89,7 +93,7 @@ export async function createItinerary(
       }
       return found;
     }
-    progress("正在核对必去地点、必吃需求与目的地候选。");
+    progress("正在核对必去地点、必吃需求与目的地候选。", "places");
     const required = new Map<string, string>();
     for (const name of brief.mustVisit) {
       const found = (await search(name, "visit")).filter(
@@ -151,10 +155,18 @@ export async function createItinerary(
         "no_place",
       );
     }
-    progress("AI 正在结合旅行目的、可用时间与预算选择每日活动和三餐。");
-    const outline = itineraryOutlineSchema.parse(
-      await ai.compose(brief, candidates, signal),
+    progress("AI 正在结合旅行目的、可用时间与预算选择每日活动和三餐。", "model");
+    const parsedOutline = itineraryOutlineSchema.safeParse(
+      await withAiBudget(() => ai.compose(brief, candidates, signal)),
     );
+    if (!parsedOutline.success) {
+      throw new ProviderError(
+        "unavailable",
+        "AI 返回的地点或建议结构无效，方案未应用。",
+        "ai_invalid_response",
+      );
+    }
+    const outline = parsedOutline.data;
     if (outline.days.length !== brief.dayCount) {
       throw new ProviderError(
         "unavailable",
@@ -195,12 +207,15 @@ export async function createItinerary(
         }
       }
     }
+    const guides = new Map(
+      outline.guides?.map(({ placeId, ...guide }) => [placeId, guide]) ?? [],
+    );
     const generatedAt = new Date().toISOString();
     const days: Itinerary["days"] = [];
     for (const [index, availability] of briefDays(brief).entries()) {
       signal.throwIfAborted();
       const day = outline.days[index];
-      progress(`正在核对第 ${index + 1} 天的实际相邻路线与活动时间。`);
+      progress(`正在核对第 ${index + 1} 天的实际相邻路线与活动时间。`, "routes");
       if (!availability.activityWindow) {
         days.push({
           date: availability.date,
@@ -243,7 +258,13 @@ export async function createItinerary(
                   source: { kind: "unverified", recordedAt: generatedAt },
                 },
         });
-        recommendations.push({ activityId: id, reason: choice.reason, dish });
+        const guide = guides.get(choice.placeId);
+        recommendations.push({
+          activityId: id,
+          reason: choice.reason,
+          dish,
+          ...(guide ? { guide: structuredClone(guide) } : {}),
+        });
       }
       function meal(kind: "breakfast" | "lunch" | "dinner", start: number, end: number) {
         const window = {
@@ -265,9 +286,14 @@ export async function createItinerary(
         add(visit, "visit", { ...availability.activityWindow });
       }
       meal("dinner", 1020, 1260);
+      if (recommendations.some((item) => !item.guide)) {
+        notices.push(
+          "部分地点的详细体验建议缺失；已保留有效地点与排程，不补写虚构介绍。",
+        );
+      }
       const legs: ActivityLeg[] = [];
       for (let i = 1; i < activities.length; i++) {
-        await turn(signal, progress);
+        await turn(signal, progress, "routes");
         let route: WalkingRoute | null = null;
         try {
           route = walkingSchema.parse(

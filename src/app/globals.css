@@ -712,6 +712,87 @@ legend {
   outline: 3px solid #16735f;
   outline-offset: 3px;
 }
+.map-marker.route-marker {
+  background: #286348;
+  border: 3px solid white;
+  box-shadow: 0 2px 6px #18372c33;
+}
+.map-marker.route-marker:not([data-purpose="visit"]) {
+  border-radius: 12px;
+  background: #8b5935;
+}
+.map-marker.route-marker.selected {
+  outline: 3px solid #244f3a;
+  transform: scale(1.08);
+}
+.map-marker.route-marker:focus-visible {
+  outline: 3px solid #203e35;
+  outline-offset: 4px;
+}
+.route-map {
+  min-width: 0;
+}
+.route-map-fit {
+  position: absolute;
+  z-index: 5;
+  top: 12px;
+  left: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 40px;
+  padding: 8px 10px;
+  border: 1px solid #b6c7b9;
+  border-radius: 7px;
+  background: white;
+  color: #244f3a;
+  font-size: 12px;
+  box-shadow: 0 2px 6px #18372c14;
+}
+.route-map-fit:hover {
+  background: #edf3ed;
+}
+.route-map-legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+  padding-top: 12px;
+  color: #4b6153;
+  font-size: 11px;
+}
+.route-map-legend > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.route-map-legend > span:last-of-type {
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+}
+.route-map-legend i {
+  width: 9px;
+  height: 9px;
+  background: #286348;
+  border-radius: 50%;
+}
+.route-map-legend .route-legend-meal {
+  border-radius: 2px;
+  background: #8b5935;
+}
+.route-map-legend > p {
+  flex-basis: 100%;
+  font-size: 11px;
+  line-height: 1.8;
+  margin: 0;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .map-marker.route-marker {
+    transition:
+      transform 180ms ease,
+      background-color 180ms ease;
+  }
+}
 .detail-place {
   margin: 20px 0 0;
 }

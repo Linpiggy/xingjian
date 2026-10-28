@@ -1,0 +1,321 @@
+.travel-home {
+  background: #f7f5ee;
+}
+.travel-home-main {
+  max-width: 1320px;
+  margin: auto;
+  padding: 60px 48px 32px;
+}
+.travel-home-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+  align-items: center;
+  gap: 56px;
+  min-height: 530px;
+}
+.travel-home-label {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 13px;
+  color: #4b634a;
+  margin-bottom: 24px;
+}
+.travel-home-copy h1 {
+  color: #233e2f;
+  font-size: clamp(40px, 4.7vw, 66px);
+  line-height: 1.3;
+  font-weight: 650;
+  letter-spacing: 0;
+}
+.travel-home-intro {
+  max-width: 450px;
+  font-size: 15px;
+  line-height: 2;
+  color: #566451;
+  margin-top: 24px;
+}
+.travel-home-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 24px;
+  margin-top: 30px;
+}
+.travel-home-actions a {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  color: #344e38;
+  font-size: 13px;
+  text-decoration: none;
+  min-height: 48px;
+}
+.travel-home-actions .travel-home-start {
+  background: #2a5d43;
+  color: white;
+  padding: 14px 24px;
+  border-radius: 8px;
+  font-size: 15px;
+}
+.travel-home-start:hover {
+  background: #1b4530;
+}
+.travel-home-scope {
+  color: #626d5c;
+  font-size: 12px;
+  margin-top: 22px;
+}
+.travel-home-figure {
+  min-width: 0;
+  margin: 0;
+}
+.travel-paper-art {
+  position: relative;
+  height: 480px;
+  isolation: isolate;
+}
+.travel-paper-art::before {
+  content: "";
+  position: absolute;
+  inset: 30px 0 0;
+  border-radius: 50% 50% 44% 56%;
+  background: #e3e8d0;
+  z-index: -1;
+}
+.travel-paper-back {
+  position: absolute;
+  inset: 22px 30px 60px 30px;
+  padding: 24px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  background: #c4d49d;
+  border: 1px solid #a9bd81;
+  border-radius: 8px;
+  transform: rotate(-9deg);
+  color: #3d5b2c;
+  font-size: 12px;
+}
+.travel-paper-back > svg {
+  position: absolute;
+  bottom: 18px;
+  left: 16px;
+}
+.travel-paper-front {
+  position: absolute;
+  inset: 58px 36px 32px 56px;
+  display: flex;
+  flex-direction: column;
+  padding: 26px 28px;
+  background: #fffef9;
+  border: 1px solid #d7d9c8;
+  border-radius: 8px;
+  box-shadow: 0 12px 24px #3545281a;
+  transform: rotate(4deg);
+}
+.travel-paper-top {
+  display: flex;
+  justify-content: space-between;
+  color: #637056;
+  font-size: 11px;
+  border-bottom: 1px solid #dce1d1;
+  padding-bottom: 16px;
+}
+.travel-paper-front > strong {
+  font-size: 31px;
+  font-weight: 600;
+  line-height: 1.45;
+  color: #2b4632;
+  margin-top: 18px;
+}
+.travel-paper-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  margin-top: 22px;
+  color: #506245;
+  font-size: 12px;
+}
+.travel-paper-timeline > div {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.travel-paper-timeline svg {
+  flex-shrink: 0;
+}
+.travel-paper-bottom {
+  font-size: 10px;
+  color: #6b745d;
+  margin-top: auto;
+  padding-top: 18px;
+}
+.travel-paper-note {
+  position: absolute;
+  right: 0;
+  bottom: 4px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 18px 22px;
+  background: #e9ae7e;
+  color: #503c26;
+  border: 1px solid #d69a6a;
+  border-radius: 8px;
+  transform: rotate(-4deg);
+  box-shadow: 0 6px 12px #53371f12;
+  font-size: 12px;
+  line-height: 1.8;
+}
+.travel-paper-note strong {
+  font-size: 16px;
+  font-weight: 600;
+}
+.travel-home-figure figcaption {
+  color: #68715f;
+  font-size: 10px;
+  text-align: center;
+  margin-top: 18px;
+}
+.travel-home-entrypoints {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  border-block: 1px solid #d6ddcd;
+  margin-top: 48px;
+}
+.travel-home-entrypoints a {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 26px 32px 26px 0;
+  text-decoration: none;
+  color: #2e4833;
+}
+.travel-home-entrypoints a + a {
+  border-left: 1px solid #d6ddcd;
+  padding-left: 24px;
+}
+.travel-home-entrypoints span {
+  font-size: 12px;
+  color: #65715a;
+}
+.travel-home-entrypoints strong {
+  font-size: 16px;
+  font-weight: 550;
+}
+.travel-home-entrypoints svg {
+  position: absolute;
+  right: 20px;
+  top: 50%;
+}
+.travel-home-entrypoints a:hover {
+  background: #eef0e2;
+}
+.travel-home-footnote {
+  color: #65715a;
+  font-size: 11px;
+  line-height: 1.9;
+  margin-top: 22px;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .travel-paper-front {
+    animation: travel-paper-arrive 550ms cubic-bezier(0.22, 1, 0.36, 1);
+    transition: transform 280ms ease;
+  }
+  .travel-paper-art:hover .travel-paper-front {
+    transform: rotate(1deg) translateY(-5px);
+  }
+  .travel-paper-note {
+    animation: travel-note-arrive 650ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  @keyframes travel-paper-arrive {
+    from {
+      transform: rotate(7deg) translateY(18px);
+    }
+    to {
+      transform: rotate(4deg) translateY(0);
+    }
+  }
+  @keyframes travel-note-arrive {
+    from {
+      transform: rotate(0deg) translateY(12px);
+    }
+    to {
+      transform: rotate(-4deg) translateY(0);
+    }
+  }
+}
+@media (max-width: 1000px) {
+  .travel-home-main {
+    padding: 36px 28px 28px;
+  }
+  .travel-home-hero {
+    gap: 24px;
+  }
+  .travel-paper-front {
+    inset-inline: 22px;
+    padding-inline: 22px;
+  }
+  .travel-paper-note {
+    right: -4px;
+  }
+  .travel-home-entrypoints a {
+    padding-right: 38px;
+  }
+  .travel-home-entrypoints strong {
+    font-size: 14px;
+  }
+}
+@media (max-width: 767px) {
+  .travel-home-main {
+    padding: 32px 20px 24px;
+  }
+  .travel-home-hero {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 28px;
+  }
+  .travel-home-copy h1 {
+    font-size: 40px;
+  }
+  .travel-home-label {
+    margin-bottom: 18px;
+  }
+  .travel-home-intro {
+    font-size: 14px;
+    margin-top: 18px;
+  }
+  .travel-home-actions {
+    gap: 18px;
+    margin-top: 22px;
+  }
+  .travel-paper-art {
+    height: 420px;
+  }
+  .travel-paper-back {
+    inset-inline: 20px;
+  }
+  .travel-paper-front {
+    inset: 48px 18px 32px 22px;
+    padding: 22px;
+  }
+  .travel-paper-front > strong {
+    font-size: 28px;
+  }
+  .travel-paper-note {
+    padding: 12px 18px;
+  }
+  .travel-home-entrypoints {
+    grid-template-columns: minmax(0, 1fr);
+    margin-top: 32px;
+  }
+  .travel-home-entrypoints a {
+    padding: 22px 36px 22px 0;
+  }
+  .travel-home-entrypoints a + a {
+    border-left: 0;
+    border-top: 1px solid #d6ddcd;
+    padding-left: 0;
+  }
+}

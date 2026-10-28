@@ -4,6 +4,7 @@ export class ProviderError extends Error {
     public readonly status: ProviderStatus,
     message: string,
     public readonly code: string = status,
+    public readonly retryAfterSeconds?: number,
   ) {
     super(message);
   }

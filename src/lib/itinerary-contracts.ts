@@ -57,28 +57,66 @@ export const itineraryRouteResolutionSchema: z.ZodType<ItineraryRouteResolution>
       .extend({ segments: z.array(z.array(coordinateSchema).max(10_000)).max(100) }),
   });
 
+const guideText = (max: number) =>
+  z
+    .string()
+    .trim()
+    .min(1)
+    .max(max)
+    .refine(
+      (text) => !/(?:https?:\/\/|www\.|data:|javascript:)/i.test(text),
+      "游玩建议不能指定外部网址或图片。",
+    );
+export const itineraryGuideSchema = z.strictObject({
+  experience: guideText(240),
+  highlights: z.array(guideText(60)).min(1).max(3),
+  tips: z.array(guideText(100)).min(1).max(3),
+  checkBeforeGo: z.array(guideText(80)).min(1).max(3),
+});
 const choice = z.strictObject({
   placeId: z.string().min(1).max(100),
   reason: z.string().trim().min(1).max(160),
   stayMinutes: z.number().int().min(15).max(180),
 });
 const food = choice.extend({ dish: z.string().trim().min(1).max(80) });
-export const itineraryOutlineSchema: z.ZodType<ItineraryOutline> = z.strictObject({
-  title: z.string().trim().min(1).max(60),
-  summary: z.string().trim().min(1).max(400),
-  days: z
-    .array(
-      z.strictObject({
-        theme: z.string().trim().min(1).max(80),
-        visits: z.array(choice).min(1).max(3),
-        breakfast: food,
-        lunch: food,
-        dinner: food,
-      }),
-    )
-    .min(1)
-    .max(14),
-});
+export const itineraryOutlineSchema: z.ZodType<ItineraryOutline> = z
+  .strictObject({
+    guides: z
+      .array(
+        itineraryGuideSchema.extend({
+          placeId: z.string().min(1).max(100),
+        }),
+      )
+      .max(84)
+      .optional(),
+    title: z.string().trim().min(1).max(60),
+    summary: z.string().trim().min(1).max(400),
+    days: z
+      .array(
+        z.strictObject({
+          theme: z.string().trim().min(1).max(80),
+          visits: z.array(choice).min(1).max(3),
+          breakfast: food,
+          lunch: food,
+          dinner: food,
+        }),
+      )
+      .min(1)
+      .max(14),
+  })
+  .superRefine((outline, context) => {
+    const selected = new Set(
+      outline.days.flatMap((day) =>
+        [...day.visits, day.breakfast, day.lunch, day.dinner].map(
+          (choice) => choice.placeId,
+        ),
+      ),
+    );
+    const ids = outline.guides?.map((guide) => guide.placeId) ?? [];
+    if (new Set(ids).size !== ids.length || ids.some((id) => !selected.has(id))) {
+      context.addIssue({ code: "custom", message: "游玩建议必须唯一关联已选择的地点。" });
+    }
+  });
 const schedule = z.strictObject({
   date: z.iso.date(),
   timeZone: z.literal("Asia/Shanghai"),
@@ -125,6 +163,7 @@ export const itinerarySchema: z.ZodType<Itinerary> = z
                 activityId: z.string(),
                 reason: z.string().max(160),
                 dish: z.string().max(80).nullable(),
+                guide: itineraryGuideSchema.optional(),
               }),
             )
             .max(8),
@@ -213,6 +252,8 @@ export const itinerarySchema: z.ZodType<Itinerary> = z
         context.addIssue({ code: "custom", message: "活动实例与有向交通段不一致。" });
       }
       if (
+        new Set(day.recommendations.map((item) => item.activityId)).size !==
+          day.recommendations.length ||
         day.recommendations.some(
           (recommendation) =>
             !schedule.items.some(
@@ -224,12 +265,22 @@ export const itinerarySchema: z.ZodType<Itinerary> = z
       }
     }
   });
+const planningStageSchema = z.enum(["places", "model", "routes"]);
+export const planningFailureSchema = z.object({
+  message: z.string().trim().min(1).max(200),
+  code: z.string().regex(/^[a-z0-9_]{1,80}$/),
+  stage: planningStageSchema.optional(),
+  retryAfterSeconds: z.number().int().min(1).max(3600).optional(),
+});
 export const itineraryEventSchema = z.discriminatedUnion("type", [
-  z.strictObject({ type: z.literal("progress"), message: z.string().max(120) }),
+  z.strictObject({
+    type: z.literal("progress"),
+    message: z.string().max(120),
+    stage: planningStageSchema.optional(),
+  }),
   z.strictObject({ type: z.literal("result"), plan: itinerarySchema }),
   z.strictObject({
     type: z.literal("error"),
-    message: z.string().max(200),
-    code: z.string().max(80),
+    ...planningFailureSchema.shape,
   }),
 ]);

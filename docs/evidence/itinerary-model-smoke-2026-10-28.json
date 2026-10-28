@@ -1,0 +1,38 @@
+{
+  "kind": "real_itinerary_model_contract_only",
+  "checkedAt": "2026-10-28T08:39:32.147Z",
+  "status": "passed",
+  "inputSummary": {
+    "city": "杭州",
+    "dayCount": 1,
+    "travelers": 1
+  },
+  "maximumCalls": {
+    "placeSearch": 2,
+    "model": 1,
+    "walking": 0,
+    "weather": 0,
+    "database": 0
+  },
+  "attempts": {
+    "placeSearch": 2,
+    "model": 1
+  },
+  "automaticRetries": 0,
+  "elapsedMs": 4949,
+  "model": {
+    "httpStatus": 200,
+    "finishReason": "stop",
+    "contentCharacters": 827,
+    "validOutline": true,
+    "selectedVisits": 3,
+    "selectedMeals": 3,
+    "guideCount": 1
+  },
+  "publicErrorCode": null,
+  "limitations": [
+    "Test city only, not the product destination",
+    "No route, schedule feasibility, UI, weather, persistence or production rights verification",
+    "No raw POI/model content or credentials retained"
+  ]
+}

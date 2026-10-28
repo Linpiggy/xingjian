@@ -5,6 +5,7 @@ import { ProviderError } from "@/server/providers/errors";
 import { modelConfig } from "@/server/ai/config";
 import { OpenAiItineraryModel } from "@/server/ai/itinerary-model";
 import { createItinerary } from "@/server/services/create-itinerary";
+import type { ItineraryStage } from "@/domain/itinerary";
 
 export async function POST(request: Request): Promise<Response> {
   return api(async () => {
@@ -29,16 +30,14 @@ export async function POST(request: Request): Promise<Response> {
       );
     }
     const cancel = new AbortController();
-    const signal = AbortSignal.any([
-      request.signal,
-      cancel.signal,
-      AbortSignal.timeout(240_000),
-    ]);
+    const deadline = AbortSignal.timeout(240_000);
+    const signal = AbortSignal.any([request.signal, cancel.signal, deadline]);
+    let stage: ItineraryStage = "places";
     const encoder = new TextEncoder();
     const stream = new ReadableStream<Uint8Array>({
       async start(controller) {
         const send = (event: unknown) => {
-          if (!signal.aborted) {
+          if (!request.signal.aborted && !cancel.signal.aborted) {
             controller.enqueue(encoder.encode(`${JSON.stringify(event)}\n`));
           }
         };
@@ -48,20 +47,33 @@ export async function POST(request: Request): Promise<Response> {
             configuredAmap(),
             new OpenAiItineraryModel(config),
             signal,
-            (message) => send({ type: "progress", message }),
+            (message, nextStage) => {
+              stage = nextStage ?? stage;
+              send({ type: "progress", message, stage });
+            },
           );
           send({ type: "result", plan });
         } catch (error) {
-          if (!signal.aborted) {
-            const message =
-              error instanceof ProviderError && error.status !== "not_configured"
+          if (!request.signal.aborted && !cancel.signal.aborted) {
+            const message = deadline.aborted
+              ? "本次规划超过处理时限，未应用方案；请减少天数或稍后重试。"
+              : error instanceof ProviderError && error.status !== "not_configured"
                 ? error.message
                 : "方案生成未完成，请检查需求后重试；原方案不会被覆盖。";
-            const code =
-              error instanceof ProviderError && /^[a-z0-9_]{1,60}$/.test(error.code)
+            const code = deadline.aborted
+              ? "generation_timeout"
+              : error instanceof ProviderError && /^[a-z0-9_]{1,60}$/.test(error.code)
                 ? error.code
                 : "unavailable";
-            send({ type: "error", message, code });
+            send({
+              type: "error",
+              message,
+              code,
+              stage: code.startsWith("ai_") ? "model" : stage,
+              ...(error instanceof ProviderError && error.retryAfterSeconds
+                ? { retryAfterSeconds: error.retryAfterSeconds }
+                : {}),
+            });
           }
         } finally {
           try {
