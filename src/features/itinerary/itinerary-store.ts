@@ -1,13 +1,41 @@
 import { create } from "zustand";
 import type { Itinerary } from "@/domain/itinerary";
-import { itinerarySchema } from "@/lib/itinerary-contracts";
+import { z } from "zod";
+import {
+  itinerarySchema,
+  itineraryChangeSchema,
+  itineraryRouteResolutionSchema,
+} from "@/lib/itinerary-contracts";
+import {
+  prepareItineraryMove,
+  type ItineraryRouteResolution,
+} from "@/domain/itinerary-moves";
+import {
+  changeItinerary,
+  rescheduleItinerary,
+  assertItineraryTimeLocks,
+  type ItineraryChange,
+} from "@/domain/itinerary-editing";
 
 type State = {
   plan: Itinerary | null;
-  review: { plan: Itinerary; baseVersion: number } | null;
+  review: {
+    id: number;
+    plan: Itinerary;
+    baseVersion: number;
+    change?: ItineraryChange;
+    routes: ItineraryRouteResolution[];
+  } | null;
+  proposalSequence: number;
+  resolveMoveRoute: (
+    proposalId: number,
+    baseVersion: number,
+    result: ItineraryRouteResolution,
+  ) => void;
   previous: Itinerary | null;
   version: number;
   receive: (plan: Itinerary, baseVersion: number) => void;
+  proposeChange: (change: ItineraryChange) => void;
   confirm: () => void;
   cancelReview: () => void;
   undo: () => void;
@@ -18,6 +46,29 @@ export const useItineraryStore = create<State>((set, get) => ({
   review: null,
   previous: null,
   version: 0,
+  proposalSequence: 0,
+  resolveMoveRoute(proposalId, baseVersion, input) {
+    const state = get();
+    if (
+      !state.plan ||
+      !state.review ||
+      state.review.id !== proposalId ||
+      state.review.baseVersion !== baseVersion ||
+      state.version !== baseVersion ||
+      state.review.change?.kind !== "move"
+    ) {
+      throw new Error("预览已关闭或行程已变化，路线结果未应用。");
+    }
+    const result = itineraryRouteResolutionSchema.parse(input);
+    const routes = z
+      .array(itineraryRouteResolutionSchema)
+      .max(3)
+      .parse([...state.review.routes, result]);
+    const plan = itinerarySchema.parse(
+      changeItinerary(state.plan, state.review.change, routes),
+    );
+    set({ review: { ...state.review, plan, routes } });
+  },
   receive(input, baseVersion) {
     const state = get();
     if (baseVersion !== state.version) {
@@ -25,17 +76,71 @@ export const useItineraryStore = create<State>((set, get) => ({
     }
     const plan = itinerarySchema.parse(input);
     if (state.plan) {
-      set({ review: { plan, baseVersion } });
+      const id = state.proposalSequence + 1;
+      set({ review: { id, plan, baseVersion, routes: [] }, proposalSequence: id });
     } else {
       set({ plan, version: state.version + 1 });
     }
+  },
+  proposeChange(input) {
+    const state = get();
+    if (!state.plan || state.review) {
+      throw new Error("请先确认或取消当前预览，再调整活动。");
+    }
+    const change = itineraryChangeSchema.parse(input);
+    const plan = itinerarySchema.parse(
+      changeItinerary(itinerarySchema.parse(state.plan), change),
+    );
+    const id = state.proposalSequence + 1;
+    set({
+      review: { id, plan, baseVersion: state.version, change, routes: [] },
+      proposalSequence: id,
+    });
   },
   confirm() {
     const state = get();
     if (!state.review || state.review.baseVersion !== state.version) {
       throw new Error("当前方案已变化，请重新生成预览。");
     }
-    const plan = itinerarySchema.parse(state.review.plan);
+    const change = state.review.change
+      ? itineraryChangeSchema.parse(state.review.change)
+      : null;
+    const routes = z
+      .array(itineraryRouteResolutionSchema)
+      .max(3)
+      .parse(state.review.routes);
+    if (
+      change?.kind === "move" &&
+      state.plan &&
+      prepareItineraryMove(state.plan, change, routes).missing.length > 0
+    ) {
+      throw new Error("请先查询受影响的路线，再确认修改。");
+    }
+    if (!change && routes.length > 0) {
+      throw new Error("整份方案替换不能附带局部路线结果。");
+    }
+    const plan = itinerarySchema.parse(
+      change && state.plan
+        ? changeItinerary(itinerarySchema.parse(state.plan), change, routes)
+        : rescheduleItinerary(itinerarySchema.parse(state.review.plan)),
+    );
+    if (state.plan) {
+      assertItineraryTimeLocks(
+        state.plan,
+        plan,
+        change?.kind === "time_lock" && !change.locked ? change.activityId : undefined,
+        change?.kind === "position_lock" && !change.locked
+          ? change.activityId
+          : undefined,
+        false,
+        change?.kind === "venue_rules" && change.reservationRelease
+          ? change.activityId
+          : undefined,
+      );
+    }
+    if (plan.status === "infeasible") {
+      throw new Error("修改存在时间或预约冲突，当前方案保持不变。");
+    }
     set({ previous: state.plan, plan, review: null, version: state.version + 1 });
   },
   cancelReview() {

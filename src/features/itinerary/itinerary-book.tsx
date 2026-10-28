@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from "react";
 import {
   ArrowUpRight,
   Clock3,
@@ -10,6 +10,10 @@ import {
   Utensils,
   CalendarDays,
   Users,
+  ChevronRight,
+  Lock,
+  CloudSun,
+  GripVertical,
 } from "lucide-react";
 import type { Itinerary } from "@/domain/itinerary";
 import type { Day } from "@/domain/models";
@@ -21,6 +25,11 @@ import {
 } from "@/domain/trip-brief";
 import { RouteMap } from "@/features/map/route-map";
 import { useWideScreen } from "@/features/map/use-wide-screen";
+import { PlaceDetailsDialog } from "./place-details-dialog";
+import type { ItineraryChange } from "@/domain/itinerary-editing";
+import { WeatherPanel } from "@/features/planner/weather-panel";
+import { ItineraryExpenseSummary } from "./itinerary-expense-view";
+import { ItineraryExpenseDialog } from "./itinerary-expense-dialog";
 
 const money = (fen: number) =>
   new Intl.NumberFormat("zh-CN", { style: "currency", currency: "CNY" }).format(
@@ -40,23 +49,41 @@ export function ItineraryBook({
   mapKey,
   mapsConfigured,
   onEdit,
+  onActivityChange,
 }: {
   plan: Itinerary;
   mapKey: string;
   mapsConfigured: boolean;
   onEdit: () => void;
+  onActivityChange?: (change: ItineraryChange) => void;
 }) {
   const [active, setActive] = useState(0);
   const [selected, setSelected] = useState<string | null>(null);
   const [mapOpen, setMapOpen] = useState(false);
+  const [detailId, setDetailId] = useState<string | null>(null);
+  const [weatherOpen, setWeatherOpen] = useState(false);
+  const [detailMoveOpen, setDetailMoveOpen] = useState(false);
+  const [expenseOpen, setExpenseOpen] = useState(false);
+  const [moveError, setMoveError] = useState<string | null>(null);
+  const drag = useRef<{ plan: Itinerary; activityId: string } | null>(null);
+  const [dropTarget, setDropTarget] = useState<{
+    index: number;
+    edge: "before" | "after";
+  } | null>(null);
   const wide = useWideScreen();
+  useEffect(() => {
+    if (moveError) {
+      document.getElementById("trip-move-error")?.focus();
+    }
+  }, [moveError]);
   const select = useCallback((id: string) => setSelected(id), []);
   useEffect(() => {
     if (mapOpen && !wide) {
       document.getElementById("trip-day-heading")?.scrollIntoView({ block: "start" });
     }
   }, [mapOpen, wide]);
-  const day = plan.days[active];
+  const currentDay = Math.min(active, plan.days.length - 1);
+  const day = plan.days[currentDay];
   const schedule = day.schedule;
   const total = briefBudget(plan.brief).totalFen;
   const mapDay: Day = useMemo(
@@ -89,6 +116,68 @@ export function ItineraryBook({
     return `${colors[index]} ${from.toFixed(4)}% ${cursor.toFixed(4)}%`;
   });
   const selectedItem = schedule?.items.find((item) => item.activity.id === selected);
+  const detailItem = schedule?.items.find((item) => item.activity.id === detailId);
+  const closeDetails = useCallback(() => setDetailId(null), []);
+  function dragOver(event: DragEvent<HTMLElement>, index: number) {
+    event.preventDefault();
+    if (
+      !wide ||
+      !onActivityChange ||
+      drag.current?.plan !== plan ||
+      !event.dataTransfer.types.includes("application/x-xingjian-activity")
+    ) {
+      event.dataTransfer.dropEffect = "none";
+      return;
+    }
+    event.dataTransfer.dropEffect = "move";
+    const box = event.currentTarget.getBoundingClientRect();
+    const edge = event.clientY < box.top + box.height / 2 ? "before" : "after";
+    setDropTarget((previous) =>
+      previous?.index === index && previous.edge === edge ? previous : { index, edge },
+    );
+  }
+  function drop(event: DragEvent<HTMLElement>, index: number) {
+    event.preventDefault();
+    const source = drag.current;
+    drag.current = null;
+    setDropTarget(null);
+    if (
+      !wide ||
+      !onActivityChange ||
+      !source ||
+      source.plan !== plan ||
+      event.dataTransfer.getData("application/x-xingjian-activity") !== source.activityId
+    ) {
+      setMoveError("请使用行程内的调整操作；未应用外部拖入的内容。");
+      return;
+    }
+    const fromDay = plan.days.findIndex((day) =>
+      day.schedule?.items.some((item) => item.activity.id === source.activityId),
+    );
+    const fromIndex =
+      plan.days[fromDay]?.schedule?.items.findIndex(
+        (item) => item.activity.id === source.activityId,
+      ) ?? -1;
+    const box = event.currentTarget.getBoundingClientRect();
+    let toIndex = index + (event.clientY < box.top + box.height / 2 ? 0 : 1);
+    if (fromDay === currentDay && fromIndex < toIndex) {
+      toIndex -= 1;
+    }
+    if (fromDay === currentDay && fromIndex === toIndex) {
+      return;
+    }
+    try {
+      onActivityChange({
+        kind: "move",
+        activityId: source.activityId,
+        toDay: currentDay,
+        toIndex,
+      });
+      setMoveError(null);
+    } catch (cause) {
+      setMoveError(cause instanceof Error ? cause.message : "移动未应用，请重试。");
+    }
+  }
   return (
     <div className={`trip-book${mapOpen ? " is-map-open" : ""}`}>
       <section className="trip-cover" aria-label="完整旅行方案总览">
@@ -130,12 +219,12 @@ export function ItineraryBook({
       )}
       <div className="trip-book-grid">
         <nav className="trip-day-nav" aria-label="选择行程日期">
-          <span className="trip-nav-label">每天，慢慢展开</span>
+          <span className="trip-nav-label">每日行程</span>
           {plan.days.map((value, index) => (
             <button
               key={value.date}
               type="button"
-              aria-current={active === index ? "date" : undefined}
+              aria-current={currentDay === index ? "date" : undefined}
               onClick={() => {
                 setActive(index);
                 setSelected(null);
@@ -165,6 +254,11 @@ export function ItineraryBook({
             时间按实际有向步行耗时、建议停留与独立 10
             分钟缓冲推算；营业、预约与菜品供应尚未核实。
           </p>
+          {moveError && (
+            <p id="trip-move-error" tabIndex={-1} className="trip-error" role="alert">
+              {moveError}
+            </p>
+          )}
           {day.notices.length > 0 && (
             <details className="trip-day-notices">
               <summary>{day.notices.length} 项用餐／交通说明</summary>
@@ -191,14 +285,78 @@ export function ItineraryBook({
                     </p>
                   )}
                   <article
-                    className={`trip-activity ${selected === item.activity.id ? "is-selected" : ""}`}
+                    className={`trip-activity ${selected === item.activity.id ? "is-selected" : ""} ${wide && onActivityChange && item.activity.kind === "visit" ? "has-drag-handle" : ""} ${dropTarget?.index === index ? `is-drop-${dropTarget.edge}` : ""}`}
+                    onDragOver={(event) => dragOver(event, index)}
+                    onDragLeave={(event) => {
+                      if (!(
+                        event.relatedTarget instanceof Node &&
+                        event.currentTarget.contains(event.relatedTarget)
+                      )) {
+                        setDropTarget(null);
+                      }
+                    }}
+                    onDrop={(event) => drop(event, index)}
                   >
+                    {wide && onActivityChange && item.activity.kind === "visit" && (
+                      <button
+                        type="button"
+                        className="trip-drag-handle"
+                        aria-label={`调整${item.activity.place.name}的位置`}
+                        title="拖动调整当天次序，或点击选择日期与位置"
+                        disabled={item.activity.positionLocked}
+                        draggable={!item.activity.positionLocked}
+                        onClick={() => {
+                          if (item.activity.positionLocked) {
+                            return;
+                          }
+                          setMoveError(null);
+                          setDetailMoveOpen(true);
+                          setSelected(item.activity.id);
+                          setDetailId(item.activity.id);
+                        }}
+                        onDragStart={(event) => {
+                          if (item.activity.positionLocked) {
+                            event.preventDefault();
+                            return;
+                          }
+                          drag.current = { plan, activityId: item.activity.id };
+                          setMoveError(null);
+                          event.dataTransfer.setData(
+                            "application/x-xingjian-activity",
+                            item.activity.id,
+                          );
+                          event.dataTransfer.effectAllowed = "move";
+                          const article = event.currentTarget.closest("article");
+                          if (article) {
+                            event.dataTransfer.setDragImage(article, 20, 20);
+                          }
+                        }}
+                        onDragEnd={() => {
+                          drag.current = null;
+                          setDropTarget(null);
+                        }}
+                      >
+                        <GripVertical size={18} aria-hidden="true" />
+                      </button>
+                    )}
                     <div className="trip-activity-top">
                       <time>{formatMinute(item.startMinute)}</time>
                       <span>
                         {purposes[item.activity.kind]} · 建议 {item.activity.stayMinutes}{" "}
                         分钟
                       </span>
+                      {item.activity.positionLocked && (
+                        <span className="trip-position-lock">
+                          <Lock size={12} aria-hidden="true" />
+                          位置已锁
+                        </span>
+                      )}
+                      {item.activity.fixedStartMinute !== null && (
+                        <span className="trip-time-lock">
+                          <Lock size={12} aria-hidden="true" />
+                          时间锁 {formatMinute(item.activity.fixedStartMinute)}
+                        </span>
+                      )}
                     </div>
                     <button
                       type="button"
@@ -223,24 +381,19 @@ export function ItineraryBook({
                       </p>
                     )}
                     <p className="trip-reason">{recommendation?.reason}</p>
-                    <details className="trip-place-evidence">
-                      <summary>地址、来源与核实事项</summary>
-                      <p>{item.activity.place.address ?? "地址未知"}</p>
-                      <p>
-                        地点来源：
-                        {item.activity.place.source.kind === "fixture"
-                          ? "测试 fixture"
-                          : item.activity.place.source.kind === "user"
-                            ? "用户记录"
-                            : "高德地点查询"}{" "}
-                        · {item.activity.place.source.queriedAt}
-                      </p>
-                      <p>
-                        安排与菜品为 AI 建议；
-                        {item.activity.kind === "visit" ? "门票" : "餐费"}
-                        、当日营业与预约未知，不代表免费或已确认。
-                      </p>
-                    </details>
+                    <button
+                      type="button"
+                      className="trip-place-evidence"
+                      aria-label={`查看${item.activity.place.name}的资料`}
+                      onClick={() => {
+                        select(item.activity.id);
+                        setMoveError(null);
+                        setDetailMoveOpen(false);
+                        setDetailId(item.activity.id);
+                      }}
+                    >
+                      地址、来源与核实事项 <ChevronRight size={12} aria-hidden="true" />
+                    </button>
                   </article>
                 </li>
               );
@@ -319,13 +472,45 @@ export function ItineraryBook({
               </dl>
             </div>
             <p className="trip-daily-target">
-              第 {active + 1} 天均分参考目标{" "}
-              {money(dailyBudgetTargetFen(plan.brief, active))}（全体）
+              第 {currentDay + 1} 天均分参考目标{" "}
+              {money(dailyBudgetTargetFen(plan.brief, currentDay))}（全体）
             </p>
             <p>
               图中为目标分配建议，不是已查询价格。每日金额仅均分参考，非当日实际费用；实际支出未知，不能据此认定预算充足，零目标也不代表免费。
             </p>
+            <details className="trip-expense-details">
+              <summary>查看或补充手动费用估算</summary>
+              <ItineraryExpenseSummary plan={plan} />
+              {onActivityChange && (
+                <button
+                  type="button"
+                  className="button"
+                  onClick={() => setExpenseOpen(true)}
+                >
+                  编辑全程费用估算
+                </button>
+              )}
+            </details>
           </section>
+          <details
+            className="trip-weather-disclosure"
+            onToggle={(event) => setWeatherOpen(event.currentTarget.open)}
+          >
+            <summary>
+              <CloudSun size={17} aria-hidden="true" />
+              当天天气与出行提示
+            </summary>
+            {weatherOpen &&
+              (mapDay.items[0] ? (
+                <WeatherPanel
+                  key={`${day.date}:${mapDay.items[0].place.id}:${mapDay.items[0].place.location.join(",")}`}
+                  date={day.date}
+                  place={mapDay.items[0].place}
+                />
+              ) : (
+                <p>当天没有活动参考点，天气未知；不会用其他日期或位置替代。</p>
+              ))}
+          </details>
         </aside>
       </div>
       <details className="trip-final-details">
@@ -342,6 +527,43 @@ export function ItineraryBook({
           AI 模型：{plan.model} · 生成时间：{plan.generatedAt}
         </p>
       </details>
+      {expenseOpen && onActivityChange && (
+        <ItineraryExpenseDialog
+          plan={plan}
+          onClose={() => setExpenseOpen(false)}
+          onPropose={(change) => {
+            onActivityChange(change);
+            setExpenseOpen(false);
+          }}
+        />
+      )}
+      {detailItem && (
+        <PlaceDetailsDialog
+          item={detailItem}
+          date={day.date}
+          dish={
+            day.recommendations.find((item) => item.activityId === detailId)?.dish ?? null
+          }
+          onClose={closeDetails}
+          initialMoveOpen={detailMoveOpen}
+          onChange={
+            onActivityChange
+              ? (change) => {
+                  onActivityChange(change);
+                  setDetailId(null);
+                }
+              : undefined
+          }
+          moveDays={plan.days.map((day) => ({
+            date: day.date,
+            available: day.schedule !== null,
+            items: (day.schedule?.items ?? []).map((item) => ({
+              id: item.activity.id,
+              name: item.activity.place.name,
+            })),
+          }))}
+        />
+      )}
       <p className="trip-page-footnote">
         <Clock3 size={14} aria-hidden="true" />
         行程暂存于当前页面，刷新会清空。时间为估算，开放、预约、天气和实际费用请在出行前再次确认。

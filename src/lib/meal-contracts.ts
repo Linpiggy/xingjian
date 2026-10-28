@@ -35,6 +35,7 @@ export const dayActivitySchema = z
     stayMinutes: z.number().int().min(15).max(240),
     window: minuteWindowSchema.nullable(),
     fixedStartMinute: minute.nullable(),
+    positionLocked: z.boolean().optional(),
     rules: venueRulesSchema.nullable(),
     meal: z
       .strictObject({

@@ -68,6 +68,7 @@ for (const [days, travelers] of [
     await fill(page, days, travelers);
     await expect(page.getByRole("main").getByRole("alert")).toHaveCount(0);
     await page.getByLabel("出发日期").fill("2026-12-31");
+    await page.getByRole("button", { name: "偏好与必去", exact: true }).click();
     await page
       .getByRole("button", { name: tripPurposeLabels.nature, exact: true })
       .click();
@@ -155,6 +156,9 @@ for (const [days, travelers] of [
     );
     await heading.focus();
     await page.evaluate(() => window.scrollTo(0, 0));
+    if (days === 14) {
+      await expect(page.getByRole("button", { name: /第 14 天/ })).toBeInViewport();
+    }
     await page.screenshot({
       path: `test-results/${testInfo.project.name}-full-proposal-${days}d-viewport.png`,
     });
@@ -201,7 +205,7 @@ test("new generated plans require confirmation and allow cancellation and versio
   await page.getByRole("button", { name: "确认使用新方案" }).click();
   await expect(page.locator(".trip-app")).toHaveAttribute("data-plan-revision", "2");
   await expect(page.locator(".trip-cover-facts")).toContainText("3 人");
-  await page.getByRole("button", { name: "撤销方案替换" }).click();
+  await page.getByRole("button", { name: "撤销上次修改" }).click();
   await expect(page.getByRole("heading", { name: "原方案", exact: true })).toBeFocused();
   await expect(page.locator(".trip-app")).toHaveAttribute("data-plan-revision", "3");
   await expect(page.locator(".trip-cover-facts")).toContainText("2 人");

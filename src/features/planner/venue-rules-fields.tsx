@@ -18,15 +18,18 @@ export function VenueRulesFields({
   hasPlace,
   hadConfirmed,
   onChange,
+  collapsible = true,
 }: {
-  kind: "lunch" | "dinner";
+  kind: "visit" | "breakfast" | "lunch" | "dinner";
   fields: VenueFields;
   hasPlace: boolean;
   hadConfirmed: boolean;
   onChange: (value: VenueFields) => void;
+  collapsible?: boolean;
 }) {
   const [open, setOpen] = useState(fields.enabled || hadConfirmed);
-  const label = mealLabels[kind];
+  const label =
+    kind === "visit" ? "景点" : kind === "breakfast" ? "早餐" : mealLabels[kind];
   const patch = (change: Partial<VenueFields>) => {
     const reservationChanged = [
       "enabled",
@@ -63,19 +66,21 @@ export function VenueRulesFields({
   }
   return (
     <div className="spacing">
-      <button
-        type="button"
-        className="button"
-        aria-expanded={open}
-        aria-controls={`${kind}-venue-fields`}
-        disabled={!hasPlace}
-        onClick={() => setOpen(!open)}
-      >
-        {open ? "收起" : "填写"}
-        {label}营业与预约
-      </button>
+      {collapsible && (
+        <button
+          type="button"
+          className="button"
+          aria-expanded={open}
+          aria-controls={`${kind}-venue-fields`}
+          disabled={!hasPlace}
+          onClick={() => setOpen(!open)}
+        >
+          {open ? "收起" : "填写"}
+          {label}营业与预约
+        </button>
+      )}
       <div id={`${kind}-venue-fields`}>
-        {open && (
+        {(open || !collapsible) && (
           <>
             <p className="small muted spacing">
               仅记录你核对的当天规则，非商家实时保证；预约不代办、不自动取消，过敏安全仍需向商家确认。

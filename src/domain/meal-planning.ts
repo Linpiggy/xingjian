@@ -20,6 +20,7 @@ export type DayActivity = {
   stayMinutes: number;
   window: MinuteWindow | null;
   fixedStartMinute: number | null;
+  positionLocked?: boolean;
   rules: VenueRules | null;
   meal: {
     perPersonFen: number | null;

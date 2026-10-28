@@ -3,6 +3,59 @@ import { tripBriefSchema } from "./trip-brief-contracts";
 import { dayActivitySchema, activityLegSchema } from "./meal-contracts";
 import type { Itinerary, ItineraryOutline } from "@/domain/itinerary";
 import { briefDays, briefBudget } from "@/domain/trip-brief";
+import type { ItineraryChange } from "@/domain/itinerary-editing";
+import type { ItineraryRouteResolution } from "@/domain/itinerary-moves";
+import { budgetEstimateSchema, coordinateSchema, walkingSchema } from "./contracts";
+import { venueRulesSchema } from "./venue-contracts";
+
+export const itineraryExpensesSchema = budgetEstimateSchema.pick({ items: true });
+const activityId = z.string().regex(/^activity:[a-zA-Z0-9-]{1,850}$/);
+export const itineraryChangeSchema: z.ZodType<ItineraryChange> = z.discriminatedUnion(
+  "kind",
+  [
+    z.strictObject({
+      kind: z.literal("expenses"),
+      expenses: itineraryExpensesSchema,
+      acknowledgeOver: z.boolean(),
+    }),
+    z.strictObject({
+      kind: z.literal("duration"),
+      activityId,
+      stayMinutes: z.number().int().min(15).max(240),
+    }),
+    z.strictObject({ kind: z.literal("time_lock"), activityId, locked: z.boolean() }),
+    z.strictObject({ kind: z.literal("position_lock"), activityId, locked: z.boolean() }),
+    z.strictObject({
+      kind: z.literal("venue_rules"),
+      activityId,
+      rules: venueRulesSchema.nullable(),
+      reservationRelease: z
+        .strictObject({
+          activityId,
+          beforeKey: z.string().min(1).max(4096),
+          afterKey: z.string().min(1).max(4096),
+        })
+        .nullable(),
+    }),
+    z.strictObject({
+      kind: z.literal("move"),
+      activityId,
+      toDay: z.number().int().min(0).max(13),
+      toIndex: z.number().int().min(0).max(7),
+    }),
+  ],
+);
+
+export const itineraryRouteResolutionSchema: z.ZodType<ItineraryRouteResolution> =
+  z.strictObject({
+    fromActivityId: activityId,
+    toActivityId: activityId,
+    origin: coordinateSchema,
+    destination: coordinateSchema,
+    route: walkingSchema
+      .strict()
+      .extend({ segments: z.array(z.array(coordinateSchema).max(10_000)).max(100) }),
+  });
 
 const choice = z.strictObject({
   placeId: z.string().min(1).max(100),
@@ -57,6 +110,7 @@ const schedule = z.strictObject({
 export const itinerarySchema: z.ZodType<Itinerary> = z
   .strictObject({
     brief: tripBriefSchema,
+    expenses: itineraryExpensesSchema.optional(),
     title: z.string().min(1).max(60),
     summary: z.string().min(1).max(400),
     days: z
@@ -122,6 +176,12 @@ export const itinerarySchema: z.ZodType<Itinerary> = z
       context.addIssue({ code: "custom", message: "费用目标分配与全体预算不一致。" });
     }
     const items = plan.days.flatMap((day) => day.schedule?.items ?? []);
+    if (new Set(items.map((item) => item.activity.id)).size !== items.length) {
+      context.addIssue({
+        code: "custom",
+        message: "完整行程的活动实例标识必须全程唯一。",
+      });
+    }
     if (
       !plan.fixture &&
       items.some((item) => item.activity.place.source.kind === "fixture")
