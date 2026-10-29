@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
-import "@fontsource-variable/noto-sans-sc";
 import "./globals.css";
+import "./workbench-theme.css";
 import { Providers } from "./providers";
 
 export const metadata: Metadata = {

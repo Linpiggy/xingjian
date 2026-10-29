@@ -120,7 +120,7 @@ test("invalid decimal and over-target inputs remain in the modal, require acknow
   expect(await page.evaluate(() => document.body.style.overflow)).toBe("hidden");
   await page.keyboard.press("Escape");
   await expect(dialog).toHaveCount(0);
-  expect(await page.evaluate(() => document.body.style.overflow)).toBe("");
+  await expect.poll(() => page.evaluate(() => document.body.style.overflow)).toBe("");
   await expect(
     page.getByRole("button", { name: "编辑全程费用估算", exact: true }),
   ).toBeFocused();

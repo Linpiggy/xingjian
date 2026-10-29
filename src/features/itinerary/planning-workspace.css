@@ -1,52 +1,57 @@
 .unified-mode-bar {
-  max-width: 1180px;
-  margin: 0 auto;
-  padding: 28px 32px 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  flex-shrink: 0;
+  gap: 8px 20px;
+  padding: 12px 24px;
+  border-bottom: 1px solid var(--trip-line);
+  background: #ffffff;
 }
 .unified-mode-tabs {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
-  max-width: 620px;
+  display: inline-flex;
+  flex-shrink: 0;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 10px;
+  background: #f0f4f1;
 }
 .unified-mode-tabs button {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-columns: 18px auto auto;
   align-items: center;
-  column-gap: 10px;
-  row-gap: 4px;
-  padding: 15px 18px;
-  min-height: 72px;
-  border: 1px solid #cbd8cb;
-  border-radius: 10px;
-  color: #50634d;
-  background: #fff;
+  gap: 10px;
+  min-height: 44px;
+  padding: 9px 12px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: transparent;
+  color: #53675c;
   text-align: left;
-}
-.unified-mode-tabs button > svg {
-  grid-row: 1 / 3;
 }
 .unified-mode-tabs button > span {
   font-size: 14px;
-  font-weight: 600;
+  font-weight: 500;
 }
 .unified-mode-tabs small {
-  font-size: 11px;
-  color: #61715a;
+  font-size: 12px;
+  white-space: nowrap;
 }
 .unified-mode-tabs button[aria-selected="true"] {
-  border-color: #759d7d;
-  background: #eaf1e5;
-  box-shadow: inset 0 0 0 1px #759d7d;
-  color: #244e34;
+  border-color: #81958a;
+  background: #ffffff;
+  box-shadow: 0 1px 3px #213b310a;
+  color: #185d4b;
 }
 .unified-mode-bar > p {
-  color: var(--trip-muted);
+  flex: 1 1 260px;
+  margin: 0;
   font-size: 12px;
-  line-height: 1.9;
-  margin-top: 12px;
+  line-height: 1.7;
+  color: var(--trip-muted);
 }
 .unified-mode-bar > .unified-mode-message {
+  flex-basis: 100%;
   color: #865024;
 }
 .unified-panel[hidden] {
@@ -66,60 +71,55 @@
   margin-bottom: 24px;
 }
 .unified-manual .page-heading h1 {
-  font-size: 32px;
+  font-size: 30px;
   line-height: 1.5;
-  color: #203c2a;
+  color: #213b31;
 }
 .unified-manual .page-heading p {
-  color: var(--trip-muted);
   font-size: 14px;
+  color: var(--trip-muted);
 }
 .unified-manual .trip-summary {
   top: 24px;
 }
 .unified-manual-toolbar {
-  max-width: 1400px;
-  padding: 24px 32px 0;
-  margin: auto;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
+  max-width: 1400px;
+  margin: auto;
+  padding: 20px 24px 0;
 }
 .unified-manual-toolbar p {
-  font-size: 13px;
+  font-size: 14px;
   color: var(--trip-muted);
-}
-@media (min-width: 1151px) {
-  .unified-ai .trip-day-nav {
-    max-height: min(400px, calc(100dvh - 48px));
-  }
 }
 @media (max-width: 767px) {
   .unified-mode-bar {
-    padding: 20px 16px 0;
+    padding: 12px;
   }
   .unified-mode-tabs {
-    gap: 8px;
+    width: 100%;
   }
   .unified-mode-tabs button {
-    padding: 12px;
-    column-gap: 8px;
-  }
-  .unified-mode-tabs button > span {
-    font-size: 13px;
+    flex: 1;
+    grid-template-columns: 18px minmax(0, 1fr);
+    gap: 3px 8px;
+    padding: 8px 10px;
   }
   .unified-mode-tabs small {
-    font-size: 10px;
+    grid-column: 1 / -1;
+    font-size: 12px;
   }
   .unified-panel .trip-entry,
   .unified-panel .form-shell {
-    padding: 22px 16px 32px;
+    padding: 24px 16px 32px;
   }
   .unified-manual .page-heading h1 {
     font-size: 27px;
   }
   .unified-manual-toolbar {
-    padding: 20px 16px 0;
+    padding: 16px 12px 0;
   }
 }

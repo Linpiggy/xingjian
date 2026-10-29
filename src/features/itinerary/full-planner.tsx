@@ -162,9 +162,6 @@ export function FullPlanner({
     >
       {!embedded && (
         <>
-          <a className="skip-link" href="#trip-main">
-            跳到主要内容
-          </a>
           <TripSiteHeader
             beforeNavigate={() =>
               !editing ||
@@ -177,7 +174,8 @@ export function FullPlanner({
         </>
       )}
       <Content
-        id="trip-main"
+        id={embedded ? "trip-main" : "main"}
+        tabIndex={embedded ? undefined : -1}
         className={editing ? "trip-entry" : "trip-result"}
         onInputCapture={() => {
           if (editing) {

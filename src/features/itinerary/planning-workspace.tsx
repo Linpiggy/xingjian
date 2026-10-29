@@ -57,7 +57,7 @@ export function PlanningWorkspace({
   return (
     <div className="trip-app unified-planner" data-plan-revision={revision}>
       <TripSiteHeader beforeNavigate={protectNavigation} />
-      <main id="main">
+      <main id="main" tabIndex={-1}>
         <div className="unified-mode-bar">
           <div className="unified-mode-tabs" role="tablist" aria-label="规划方式">
             {(["ai", "manual"] as const).map((value, tabIndex) => (

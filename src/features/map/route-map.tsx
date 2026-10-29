@@ -1,10 +1,24 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
-import { MapPin, RotateCw, Scan } from "lucide-react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type RefObject,
+} from "react";
+import { MapPin, RotateCw, Scan, Maximize2, Plus, Minus } from "lucide-react";
 import type { Day } from "@/domain/models";
 import { stopIdentity } from "@/domain/meals";
 import { initializeMap, type MapFailure } from "./initialize-map";
 import { routeMapPaths, routeLineStyle } from "./route-presentation";
+import { routeReplay } from "./route-replay";
+import { useRouteReplay } from "./use-route-replay";
+import { RouteReplayControls } from "./route-replay-controls";
+import { RouteDiagram } from "./route-diagram";
+import { RouteMapDialog } from "./route-map-dialog";
+import "./route-map.css";
 
 const failureMessages: Record<MapFailure, string> = {
   sdk_failed: "地图加载失败，请检查网络后重试。",
@@ -12,7 +26,6 @@ const failureMessages: Record<MapFailure, string> = {
   basemap_timeout: "底图加载超时，请稍后重试。",
   initialization_failed: "地图初始化失败，行程草稿仍保留。",
 };
-
 type Runtime = { map: AMap.Map; sdk: typeof AMap };
 export function RouteMap({
   day,
@@ -28,21 +41,44 @@ export function RouteMap({
   configured: boolean;
 }) {
   const container = useRef<HTMLDivElement>(null);
+  const enlarged = useRef<HTMLDivElement>(null);
+  // The SDK owns this element. Moving it between React-owned hosts preserves
+  // one map instance, its attribution and camera rather than reloading the SDK.
+  const canvas = useRef<HTMLDivElement | null>(null);
   const buttons = useRef<{ id: string; element: HTMLButtonElement }[]>([]);
   const lines = useRef<{ overlay: AMap.Polyline; activityIds: string[] }[]>([]);
+  const cursorMarker = useRef<AMap.Marker | null>(null);
   const initialCenter = useRef(day.items[0]?.place.location);
   const [runtime, setRuntime] = useState<Runtime | null>(null);
   const [failed, setFailed] = useState<MapFailure | null>(null);
   const [attempt, setAttempt] = useState(0);
+  const [expanded, setExpanded] = useState(false);
+  const track = useMemo(() => routeReplay(day), [day]);
+  const replay = useRouteReplay(track);
+  const { pause } = replay;
+  const select = useCallback(
+    (id: string) => {
+      pause();
+      onSelect(id);
+    },
+    [onSelect, pause],
+  );
+  const close = useCallback(() => {
+    pause();
+    setExpanded(false);
+  }, [pause]);
   useEffect(() => {
     if (!configured || !container.current) {
       return;
     }
-    const root = container.current;
+    const root = document.createElement("div");
+    root.className = "map-canvas";
+    (enlarged.current ?? container.current).append(root);
+    canvas.current = root;
     window._AMapSecurityConfig = {
       serviceHost: `${window.location.origin}/_AMapService`,
     };
-    return initializeMap({
+    const stop = initializeMap({
       load: async () => {
         const loaderModule = await import("@amap/amap-jsapi-loader");
         if (attempt) {
@@ -60,7 +96,26 @@ export function RouteMap({
       onReady: (map, sdk) => setRuntime({ map, sdk }),
       onFailure: setFailed,
     });
+    return () => {
+      stop();
+      root.remove();
+      if (canvas.current === root) {
+        canvas.current = null;
+      }
+    };
   }, [configured, mapKey, attempt]);
+  useLayoutEffect(() => {
+    const target = expanded ? enlarged.current : container.current;
+    if (target && canvas.current) {
+      target.append(canvas.current);
+      // Fit after the new host has layout using the SDK's public API;
+      // do not rely on an undocumented resize method.
+      const frame = requestAnimationFrame(() =>
+        runtime?.map.setFitView(undefined, true, [48, 48, 48, 48]),
+      );
+      return () => cancelAnimationFrame(frame);
+    }
+  }, [expanded, runtime]);
   useEffect(() => {
     if (!runtime) {
       return;
@@ -77,7 +132,7 @@ export function RouteMap({
       element.textContent = String(index + 1);
       element.title = item.place.name;
       element.setAttribute("aria-label", `选中地点：${item.place.name}`);
-      element.addEventListener("click", () => onSelect(stopIdentity(item)));
+      element.addEventListener("click", () => select(stopIdentity(item)));
       buttons.current.push({ id: stopIdentity(item), element });
       map.add(
         new sdk.Marker({
@@ -95,14 +150,24 @@ export function RouteMap({
       lines.current.push({ overlay, activityIds: segment.activityIds });
       map.add(overlay);
     }
+    const marker = new sdk.Marker({
+      position: day.items[0]?.place.location,
+      content: '<span class="route-sdk-cursor" aria-hidden="true"></span>',
+      anchor: "center",
+      zIndex: 200,
+    });
+    cursorMarker.current = marker;
+    map.add(marker);
+    marker.hide();
     if (day.items.length) {
       map.setFitView(undefined, true, [48, 48, 48, 48]);
     }
     return () => {
+      cursorMarker.current = null;
       buttons.current = [];
       lines.current = [];
     };
-  }, [runtime, day, onSelect]);
+  }, [runtime, day, select]);
   useEffect(() => {
     for (const button of buttons.current) {
       button.element.classList.toggle("selected", button.id === selectedId);
@@ -125,61 +190,148 @@ export function RouteMap({
       runtime.map.setCenter(item.place.location, reduce, reduce ? 0 : 260);
     }
   }, [runtime, selectedId, day]);
+  useEffect(() => {
+    const marker = cursorMarker.current;
+    if (marker && replay.cursor) {
+      marker.setPosition(replay.cursor);
+      marker.show();
+    } else {
+      marker?.hide();
+    }
+  }, [runtime, replay.cursor]);
+  useEffect(() => pause(), [selectedId, pause]);
   const mappedLegs = day.legs.filter((leg) =>
     leg.route?.segments.some((path) => path.length >= 2),
   ).length;
-  return (
-    <div className="route-map">
-      <div className="map-stage" role="region" aria-label="当天真实地图">
-        <div ref={container} className="map-canvas" />
-        {runtime && !failed && (
-          <button
-            type="button"
-            className="route-map-fit"
-            aria-label="查看全日路线"
-            onClick={() =>
-              runtime.map.setFitView(
-                undefined,
-                window.matchMedia("(prefers-reduced-motion: reduce)").matches,
-                [48, 48, 48, 48],
-              )
-            }
-          >
-            <Scan size={16} aria-hidden="true" />
-            全日视野
-          </button>
+  function stage(host: RefObject<HTMLDivElement | null>, large: boolean) {
+    return (
+      <div
+        className="map-stage route-map-stage"
+        role="region"
+        aria-label={large ? "放大的当天地图" : "当天真实地图"}
+        aria-hidden={!large && expanded ? true : undefined}
+      >
+        {(!runtime || failed) && (
+          <RouteDiagram
+            day={day}
+            selectedId={selectedId}
+            onSelect={select}
+            cursor={replay.cursor}
+          />
         )}
-        {!configured ? (
-          <div className="map-state">
-            <MapPin size={36} aria-hidden="true" />
-            <h3>地图暂不可用</h3>
-            <p>你的行程已保留，仍可在行程中查看步行耗时与距离。</p>
-          </div>
-        ) : failed ? (
-          <div className="map-state">
-            <h3>地图加载失败</h3>
-            <p>{failureMessages[failed]}</p>
-            <p>行程已保留，你可以继续查看地点详情。</p>
+        <div
+          ref={host}
+          className="route-map-host"
+          style={{ visibility: runtime && !failed ? "visible" : "hidden" }}
+        />
+        {runtime && !failed && (
+          <div className="route-map-camera">
             <button
+              type="button"
               className="button"
-              onClick={() => {
-                setFailed(null);
-                setRuntime(null);
-                setAttempt((value) => value + 1);
-              }}
+              aria-label="查看全日路线"
+              onClick={() =>
+                runtime.map.setFitView(undefined, replay.reduced, [48, 48, 48, 48])
+              }
             >
-              <RotateCw size={18} />
-              重试地图
+              <Scan size={16} aria-hidden="true" />
+              全日视野
+            </button>
+            <button
+              type="button"
+              className="button"
+              aria-label="放大一级"
+              onClick={() => runtime.map.zoomIn()}
+            >
+              <Plus size={16} aria-hidden="true" />
+            </button>
+            <button
+              type="button"
+              className="button"
+              aria-label="缩小一级"
+              onClick={() => runtime.map.zoomOut()}
+            >
+              <Minus size={16} aria-hidden="true" />
             </button>
           </div>
-        ) : !runtime ? (
-          <div className="map-state skeleton-lines" role="status">
-            <span />
-            <span />
-            <p>正在加载高德地图。</p>
-          </div>
-        ) : null}
+        )}
       </div>
+    );
+  }
+  const fixture =
+    day.items.some((item) => item.place.source.kind === "fixture") ||
+    day.legs.some((leg) => leg.route?.source.kind === "fixture");
+  const stopIndex = (
+    <nav className="route-map-stop-index" aria-label="地图地点索引">
+      <ol>
+        {day.items.map((item, index) => (
+          <li key={stopIdentity(item)}>
+            <button
+              type="button"
+              data-purpose={item.purpose ?? "visit"}
+              aria-label={`在路线中查看第 ${index + 1} 站：${item.place.name}`}
+              aria-pressed={selectedId === stopIdentity(item)}
+              onClick={() => select(stopIdentity(item))}
+            >
+              <strong>{index + 1}</strong>
+              <span>{item.place.name}</span>
+            </button>
+          </li>
+        ))}
+      </ol>
+    </nav>
+  );
+  const status = !configured ? (
+    <div className="route-map-status">
+      <MapPin size={18} aria-hidden="true" />
+      <div>
+        <h3>地图暂不可用</h3>
+        <p>先查看地点与已有轨迹的几何预览；无底图，不用于导航。</p>
+      </div>
+    </div>
+  ) : failed ? (
+    <div className="route-map-status">
+      <div>
+        <h3>地图加载失败</h3>
+        <p>{failureMessages[failed]}行程与几何预览仍保留。</p>
+      </div>
+      <button
+        type="button"
+        className="button"
+        onClick={() => {
+          setFailed(null);
+          setRuntime(null);
+          setAttempt((value) => value + 1);
+        }}
+      >
+        <RotateCw size={16} aria-hidden="true" />
+        重试地图
+      </button>
+    </div>
+  ) : !runtime ? (
+    <p className="route-map-status" role="status">
+      正在加载高德地图，可先查看路线几何预览。
+    </p>
+  ) : null;
+  return (
+    <div className={`route-map${expanded ? " is-expanded" : ""}`}>
+      <div className="route-map-toolbar">
+        <span>
+          {day.items.length} 站 · {mappedLegs}/{day.legs.length} 段含轨迹
+        </span>
+        <button type="button" className="button" onClick={() => setExpanded(true)}>
+          <Maximize2 size={16} aria-hidden="true" />
+          放大地图
+        </button>
+      </div>
+      {stage(container, false)}
+      {!expanded && (
+        <>
+          {stopIndex}
+          {status}
+          <RouteReplayControls track={track} replay={replay} />
+        </>
+      )}
       <footer className="route-map-legend" aria-label="地图图例与轨迹覆盖">
         <span>
           <i className="route-legend-visit" aria-hidden="true" />
@@ -194,6 +346,14 @@ export function RouteMap({
         </span>
         <p>编号对应当天次序；选中地点强调相邻路段。缺失轨迹不以直线补连。</p>
       </footer>
+      {expanded && (
+        <RouteMapDialog date={day.date} fixture={fixture} onClose={close}>
+          {stage(enlarged, true)}
+          {stopIndex}
+          {status}
+          <RouteReplayControls track={track} replay={replay} />
+        </RouteMapDialog>
+      )}
     </div>
   );
 }

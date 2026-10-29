@@ -1740,23 +1740,25 @@ button.trip-place-evidence:hover {
 }
 @media (max-width: 767px) {
   .trip-site-header {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    height: auto;
-    min-height: 112px;
-    padding: 12px 20px;
-    gap: 8px 16px;
+    display: flex;
+    height: 64px;
+    min-height: 64px;
+    padding: 0 12px;
+    gap: 8px;
+  }
+  .trip-brand {
+    flex-shrink: 0;
+    white-space: nowrap;
   }
   .trip-primary-nav {
-    grid-column: 1 / -1;
-    grid-row: 2;
-    justify-content: space-between;
-    width: 100%;
-    margin-left: 0;
+    justify-content: flex-end;
+    width: auto;
+    min-width: 0;
+    margin-left: auto;
   }
   .trip-primary-nav a {
     justify-content: center;
-    flex: 1;
+    flex: none;
   }
   .trip-primary-nav + a:last-child {
     grid-column: 2;

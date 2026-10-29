@@ -207,6 +207,7 @@ export function BriefForm({
     setValidation(null);
     onSubmit(parsed.data);
   }
+  const PurposeIcon = purposeVisuals[purpose].icon;
   const summaryBudgetFen = parseYuanFen(summary.amount);
   const time = (value: number) =>
     `${String(Math.floor(value / 60) % 24).padStart(2, "0")}:${String(value % 60).padStart(2, "0")}`;
@@ -598,6 +599,14 @@ export function BriefForm({
           <div className="trip-summary-heading">
             <span>此行概览</span>
             <Compass size={21} strokeWidth={1.4} aria-hidden="true" />
+          </div>
+          <div className="trip-intent-visual" aria-hidden="true">
+            <PurposeIcon size={48} strokeWidth={1.3} />
+            <div>
+              <CalendarDays size={21} />
+              <MapPin size={21} />
+              <Utensils size={21} />
+            </div>
           </div>
           <h2>{summary.city.trim() || "目的地待定"}</h2>
           <p className="trip-summary-date">

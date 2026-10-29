@@ -1,0 +1,505 @@
+body .trip-app .trip-result {
+  width: 100%;
+  max-width: none;
+  padding: 16px 24px 24px;
+}
+.trip-app .map-workspace {
+  min-width: 0;
+}
+.trip-app .trip-result > .trip-undo {
+  align-self: flex-start;
+  flex-shrink: 0;
+  margin-bottom: 12px;
+}
+.trip-app .map-workspace .trip-cover {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 4px 16px;
+  padding: 14px 18px;
+  border: 1px solid var(--trip-line);
+  border-radius: 12px;
+  background: #ffffff;
+}
+.trip-app .map-workspace .trip-cover-city {
+  margin: 0 0 4px;
+  font-size: 14px;
+  font-weight: 500;
+}
+.trip-app .map-workspace .trip-cover-meta {
+  grid-column: 2;
+  grid-row: 1;
+  align-self: center;
+  margin: 0;
+  font-size: 14px;
+}
+.trip-app .map-workspace .trip-cover h1 {
+  grid-column: 1 / -1;
+  font-size: clamp(24px, 2.2vw, 30px);
+  font-weight: 600;
+  line-height: 1.5;
+}
+.trip-app .map-workspace .trip-cover-intro {
+  grid-column: 1 / -1;
+  max-width: none;
+  margin-top: 0;
+  line-height: 1.7;
+}
+.trip-app .map-workspace .trip-cover-intro summary {
+  cursor: pointer;
+  color: var(--trip-muted);
+}
+.trip-app .map-workspace .trip-cover-intro > p {
+  max-width: 86ch;
+  margin-top: 8px;
+}
+.trip-app .map-workspace .trip-cover-bottom {
+  grid-column: 1 / -1;
+  margin-top: 8px;
+  gap: 16px;
+}
+.trip-app .map-workspace .trip-cover-facts {
+  font-size: 14px;
+  gap: 8px 16px;
+}
+.trip-app .map-workspace .trip-fixture {
+  flex-shrink: 0;
+  margin-top: 10px;
+  padding: 8px 12px;
+}
+.trip-app .map-workspace > .trip-day-nav {
+  position: static;
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  flex-shrink: 0;
+  width: 100%;
+  max-height: none;
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-inline: contain;
+  gap: 8px;
+  padding: 12px 0;
+  scrollbar-width: thin;
+}
+.trip-app .map-workspace .trip-nav-label {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  padding: 0 8px 0 0;
+  font-size: 14px;
+}
+.trip-app .map-workspace .trip-day-nav button {
+  flex: 0 0 auto;
+  min-width: 100px;
+  min-height: 54px;
+  padding: 8px 14px;
+  gap: 0;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+}
+.trip-app .map-workspace .trip-day-nav button span,
+.trip-app .map-workspace .trip-day-nav button small {
+  font-size: 14px;
+}
+.trip-app .map-workspace .trip-day-nav button[aria-current] {
+  border-color: #81958a;
+  background: #e8f1eb;
+  color: #185d4b;
+  box-shadow: none;
+}
+.trip-app .map-workspace > .trip-book-grid {
+  margin-top: 0;
+  gap: 16px;
+}
+.trip-app .map-workspace .trip-day-content {
+  min-width: 0;
+  padding: 20px;
+  border-radius: 12px;
+}
+.trip-app .map-workspace .trip-day-heading h2 {
+  font-size: 22px;
+  font-weight: 600;
+}
+.trip-app .map-workspace .trip-day-heading > div > span,
+.trip-app .map-workspace .trip-timing-note {
+  font-size: 14px;
+  color: var(--trip-muted);
+}
+.trip-app .map-workspace .trip-timing-note {
+  margin-top: 12px;
+  padding-bottom: 16px;
+  line-height: 1.7;
+}
+.trip-app .map-workspace .trip-activity {
+  padding-top: 18px;
+  padding-bottom: 18px;
+  border-radius: 8px;
+}
+.trip-app .map-workspace .trip-activity.is-selected {
+  background: #e8f1eb;
+}
+.trip-app .map-workspace .trip-activity-top > span {
+  font-size: 14px;
+}
+.trip-app .map-workspace .trip-activity-top time {
+  top: 20px;
+  color: #185d4b;
+}
+.trip-app .map-workspace .trip-place-select {
+  font-weight: 600;
+  line-height: 1.6;
+}
+.trip-app .map-workspace .trip-reason,
+.trip-app .map-workspace .trip-dish,
+.trip-app .map-workspace .trip-dish small,
+.trip-app .map-workspace .trip-experience,
+.trip-app .map-workspace .trip-place-evidence {
+  font-size: 14px;
+  line-height: 1.7;
+}
+.trip-app .map-workspace .trip-timeline li {
+  animation: none;
+}
+.trip-app .map-workspace .trip-map-aside {
+  position: static;
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid var(--trip-line);
+  border-radius: 12px;
+  background: #ffffff;
+}
+.trip-app .map-workspace .trip-map-panel {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+.trip-app .map-workspace .trip-map-panel h2 {
+  font-size: 20px;
+  font-weight: 600;
+}
+.trip-app .map-workspace .trip-map-panel > div > span {
+  display: block;
+  margin-top: 4px;
+  font-size: 14px;
+  color: var(--trip-muted);
+}
+.trip-app .map-workspace .route-map-legend,
+.trip-app .map-workspace .route-map-legend > p {
+  font-size: 14px;
+  line-height: 1.7;
+}
+.trip-app .map-workspace .trip-budget-panel {
+  margin-top: 24px;
+  padding: 20px 0 0;
+  border: 0;
+  border-top: 1px solid var(--trip-line);
+  border-radius: 0;
+  box-shadow: none;
+}
+.trip-app .map-workspace .trip-budget-heading h2 {
+  font-size: 20px;
+  font-weight: 600;
+}
+.trip-app .map-workspace .trip-page-footnote {
+  flex-shrink: 0;
+  margin-top: 10px;
+  font-size: 12px;
+  line-height: 1.7;
+}
+.map-workspace-empty {
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 16px;
+  min-height: 320px;
+  height: 100%;
+  padding: 24px;
+  text-align: center;
+  color: var(--trip-muted);
+}
+.map-workspace-empty h2 {
+  font-size: 20px;
+  color: var(--trip-ink);
+}
+@media screen and (min-width: 768px) {
+  .trip-app:has(> .trip-result > .map-workspace):not(:has(.trip-review-bar)),
+  .unified-planner:has(.unified-ai:not([hidden]) .map-workspace):not(
+      :has(.trip-review-bar)
+    ) {
+    display: flex;
+    flex-direction: column;
+    height: 100dvh;
+    min-height: 0;
+    overflow: hidden;
+  }
+  .unified-planner:has(.unified-ai:not([hidden]) .map-workspace):not(
+      :has(.trip-review-bar)
+    )
+    > main {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+  }
+  .unified-ai:not([hidden]):has(.map-workspace),
+  .itinerary-embedded:has(> .trip-result > .map-workspace) {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+  }
+  .trip-app .trip-result:has(> .map-workspace):not(:has(> .trip-review-bar)) {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+  }
+  .trip-app .map-workspace {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+  }
+  .trip-app .map-workspace .trip-cover {
+    flex-shrink: 0;
+  }
+  .trip-app .map-workspace > .trip-book-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.15fr) minmax(340px, 1fr);
+    align-items: stretch;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+  }
+  .trip-app .map-workspace .trip-day-content,
+  .trip-app .map-workspace .trip-map-aside {
+    height: 100%;
+    min-height: 0;
+    overflow: auto;
+    overscroll-behavior: contain;
+    scroll-padding-block: 20px;
+    scrollbar-width: thin;
+    scrollbar-color: #93aa9b transparent;
+  }
+  .trip-app .map-workspace .trip-day-content {
+    scroll-padding-top: calc(var(--day-heading-height, 88px) + 24px);
+  }
+  .trip-app .map-workspace .trip-day-heading {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    padding: 4px 0 12px;
+    background: #ffffff;
+    border-bottom: 1px solid var(--trip-line);
+  }
+  .trip-app .map-workspace .trip-map-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    min-height: 100%;
+  }
+  .trip-app .map-workspace .route-map {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 280px;
+  }
+  .trip-app .map-workspace .map-stage {
+    flex: 1;
+    min-height: 240px;
+    height: auto;
+  }
+  .trip-app .trip-result:has(> .trip-review-bar) > .map-workspace {
+    flex: none;
+    height: max(620px, calc(100dvh - 160px));
+  }
+}
+@media (max-width: 767px) {
+  body .trip-app .trip-result {
+    padding: 14px 12px 24px;
+  }
+  .trip-app .map-workspace .trip-cover {
+    display: block;
+    padding: 16px;
+  }
+  .trip-app .map-workspace .trip-cover-meta {
+    margin-block: 4px;
+  }
+  .trip-app .map-workspace .trip-cover-bottom {
+    gap: 12px;
+  }
+  .trip-app .map-workspace .trip-cover-facts {
+    gap: 8px 12px;
+  }
+  .trip-app .map-workspace .trip-nav-label {
+    display: none;
+  }
+  .trip-app .map-workspace .trip-day-nav button {
+    min-width: 92px;
+  }
+  .trip-app .map-workspace > .trip-book-grid {
+    display: block;
+  }
+  .trip-app .map-workspace .trip-day-content {
+    padding: 16px 12px;
+  }
+  .trip-app .map-workspace .trip-day-heading {
+    align-items: flex-start;
+  }
+  .trip-app .map-workspace .trip-day-heading h2 {
+    font-size: 20px;
+  }
+  .trip-app .map-workspace .trip-activity {
+    padding: 16px 6px;
+  }
+  .trip-app .map-workspace .trip-activity-top time {
+    position: static;
+  }
+  .trip-app .map-workspace .trip-map-aside {
+    margin-top: 16px;
+    padding: 12px;
+  }
+  .trip-app .map-workspace .trip-map-panel .map-stage {
+    height: 320px;
+  }
+}
+.trip-app .map-workspace .trip-cover,
+.trip-app .map-workspace .trip-day-content,
+.trip-app .map-workspace .trip-map-aside,
+.trip-app .map-workspace .trip-day-heading {
+  background: #fffef9;
+}
+.trip-app .map-workspace .trip-cover {
+  border-color: #cbd3b9;
+  box-shadow:
+    0 2px 3px #36432a04,
+    0 8px 20px #36432a04;
+}
+.trip-app .map-workspace .trip-cover-city {
+  color: #53634c;
+}
+.trip-app .map-workspace .trip-cover-meta {
+  color: #704522;
+}
+.trip-app .map-workspace .trip-day-nav button[aria-current],
+.trip-app .map-workspace .trip-activity.is-selected {
+  border-color: #899774;
+  color: #2a5d43;
+  background: #eaf0e3;
+}
+.trip-app
+  .map-workspace
+  .trip-activity[data-kind]:not([data-kind="visit"])
+  .trip-activity-top
+  time,
+.trip-app
+  .map-workspace
+  .trip-activity[data-kind]:not([data-kind="visit"])
+  .trip-place-select
+  svg {
+  color: #8b5935;
+}
+.trip-day-overview {
+  margin-top: 16px;
+  padding: 16px;
+  border: 1px solid #d9ddcc;
+  border-radius: 8px;
+  background: #f5f5e9;
+}
+.trip-day-metrics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 20px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #d9ddcc;
+  color: #53634c;
+  font-size: 14px;
+}
+.trip-day-metrics > span {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.trip-day-metrics strong {
+  font-weight: 600;
+  color: #304730;
+}
+.trip-day-metrics small {
+  font-size: 12px;
+  color: #704522;
+}
+.trip-rhythm-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 16px;
+}
+.trip-rhythm-heading h3 {
+  font-size: 14px;
+  font-weight: 500;
+}
+.trip-rhythm-heading > span {
+  font-size: 12px;
+  color: #62704e;
+}
+.trip-rhythm {
+  display: flex;
+  gap: 8px;
+  margin: 12px -4px -4px;
+  padding: 4px;
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+  scrollbar-width: thin;
+  list-style: none;
+}
+.trip-rhythm li {
+  flex: 1 0 72px;
+}
+.trip-rhythm button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  min-height: 104px;
+  padding: 12px 6px;
+  border: 1px solid #d9ddcc;
+  border-radius: 6px;
+  color: #53634c;
+  background: #fffef9;
+}
+.trip-rhythm button[aria-pressed="true"] {
+  border-color: #899774;
+  background: #eaf0e3;
+  color: #2a5d43;
+}
+.trip-rhythm strong {
+  font-size: 14px;
+  font-weight: 500;
+}
+.trip-rhythm time {
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.trip-app .route-map .route-map-dialog .route-map-stage {
+  height: auto;
+  min-height: 220px;
+}
+@media (max-width: 767px) {
+  .trip-app .map-workspace.is-map-open .trip-timeline,
+  .trip-app .map-workspace.is-map-open .trip-day-content > .trip-day-notices {
+    display: block;
+  }
+  .trip-day-overview {
+    padding: 12px;
+  }
+  .trip-day-metrics {
+    gap: 8px 16px;
+  }
+}

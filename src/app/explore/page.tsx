@@ -17,7 +17,7 @@ export default function ExplorePage() {
   return (
     <div className="trip-app travel-home">
       <TripSiteHeader />
-      <main id="main" className="travel-home-main">
+      <main id="main" tabIndex={-1} className="travel-home-main">
         <section className="travel-home-hero" aria-labelledby="travel-home-heading">
           <div className="travel-home-copy">
             <p className="travel-home-label">
@@ -30,8 +30,8 @@ export default function ExplorePage() {
               值得好好期待。
             </h1>
             <p className="travel-home-intro">
-              可以把安排交给
-              AI，也可以亲自挑选想去的地点。在同一个工作台，把每天的吃玩、步行与停留，慢慢调成喜欢的样子。
+              可以把安排交给 AI，也可以亲自挑选想去的地点。
+              在同一个工作台，把每天的吃玩、步行与停留，慢慢调成喜欢的样子。
             </p>
             <div className="travel-home-actions">
               <Link href="/plan" className="travel-home-start">
@@ -47,14 +47,13 @@ export default function ExplorePage() {
             <div className="travel-paper-art" aria-hidden="true">
               <div className="travel-paper-back">
                 <span>把想去，写成出发。</span>
-                <Compass size={80} strokeWidth={1} />
               </div>
               <div className="travel-paper-front">
                 <div className="travel-paper-top">
                   <span>我的旅行提案</span>
                   <span>行间</span>
                 </div>
-                <strong>
+                <strong className="travel-paper-title">
                   有计划，
                   <br />
                   也有余地。
@@ -81,7 +80,6 @@ export default function ExplorePage() {
                 <SlidersHorizontal size={20} />
                 <span>
                   不必一次定稿
-                  <br />
                   <strong>先预览，再决定。</strong>
                 </span>
               </div>
@@ -107,8 +105,8 @@ export default function ExplorePage() {
           </Link>
         </section>
         <p className="travel-home-footnote">
-          候选来自地点搜索，体验建议由 AI
-          提供；开放、预约与实际费用仍需核实。当前行程仅保留在本次浏览会话内，刷新会清空。
+          候选来自地点搜索，体验建议由 AI 提供；开放、预约与实际费用仍需核实。
+          当前行程仅保留在本次浏览会话内，刷新会清空。
         </p>
       </main>
     </div>

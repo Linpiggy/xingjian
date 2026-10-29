@@ -55,7 +55,7 @@ test("form validation, successful draft, selection and missing map config", asyn
     page.getByText("测试 fixture：此页面数据不是真实接口查询。"),
   ).toBeVisible();
   await expect(page.getByText("约 20 分钟 / 1.2 km", { exact: true })).toBeVisible();
-  await page.getByRole("button", { name: /测试景点二/ }).click();
+  await page.locator(".stop-card").filter({ hasText: "测试景点二" }).click();
   if (testInfo.project.name === "mobile") {
     await expect(page.getByRole("dialog")).toBeVisible();
     await expect(
@@ -142,8 +142,12 @@ test("switching days and confirming new draft reset", async ({ page }) => {
   await addFixturePlaces(page);
   await page.getByRole("button", { name: "生成路线草稿" }).click();
   await page.getByRole("button", { name: "第 2 天", exact: true }).click();
-  await expect(page.getByRole("button", { name: /测试景点三/ })).toBeVisible();
-  await expect(page.getByRole("button", { name: /测试景点一/ })).not.toBeVisible();
+  await expect(
+    page.locator(".stop-card").filter({ hasText: "测试景点三" }),
+  ).toBeVisible();
+  await expect(
+    page.locator(".stop-card").filter({ hasText: "测试景点一" }),
+  ).not.toBeVisible();
   page.once("dialog", (dialog) => dialog.accept());
   await page.getByRole("button", { name: "新建计划", exact: true }).click();
   await expect(page.getByRole("button", { name: "生成路线草稿" })).toBeVisible();
