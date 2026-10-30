@@ -8,6 +8,7 @@ import { TripSiteHeader } from "./trip-site-header";
 import { Compass, Check, RotateCcw, ArrowUpRight } from "lucide-react";
 import type { TripBrief } from "@/domain/trip-brief";
 import { BriefForm } from "./brief-form";
+import type { GenerationProgress } from "./planning-progress";
 import { ItineraryBook } from "./itinerary-book";
 import { requestItinerary, PlanningRequestError } from "./request-itinerary";
 import { useItineraryStore } from "./itinerary-store";
@@ -40,6 +41,7 @@ export function FullPlanner({
   );
   const [pending, setPending] = useState(false);
   const [progress, setProgress] = useState("");
+  const [generation, setGeneration] = useState<GenerationProgress | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [failure, setFailure] = useState<PlanningRequestError | null>(null);
   const [cooldown, setCooldown] = useState(0);
@@ -54,9 +56,14 @@ export function FullPlanner({
   }, [cooldown]);
   const mutation = useMutation({
     mutationFn: ({ brief, signal }: { brief: TripBrief; signal: AbortSignal }) =>
-      requestItinerary(brief, signal, (message) => {
+      requestItinerary(brief, signal, (message, stage, work) => {
         if (!signal.aborted) {
           setProgress(message);
+          setGeneration((previous) => ({
+            stage: stage ?? previous?.stage ?? "places",
+            work: work ?? (stage === previous?.stage ? (previous?.work ?? null) : null),
+            startedAt: previous?.startedAt ?? Date.now(),
+          }));
         }
       }),
     gcTime: 0,
@@ -90,6 +97,7 @@ export function FullPlanner({
     controller.current = request;
     const baseVersion = useItineraryStore.getState().version;
     setPending(true);
+    setGeneration({ stage: "places", work: null, startedAt: Date.now() });
     setError(null);
     setFailure(null);
     setProgress("正在准备公开候选与完整旅行方案…");
@@ -195,9 +203,7 @@ export function FullPlanner({
         {editing ? (
           <>
             <div className="trip-entry-heading">
-              <span className="trip-page-eyebrow">新的旅行计划</span>
-              <h1>这次，想怎样旅行？</h1>
-              <p>从一个目的地开始，把喜欢的体验，安排进真实的一天。</p>
+              <h1>规划旅行</h1>
             </div>
             <div className="trip-entry-grid">
               <BriefForm
@@ -206,6 +212,7 @@ export function FullPlanner({
                 initial={plan?.brief ?? null}
                 pending={pending}
                 progress={progress}
+                generation={generation}
                 error={error}
                 failure={failure}
                 cooldown={cooldown}

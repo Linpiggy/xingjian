@@ -100,6 +100,10 @@ test("place drawer uses native focus trapping, Escape and backdrop dismissal whi
   await page.keyboard.press("Tab");
   await expect(dialog.getByRole("button", { name: "关闭地点资料" })).toBeFocused();
   await page.keyboard.press("Tab");
+  await expect(
+    dialog.getByRole("button", { name: "添加平台参考图片", exact: true }),
+  ).toBeFocused();
+  await page.keyboard.press("Tab");
   await expect(dialog.getByLabel("建议停留（分钟）")).toBeFocused();
   await page.keyboard.press("Tab");
   await expect(dialog.getByRole("button", { name: "预览停留调整" })).toBeFocused();

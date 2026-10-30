@@ -60,7 +60,7 @@ for (const [days, travelers] of [
       });
     });
     await page.goto("/plan");
-    await expect(page.getByRole("heading", { name: "这次，想怎样旅行？" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "规划旅行" })).toBeVisible();
     await generate(page);
     await expect(page.getByRole("main").getByRole("alert")).toBeVisible();
     await expect(page.getByLabel("目的地城市")).toBeFocused();
@@ -116,9 +116,7 @@ for (const [days, travelers] of [
     const place = page.getByRole("button", { name: "测试文化场馆1", exact: true });
     await place.click();
     await expect(place).toHaveAttribute("aria-pressed", "true");
-    if (testInfo.project.name === "mobile") {
-      await page.getByRole("button", { name: "查看地图" }).click();
-    }
+    await page.getByRole("button", { name: "查看地图", exact: true }).click();
     await expect(page.getByRole("region", { name: "当天真实地图" })).toBeVisible();
     await expect(
       page.getByRole("heading", { name: "地图暂不可用", exact: true }),
@@ -133,7 +131,7 @@ for (const [days, travelers] of [
       if (days === 1) {
         await page.screenshot({ path: "test-results/mobile-full-map-viewport.png" });
       }
-      await page.getByRole("button", { name: "收起地图" }).click();
+      await page.getByRole("button", { name: "查看当天安排", exact: true }).click();
       await expect(place).toBeVisible();
     }
     if (days === 14) {
@@ -300,7 +298,7 @@ test("the actual planning API enforces same origin and exposes missing configura
   await expect(page.getByRole("main").getByRole("alert")).toContainText(
     "AI 规划服务暂不可用",
   );
-  await expect(page.getByRole("heading", { name: "这次，想怎样旅行？" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "规划旅行" })).toBeVisible();
   await expect(page.locator("body")).not.toContainText("OPENAI_API_KEY");
   await expect(page.locator("body")).not.toContainText("fixture-model");
 });

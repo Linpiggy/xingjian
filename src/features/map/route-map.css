@@ -12,6 +12,12 @@
   color: #53634c;
   font-size: 14px;
 }
+.route-map-toolbar-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
 .route-map-stage {
   isolation: isolate;
   min-height: 260px;

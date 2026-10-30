@@ -41,6 +41,67 @@ async function service() {
   return (await import("@/server/services/create-itinerary")).createItinerary;
 }
 describe("complete itinerary orchestration, offline only", () => {
+  it("automatically provides reviewed catalog context to the model while keeping the requested brief unchanged", async () => {
+    const { provider, model } = dependencies();
+    const brief = fixtureBrief();
+    const references = fixtureSocialInspiration();
+    const source = {
+      load: vi.fn(async () => ({ status: "available" as const, references })),
+    };
+    const plan = await (
+      await service()
+    )(brief, provider, model, new AbortController().signal, vi.fn(), source);
+    expect(source.load).toHaveBeenCalledOnce();
+    expect(model.compose).toHaveBeenCalledOnce();
+    expect(vi.mocked(model.compose).mock.calls[0][0].socialInspiration).toEqual(
+      references,
+    );
+    expect(plan.brief).toEqual(brief);
+    expect(plan.brief.socialInspiration).toBeUndefined();
+    expect(plan.socialSource).toEqual({ status: "available", references });
+    expect(plan.notices.join()).toContain("后台检索");
+    expect(plan.constraints).toEqual([]);
+  });
+  it.each(["not_configured", "no_results", "unavailable"] as const)(
+    "does not pretend %s social material was used or trigger a second model call",
+    async (status) => {
+      const { provider, model } = dependencies();
+      const brief = fixtureBrief();
+      const source = { load: vi.fn(async () => ({ status })) };
+      const plan = await (
+        await service()
+      )(brief, provider, model, new AbortController().signal, vi.fn(), source);
+      expect(model.compose).toHaveBeenCalledOnce();
+      expect(vi.mocked(model.compose).mock.calls[0][0].socialInspiration).toBeUndefined();
+      expect(plan.brief).toEqual(brief);
+      expect(plan.socialSource).toEqual({ status });
+    },
+  );
+  it("preserves explicitly chosen notes rather than silently replacing them with automatic sources", async () => {
+    const { provider, model } = dependencies();
+    const brief = fixtureBrief();
+    brief.socialInspiration = fixtureSocialInspiration();
+    const source = { load: vi.fn() };
+    const plan = await (
+      await service()
+    )(brief, provider, model, new AbortController().signal, vi.fn(), source);
+    expect(source.load).not.toHaveBeenCalled();
+    expect(plan.brief).toEqual(brief);
+    expect(plan.socialSource).toBeUndefined();
+  });
+  it("refuses a cross-city catalog result before sending any of its excerpts to the model", async () => {
+    const { provider, model } = dependencies();
+    const references = fixtureSocialInspiration();
+    references.city = "错误城市";
+    const source = {
+      load: vi.fn(async () => ({ status: "available" as const, references })),
+    };
+    const plan = await (
+      await service()
+    )(fixtureBrief(), provider, model, new AbortController().signal, vi.fn(), source);
+    expect(vi.mocked(model.compose).mock.calls[0][0].socialInspiration).toBeUndefined();
+    expect(plan.socialSource).toEqual({ status: "unavailable" });
+  });
   it("searches reviewed social places once across notes without adding hard requirements or model calls", async () => {
     const { provider, model } = dependencies();
     const brief = fixtureBrief();
@@ -308,14 +369,35 @@ describe("complete itinerary orchestration, offline only", () => {
     ).rejects.toThrow("未获得唯一匹配");
     expect(model.compose).not.toHaveBeenCalled();
   });
-  it("rejects duplicate, invented and wrong-kind model selections before routing", async () => {
-    for (const variant of ["duplicate", "invented", "wrong_kind"]) {
+  it("reconciles valid duplicate visits without a second model request or duplicated itinerary", async () => {
+    const { provider, model } = dependencies();
+    const outline = fixtureOutline();
+    delete outline.guides;
+    outline.days[1].visits = [structuredClone(outline.days[0].visits[0])];
+    vi.mocked(model.compose).mockResolvedValue(outline);
+    const result = await (
+      await service()
+    )(fixtureBrief(), provider, model, new AbortController().signal);
+    const ids = result.days.flatMap(
+      (day) =>
+        day.schedule?.items
+          .filter((item) => item.activity.kind === "visit")
+          .map((item) => item.activity.place.id) ?? [],
+    );
+    expect(new Set(ids).size).toBe(ids.length);
+    expect(
+      result.days.every((day) =>
+        day.schedule?.items.some((item) => item.activity.kind === "visit"),
+      ),
+    ).toBe(true);
+    expect(result.notices.join()).toContain("去除 1 处重复景点");
+    expect(model.compose).toHaveBeenCalledOnce();
+  });
+  it("rejects invented and wrong-kind model selections before routing", async () => {
+    for (const variant of ["invented", "wrong_kind"]) {
       vi.resetModules();
       const { provider, model } = dependencies();
       const outline = fixtureOutline();
-      if (variant === "duplicate") {
-        outline.days[1].visits[0].placeId = outline.days[0].visits[0].placeId;
-      }
       if (variant === "invented") {
         outline.days[0].visits[0].placeId = "not-in-candidates";
       }

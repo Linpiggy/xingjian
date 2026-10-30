@@ -70,16 +70,17 @@ async function setup(
   }
   await page.getByRole("button", { name: "生成我的完整方案", exact: true }).click();
   await expect(page.locator(".trip-app")).toHaveAttribute("data-plan-revision", "1");
-  const mobileMap = page.getByRole("button", { name: "查看地图", exact: true });
-  if (await mobileMap.isVisible()) {
-    await mobileMap.click();
-  }
+  await page
+    .getByRole("complementary", { name: "当天路线地图", exact: true })
+    .locator(".route-inline-inspection > summary")
+    .click();
   return { calls: () => supplierCalls, day: () => reference! };
 }
 
 test("enlarged map preserves a single accessible preview, native dialog focus and Escape restoration without requests", async ({
   page,
 }, testInfo) => {
+  await page.emulateMedia({ reducedMotion: "no-preference" });
   const source = await setup(page, "normal", testInfo.project.name);
   const preview = page.getByRole("region", { name: "当天真实地图", exact: true });
   const before = (await preview.boundingBox())!;
@@ -88,7 +89,7 @@ test("enlarged map preserves a single accessible preview, native dialog focus an
   ).toBeVisible();
   const expand = page.getByRole("button", { name: "放大地图", exact: true });
   await expand.click();
-  const dialog = page.getByRole("dialog", { name: "把这一天，看得更清楚" });
+  const dialog = page.getByRole("dialog", { name: "全天路线" });
   await expect(dialog).toBeVisible();
   await expect(
     dialog.getByText("离线测试 fixture · 非真实查询路线", { exact: true }),
@@ -137,6 +138,13 @@ test("enlarged map preserves a single accessible preview, native dialog focus an
   await expect(expand).toBeFocused();
   await expect.poll(() => page.evaluate(() => document.body.style.overflow)).toBe("");
   await expect(preview).toBeVisible();
+  await page.getByRole("button", { name: "演示路线", exact: true }).click();
+  await expect(dialog).toBeVisible();
+  await expect(
+    dialog.getByRole("button", { name: "暂停演示", exact: true }),
+  ).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(dialog).toHaveCount(0);
   expect(source.calls()).toBe(0);
 });
 
@@ -217,6 +225,7 @@ test("reduced motion retains manual route inspection and no geometry never creat
   const glance = page.getByRole("region", { name: "当日行程速览", exact: true });
   await expect(glance).toContainText("2 处游览");
   await expect(glance).toContainText("3 次用餐");
+  await glance.getByText(/查看行程节奏/).click();
   await glance
     .getByRole("button", { name: "在地图中定位第 1 站：测试早餐店", exact: true })
     .click();

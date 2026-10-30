@@ -32,7 +32,9 @@ import { WeatherPanel } from "@/features/planner/weather-panel";
 import { ItineraryExpenseSummary } from "./itinerary-expense-view";
 import { ItineraryExpenseDialog } from "./itinerary-expense-dialog";
 import { DayOverview } from "./day-overview";
+import { PlacePhoto } from "./place-photo";
 import "./map-workspace.css";
+import "./itinerary-usability.css";
 
 const money = (fen: number) =>
   new Intl.NumberFormat("zh-CN", { style: "currency", currency: "CNY" }).format(
@@ -64,28 +66,40 @@ export function ItineraryBook({
 }) {
   const [dayIndex, setDayIndex] = useState(0);
   const [selected, setSelected] = useState<string | null>(null);
-  const [mapOpen, setMapOpen] = useState(false);
   const [detailId, setDetailId] = useState<string | null>(null);
   const [weatherOpen, setWeatherOpen] = useState(false);
+  const [sourcesOpen, setSourcesOpen] = useState(false);
   const [detailMoveOpen, setDetailMoveOpen] = useState(false);
   const [expenseOpen, setExpenseOpen] = useState(false);
   const [moveError, setMoveError] = useState<string | null>(null);
+  const mapAnchor = useRef<HTMLElement | null>(null);
   const dayPane = useRef<HTMLElement | null>(null);
   const dayHeading = useRef<HTMLDivElement | null>(null);
+  const dayNavigation = useRef<HTMLElement | null>(null);
   useEffect(() => {
     const heading = dayHeading.current;
     const pane = dayPane.current;
     if (!heading || !pane) {
       return;
     }
-    const measure = () =>
+    const measure = () => {
       pane.style.setProperty(
         "--day-heading-height",
         `${Math.ceil(heading.getBoundingClientRect().height)}px`,
       );
+      heading
+        .closest<HTMLElement>(".map-workspace")
+        ?.style.setProperty(
+          "--day-nav-height",
+          `${Math.ceil(dayNavigation.current?.getBoundingClientRect().height ?? 88)}px`,
+        );
+    };
     measure();
     const observer = new ResizeObserver(measure);
     observer.observe(heading);
+    if (dayNavigation.current) {
+      observer.observe(dayNavigation.current);
+    }
     return () => observer.disconnect();
   }, []);
   const drag = useRef<{ plan: Itinerary; activityId: string } | null>(null);
@@ -100,15 +114,26 @@ export function ItineraryBook({
     }
   }, [moveError]);
   const select = useCallback((id: string) => setSelected(id), []);
-  useEffect(() => {
-    if (mapOpen && !wide) {
-      document.getElementById("trip-day-heading")?.scrollIntoView({ block: "start" });
-    }
-  }, [mapOpen, wide]);
+  const locate = useCallback((id: string) => {
+    setSelected(id);
+    mapAnchor.current?.scrollIntoView({ block: "start", behavior: "instant" });
+  }, []);
+  function chooseDay(index: number) {
+    setDayIndex(index);
+    setSelected(null);
+    requestAnimationFrame(() =>
+      mapAnchor.current?.scrollIntoView({ block: "start", behavior: "instant" }),
+    );
+  }
   const currentDay = Math.min(dayIndex, plan.days.length - 1);
   const day = plan.days[currentDay];
   const schedule = day.schedule;
   const total = briefBudget(plan.brief).totalFen;
+  const socialReferences =
+    plan.brief.socialInspiration ??
+    (plan.socialSource?.status === "available"
+      ? plan.socialSource.references
+      : undefined);
   const mapDay: Day = useMemo(
     () => ({
       date: day.date,
@@ -141,14 +166,33 @@ export function ItineraryBook({
   const selectedItem = schedule?.items.find((item) => item.activity.id === selected);
   const detailItem = schedule?.items.find((item) => item.activity.id === detailId);
   const mapPane = active ? (
-    <aside className="trip-map-aside map-workspace-canvas" aria-label="当天路线地图">
+    <aside
+      ref={mapAnchor}
+      className="trip-map-aside map-workspace-canvas"
+      aria-label="当天路线地图"
+    >
       {mapDay.items.length > 0 ? (
         <section className="trip-map-panel">
-          <div>
-            <h2>把今天放在地图上</h2>
-            <span>
-              {selectedItem?.activity.place.name ?? "选择行程中的地点，与地图联动"}
-            </span>
+          <div className="trip-map-heading">
+            <div>
+              <h2>第 {currentDay + 1} 天路线</h2>
+              <span>{selectedItem?.activity.place.name ?? day.date}</span>
+            </div>
+            <button
+              type="button"
+              className="button"
+              onClick={() => {
+                dayHeading.current?.scrollIntoView({
+                  block: "start",
+                  behavior: "instant",
+                });
+                dayHeading.current
+                  ?.querySelector<HTMLElement>("h2")
+                  ?.focus({ preventScroll: true });
+              }}
+            >
+              查看当天安排 <ChevronRight size={15} aria-hidden="true" />
+            </button>
           </div>
           <RouteMap
             day={mapDay}
@@ -156,6 +200,7 @@ export function ItineraryBook({
             onSelect={select}
             mapKey={mapKey}
             configured={mapsConfigured}
+            compact
           />
         </section>
       ) : (
@@ -229,9 +274,8 @@ export function ItineraryBook({
     }
   }
   return (
-    <div className={`trip-book map-workspace${mapOpen ? " is-map-open" : ""}`}>
+    <div className="trip-book map-workspace vertical-itinerary">
       <section className="trip-cover" aria-label="完整旅行方案总览">
-        <p className="trip-cover-city">{plan.brief.destinationCity} · 旅行提案</p>
         <div className="trip-cover-meta">
           <span>{tripPurposeLabels[plan.brief.mainPurpose]}</span>
           <span>
@@ -241,10 +285,6 @@ export function ItineraryBook({
         <h1 tabIndex={-1} id="itinerary-heading">
           {plan.title}
         </h1>
-        <details className="trip-cover-intro">
-          <summary>查看规划思路</summary>
-          <p>{plan.summary}</p>
-        </details>
         <div className="trip-cover-bottom">
           <div className="trip-cover-facts">
             <span>
@@ -261,53 +301,89 @@ export function ItineraryBook({
             </span>
             <span>全体预算目标 {money(total)}</span>
           </div>
+          <details className="trip-cover-intro">
+            <summary>查看规划思路</summary>
+            <p>{plan.summary}</p>
+          </details>
+          {onActivityChange && (
+            <button type="button" className="button" onClick={() => setExpenseOpen(true)}>
+              费用估算
+            </button>
+          )}
           <button className="button" onClick={onEdit}>
             调整旅行需求 <ArrowUpRight size={15} aria-hidden="true" />
           </button>
         </div>
       </section>
+      {plan.socialSource && (
+        <p className="trip-source-notice" role="status">
+          {plan.socialSource.status === "available" ? (
+            <>
+              社交参考 · 后台匹配了 {plan.socialSource.references.notes.length}{" "}
+              篇同城资料，内容仍待核实。
+              <a href="#trip-social-sources" onClick={() => setSourcesOpen(true)}>
+                查看来源
+              </a>
+            </>
+          ) : plan.socialSource.status === "not_configured" ? (
+            "未连接后台社交资料库，本方案未使用小红书等平台内容。"
+          ) : plan.socialSource.status === "no_results" ? (
+            "后台暂无匹配的同城社交资料，本方案仅参考地点候选。"
+          ) : (
+            "后台社交资料暂不可用，本方案未使用其内容。"
+          )}
+        </p>
+      )}
       {plan.fixture && (
         <p className="trip-fixture" role="status">
           测试 fixture：此方案用于离线交互验证，不是真实接口规划结果。
         </p>
       )}
-      <nav className="trip-day-nav" aria-label="选择行程日期">
+      <nav ref={dayNavigation} className="trip-day-nav" aria-label="选择行程日期">
         <span className="trip-nav-label">每日行程</span>
         {plan.days.map((value, index) => (
           <button
             key={value.date}
             type="button"
             aria-current={currentDay === index ? "date" : undefined}
-            onClick={() => {
-              setDayIndex(index);
-              setSelected(null);
-              dayPane.current?.scrollTo({ top: 0, behavior: "instant" });
-            }}
+            onClick={() => chooseDay(index)}
           >
             <span>第 {index + 1} 天</span>
             <small>{value.date.slice(5).replace("-", ".")}</small>
           </button>
         ))}
       </nav>
+      {mapPane}
       <div className="trip-book-grid">
-        {wide && mapPane}
         <section ref={dayPane} className="trip-day-content" aria-label="当日完整安排">
           <div ref={dayHeading} className="trip-day-heading" id="trip-day-heading">
             <div>
               <span>{day.date} · 上海时区</span>
-              <h2>{day.theme}</h2>
+              <h2 tabIndex={-1}>{day.theme}</h2>
             </div>
-            <button
-              className="button trip-mobile-map"
-              aria-pressed={mapOpen}
-              onClick={() => setMapOpen(!mapOpen)}
-            >
-              <Map size={16} aria-hidden="true" />
-              {mapOpen ? "收起地图" : "查看地图"}
-            </button>
+            <div className="trip-day-actions">
+              <button
+                className="button"
+                onClick={() =>
+                  mapAnchor.current?.scrollIntoView({
+                    block: "start",
+                    behavior: "instant",
+                  })
+                }
+              >
+                <Map size={16} aria-hidden="true" />
+                查看地图
+              </button>
+              <button
+                className="button"
+                disabled={currentDay === plan.days.length - 1}
+                onClick={() => chooseDay(currentDay + 1)}
+              >
+                下一天 <ChevronRight size={15} aria-hidden="true" />
+              </button>
+            </div>
           </div>
-          {!wide && mapOpen && mapPane}
-          <DayOverview day={day} selected={selected} onSelect={select} />
+          <DayOverview day={day} selected={selected} onSelect={locate} />
           <p className="trip-timing-note">
             时间按实际有向步行耗时、建议停留与独立 10
             分钟缓冲推算；营业、预约与菜品供应尚未核实。
@@ -399,10 +475,16 @@ export function ItineraryBook({
                       </button>
                     )}
                     <div className="trip-activity-top">
+                      <span
+                        className="trip-stop-number"
+                        aria-label={`地图编号 ${index + 1}`}
+                      >
+                        {index + 1}
+                      </span>
                       <time>{formatMinute(item.startMinute)}</time>
-                      <span>
-                        {purposes[item.activity.kind]} · 建议 {item.activity.stayMinutes}{" "}
-                        分钟
+                      <span className="trip-activity-duration">
+                        <span>{purposes[item.activity.kind]}</span>
+                        <span>建议 {item.activity.stayMinutes} 分钟</span>
                       </span>
                       {item.activity.positionLocked && (
                         <span className="trip-position-lock">
@@ -417,53 +499,63 @@ export function ItineraryBook({
                         </span>
                       )}
                     </div>
-                    <button
-                      type="button"
-                      className="trip-place-select"
-                      aria-pressed={selected === item.activity.id}
-                      onClick={() => select(item.activity.id)}
-                    >
-                      <span>
-                        {item.activity.kind === "visit" ? (
-                          <MapPin size={17} aria-hidden="true" />
-                        ) : (
-                          <Utensils size={17} aria-hidden="true" />
-                        )}
-                        {item.activity.place.name}
-                      </span>
-                      <ArrowUpRight size={17} aria-hidden="true" />
-                    </button>
-                    {recommendation?.dish && (
-                      <p className="trip-dish">
-                        菜品建议 · {recommendation.dish}
-                        <small>供应与饮食适配需向商家核实</small>
-                      </p>
-                    )}
-                    <p className="trip-reason">{recommendation?.reason}</p>
-                    {recommendation?.guide && (
-                      <p className="trip-experience">
+                    <div className="trip-activity-body">
+                      <button
+                        type="button"
+                        className="trip-place-select"
+                        aria-pressed={selected === item.activity.id}
+                        onClick={() => locate(item.activity.id)}
+                      >
                         <span>
-                          AI {item.activity.kind === "visit" ? "游玩" : "用餐"}建议
+                          {item.activity.kind === "visit" ? (
+                            <MapPin size={17} aria-hidden="true" />
+                          ) : (
+                            <Utensils size={17} aria-hidden="true" />
+                          )}
+                          {item.activity.place.name}
                         </span>
-                        {recommendation.guide.experience}
+                        <ArrowUpRight size={17} aria-hidden="true" />
+                      </button>
+                      <PlacePhoto
+                        city={plan.brief.destinationCity}
+                        placeId={item.activity.place.id}
+                        name={item.activity.place.name}
+                      />
+                      <p className="trip-activity-address">
+                        {item.activity.place.address ?? "地址待核实"}
                       </p>
-                    )}
-                    <button
-                      type="button"
-                      className="trip-place-evidence"
-                      aria-label={`查看${item.activity.place.name}的资料`}
-                      onClick={() => {
-                        select(item.activity.id);
-                        setMoveError(null);
-                        setDetailMoveOpen(false);
-                        setDetailId(item.activity.id);
-                      }}
-                    >
-                      {recommendation?.guide
-                        ? "详细建议、地址与核实事项"
-                        : "地址、来源与核实事项"}{" "}
-                      <ChevronRight size={12} aria-hidden="true" />
-                    </button>
+                      {recommendation?.dish && (
+                        <p className="trip-dish">
+                          菜品建议 · {recommendation.dish}
+                          <small>供应与饮食适配需向商家核实</small>
+                        </p>
+                      )}
+                      <p className="trip-reason">{recommendation?.reason}</p>
+                      {recommendation?.guide && (
+                        <details className="trip-experience">
+                          <summary>体验建议</summary>
+                          <p>
+                            <span>
+                              AI {item.activity.kind === "visit" ? "游玩" : "用餐"}建议
+                            </span>
+                            {recommendation.guide.experience}
+                          </p>
+                        </details>
+                      )}
+                      <button
+                        type="button"
+                        className="trip-place-evidence"
+                        aria-label={`查看${item.activity.place.name}的资料`}
+                        onClick={() => {
+                          select(item.activity.id);
+                          setMoveError(null);
+                          setDetailMoveOpen(false);
+                          setDetailId(item.activity.id);
+                        }}
+                      >
+                        查看与编辑 <ChevronRight size={12} aria-hidden="true" />
+                      </button>
+                    </div>
                   </article>
                 </li>
               );
@@ -486,7 +578,7 @@ export function ItineraryBook({
             <div className="trip-budget-heading">
               <WalletMark />
               <div>
-                <h2>留好预算，也留好余地</h2>
+                <h2>预算目标分配</h2>
                 <p>全体目标 {money(total)}，不是实际报价</p>
               </div>
             </div>
@@ -579,27 +671,37 @@ export function ItineraryBook({
               AI 模型：{plan.model} · 生成时间：{plan.generatedAt}
             </p>
           </details>
-          {plan.brief.socialInspiration && (
-            <details className="trip-final-details" aria-label="社交参考来源">
+          {socialReferences && (
+            <details
+              id="trip-social-sources"
+              className="trip-final-details"
+              aria-label="社交参考来源"
+              open={sourcesOpen}
+              onToggle={(event) => setSourcesOpen(event.currentTarget.open)}
+            >
               <summary>
-                社交参考来源 · {plan.brief.socialInspiration.notes.length} 篇选用摘录
+                社交参考来源 · {socialReferences.notes.length} 篇
+                {plan.socialSource?.status === "available" ? "后台匹配资料" : "选用摘录"}
               </summary>
               <p>
-                这是用户选用、供模型参考的未核实经验，不是逐活动采用证明，也不确认营业、价格、过敏安全或图片使用权。规范链接不携带访问令牌，可能需在平台内查看。
+                {plan.socialSource?.status === "available"
+                  ? "这些资料由后台按同城与旅行偏好检索，供模型参考；不是实时平台搜索。"
+                  : "这是用户选用、供模型参考的未核实经验。"}
+                不是逐活动采用证明，也不确认营业、价格、过敏安全或图片使用权。规范链接不携带访问令牌，可能需在平台内查看。
               </p>
-              {plan.brief.socialInspiration.notes.map((note) => (
+              {socialReferences.notes.map((note) => (
                 <div className="trip-social-reference" key={note.noteId}>
                   <a href={socialNoteUrl(note)} target="_blank" rel="noreferrer noopener">
                     {note.title}
                   </a>
                   <p>{note.excerpt}</p>
                   <p>
-                    笔记自带时间（未核实）：{note.publishedAt ?? "未知"} · 导入记录：
+                    笔记自带时间（未核实）：{note.publishedAt ?? "未知"} · 资料索引记录：
                     {note.importedAt}
                   </p>
                   {note.places.length > 0 && (
                     <p>
-                      用户希望检索的候选：
+                      资料中待核对的候选：
                       {note.places.map((place) => place.name).join("、")}
                       ；不代表全部已安排。
                     </p>
@@ -623,6 +725,7 @@ export function ItineraryBook({
       {detailItem && (
         <PlaceDetailsDialog
           item={detailItem}
+          city={plan.brief.destinationCity}
           date={day.date}
           dish={
             day.recommendations.find((item) => item.activityId === detailId)?.dish ?? null

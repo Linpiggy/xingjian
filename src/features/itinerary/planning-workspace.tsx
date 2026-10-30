@@ -24,6 +24,7 @@ export function PlanningWorkspace({
   const [mode, setMode] = useState(initialMode);
   const [manualReady, setManualReady] = useState(initialMode === "manual");
   const [message, setMessage] = useState("");
+  const [toolsOpen, setToolsOpen] = useState(initialMode === "manual");
   const panels = useRef<(HTMLDivElement | null)[]>([]);
   const dirty = useRef([false, false]);
   const index = mode === "ai" ? 0 : 1;
@@ -59,49 +60,54 @@ export function PlanningWorkspace({
       <TripSiteHeader beforeNavigate={protectNavigation} />
       <main id="main" tabIndex={-1}>
         <div className="unified-mode-bar">
-          <div className="unified-mode-tabs" role="tablist" aria-label="规划方式">
-            {(["ai", "manual"] as const).map((value, tabIndex) => (
-              <button
-                key={value}
-                id={`planning-tab-${value}`}
-                type="button"
-                role="tab"
-                aria-selected={mode === value}
-                aria-controls={`planning-panel-${value}`}
-                tabIndex={mode === value ? 0 : -1}
-                onClick={() => select(value)}
-                onKeyDown={(event) => {
-                  if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) {
-                    return;
-                  }
-                  event.preventDefault();
-                  const next =
-                    event.key === "Home"
-                      ? "ai"
-                      : event.key === "End"
-                        ? "manual"
-                        : tabIndex === 0
+          <details
+            className="unified-manual-tools"
+            open={toolsOpen}
+            onToggle={(event) => setToolsOpen(event.currentTarget.open)}
+          >
+            <summary>手动草稿工具</summary>
+            <div className="unified-mode-tabs" role="tablist" aria-label="规划方式">
+              {(["ai", "manual"] as const).map((value, tabIndex) => (
+                <button
+                  key={value}
+                  id={`planning-tab-${value}`}
+                  type="button"
+                  role="tab"
+                  aria-selected={mode === value}
+                  aria-controls={`planning-panel-${value}`}
+                  tabIndex={mode === value ? 0 : -1}
+                  onClick={() => select(value)}
+                  onKeyDown={(event) => {
+                    if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) {
+                      return;
+                    }
+                    event.preventDefault();
+                    const next =
+                      event.key === "Home"
+                        ? "ai"
+                        : event.key === "End"
                           ? "manual"
-                          : "ai";
-                  if (select(next)) {
-                    document.getElementById(`planning-tab-${next}`)?.focus();
-                  }
-                }}
-              >
-                {value === "ai" ? (
-                  <Sparkles size={18} aria-hidden="true" />
-                ) : (
-                  <MapPin size={18} aria-hidden="true" />
-                )}
-                <span>{value === "ai" ? "完整 AI 规划" : "手动选点"}</span>
-                <small>{value === "ai" ? "1—14 天 · 1—20 人" : "2—3 天 · 1—8 人"}</small>
-              </button>
-            ))}
-          </div>
-          <p>
-            两种方式，同一个工作台。输入和方案分别保留，切换不会自动查询或把自定义点位交给
-            AI。
-          </p>
+                          : tabIndex === 0
+                            ? "manual"
+                            : "ai";
+                    if (select(next)) {
+                      document.getElementById(`planning-tab-${next}`)?.focus();
+                    }
+                  }}
+                >
+                  {value === "ai" ? (
+                    <Sparkles size={18} aria-hidden="true" />
+                  ) : (
+                    <MapPin size={18} aria-hidden="true" />
+                  )}
+                  <span>{value === "ai" ? "完整 AI 规划" : "手动选点"}</span>
+                  <small>
+                    {value === "ai" ? "1—14 天 · 1—20 人" : "2—3 天 · 1—8 人"}
+                  </small>
+                </button>
+              ))}
+            </div>
+          </details>
           {message && (
             <p className="unified-mode-message" role="status">
               {message}

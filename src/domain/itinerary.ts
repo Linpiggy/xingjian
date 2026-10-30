@@ -2,8 +2,14 @@ import type { TripBrief } from "./trip-brief";
 import type { Place } from "./models";
 import type { MealDayPlan } from "./meal-planning";
 import type { ItineraryExpenses } from "./itinerary-expenses";
+import type { SocialInspiration } from "./social-inspiration";
+
+export type SocialSource =
+  | { status: "available"; references: SocialInspiration }
+  | { status: "not_configured" | "no_results" | "unavailable" };
 
 export type ItineraryStage = "places" | "model" | "routes";
+export type ItineraryWork = { completed: number; total: number };
 export type ItineraryCandidate = {
   place: Place;
   kind: "visit" | "restaurant";
@@ -42,6 +48,7 @@ export type ItineraryDay = {
 };
 export type Itinerary = {
   brief: TripBrief;
+  socialSource?: SocialSource;
   expenses?: ItineraryExpenses;
   title: string;
   summary: string;

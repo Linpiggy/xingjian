@@ -65,7 +65,7 @@ export function RouteMapDialog({
         <div>
           <span>{date} · 全天路线</span>
           <h2 id="route-map-dialog-title" tabIndex={-1}>
-            把这一天，看得更清楚
+            全天路线
           </h2>
           {fixture && (
             <small className="route-map-source-note">

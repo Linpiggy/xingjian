@@ -6,6 +6,7 @@ import { modelConfig } from "@/server/ai/config";
 import { OpenAiItineraryModel } from "@/server/ai/itinerary-model";
 import { createItinerary } from "@/server/services/create-itinerary";
 import type { ItineraryStage } from "@/domain/itinerary";
+import { SocialCatalogProvider } from "@/server/providers/social-catalog";
 
 export async function POST(request: Request): Promise<Response> {
   return api(async () => {
@@ -47,10 +48,11 @@ export async function POST(request: Request): Promise<Response> {
             configuredAmap(),
             new OpenAiItineraryModel(config),
             signal,
-            (message, nextStage) => {
+            (message, nextStage, work) => {
               stage = nextStage ?? stage;
-              send({ type: "progress", message, stage });
+              send({ type: "progress", message, stage, ...(work ? { work } : {}) });
             },
+            new SocialCatalogProvider(),
           );
           send({ type: "result", plan });
         } catch (error) {

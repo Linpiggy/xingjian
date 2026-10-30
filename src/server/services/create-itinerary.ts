@@ -1,6 +1,7 @@
 import type { Coordinate, Place, WalkingRoute } from "@/domain/models";
 import type { DayActivity, ActivityLeg } from "@/domain/meal-planning";
 import { scheduleAvailableDay } from "@/domain/meal-planning";
+import { uniqueItineraryVisits } from "@/domain/itinerary-selection";
 import {
   briefDays,
   briefBudget,
@@ -8,8 +9,19 @@ import {
   type TripBrief,
   type TripPurpose,
 } from "@/domain/trip-brief";
-import type { Itinerary, ItineraryCandidate, ItineraryStage } from "@/domain/itinerary";
-import { itinerarySchema, itineraryOutlineSchema } from "@/lib/itinerary-contracts";
+import type {
+  Itinerary,
+  ItineraryCandidate,
+  ItineraryStage,
+  ItineraryWork,
+  SocialSource,
+} from "@/domain/itinerary";
+import {
+  itinerarySchema,
+  itineraryOutlineSchema,
+  socialSourceSchema,
+} from "@/lib/itinerary-contracts";
+import type { SocialReferenceProvider } from "@/server/providers/social-catalog";
 import { tripBriefSchema } from "@/lib/trip-brief-contracts";
 import { placeSchema, walkingSchema } from "@/lib/contracts";
 import type { ItineraryModel } from "@/server/ai/itinerary-model";
@@ -66,10 +78,35 @@ export async function createItinerary(
   provider: ItineraryProvider,
   ai: ItineraryModel,
   signal: AbortSignal,
-  progress: (message: string, stage?: ItineraryStage) => void = () => {},
+  progress: (
+    message: string,
+    stage?: ItineraryStage,
+    work?: ItineraryWork,
+  ) => void = () => {},
+  socialProvider?: SocialReferenceProvider,
 ): Promise<Itinerary> {
   const brief = tripBriefSchema.parse(raw);
   return withItineraryBudget(async () => {
+    let socialSource: SocialSource | undefined;
+    if (socialProvider && !brief.socialInspiration) {
+      progress("正在检查后台可用的同城社交参考资料。", "places");
+      try {
+        socialSource = socialSourceSchema.parse(await socialProvider.load(brief, signal));
+        if (
+          socialSource.status === "available" &&
+          normalize(socialSource.references.city) !== normalize(brief.destinationCity)
+        ) {
+          socialSource = { status: "unavailable" };
+        }
+      } catch {
+        signal.throwIfAborted();
+        socialSource = { status: "unavailable" };
+      }
+    }
+    const references =
+      brief.socialInspiration ??
+      (socialSource?.status === "available" ? socialSource.references : undefined);
+    const modelBrief = references ? { ...brief, socialInspiration: references } : brief;
     const candidates: ItineraryCandidate[] = [];
     const searches = new Map<string, Place[]>();
     async function search(
@@ -137,17 +174,14 @@ export async function createItinerary(
     }
     const socialNotices: string[] = [];
     const checkedSocialPlaces = new Set<string>();
-    for (const note of brief.socialInspiration?.notes ?? []) {
+    for (const note of references?.notes ?? []) {
       for (const place of note.places) {
         const key = `${place.kind}:${normalize(place.name)}`;
         if (checkedSocialPlaces.has(key)) {
           continue;
         }
         checkedSocialPlaces.add(key);
-        progress(
-          "正在核对社交参考中经你确认的推荐地点，不把帖子当作路线或营业证据。",
-          "places",
-        );
+        progress("正在核对社交参考中的推荐地点，不把帖子当作路线或营业证据。", "places");
         try {
           const exact = (await search(place.name, place.kind, true)).filter(
             (found) => normalize(found.name) === normalize(place.name),
@@ -200,7 +234,7 @@ export async function createItinerary(
     }
     progress("AI 正在结合旅行目的、可用时间与预算选择每日活动和三餐。", "model");
     const parsedOutline = itineraryOutlineSchema.safeParse(
-      await withAiBudget(() => ai.compose(brief, candidates, signal)),
+      await withAiBudget(() => ai.compose(modelBrief, candidates, signal)),
     );
     if (!parsedOutline.success) {
       throw new ProviderError(
@@ -209,7 +243,7 @@ export async function createItinerary(
         "ai_invalid_response",
       );
     }
-    const outline = parsedOutline.data;
+    let outline = parsedOutline.data;
     if (outline.days.length !== brief.dayCount) {
       throw new ProviderError(
         "unavailable",
@@ -217,11 +251,9 @@ export async function createItinerary(
         "ai_invalid_response",
       );
     }
-    const usedVisits = new Set<string>();
     for (const day of outline.days) {
       for (const choice of day.visits) {
         if (
-          usedVisits.has(choice.placeId) ||
           !candidates.some(
             (candidate) =>
               candidate.kind === "visit" && candidate.place.id === choice.placeId,
@@ -229,11 +261,10 @@ export async function createItinerary(
         ) {
           throw new ProviderError(
             "unavailable",
-            "AI 返回了重复或无效景点，方案未应用。",
+            "AI 选择了候选之外的景点，方案未应用。",
             "ai_invalid_response",
           );
         }
-        usedVisits.add(choice.placeId);
       }
       for (const meal of [day.breakfast, day.lunch, day.dinner]) {
         if (
@@ -250,6 +281,12 @@ export async function createItinerary(
         }
       }
     }
+    const selection = uniqueItineraryVisits(
+      outline,
+      candidates,
+      new Set(required.values()),
+    );
+    outline = selection.outline;
     const guides = new Map(
       outline.guides?.map(({ placeId, ...guide }) => [placeId, guide]) ?? [],
     );
@@ -258,7 +295,10 @@ export async function createItinerary(
     for (const [index, availability] of briefDays(brief).entries()) {
       signal.throwIfAborted();
       const day = outline.days[index];
-      progress(`正在核对第 ${index + 1} 天的实际相邻路线与活动时间。`, "routes");
+      progress(`正在核对第 ${index + 1} 天的相邻路线与时间。`, "routes", {
+        completed: index,
+        total: brief.dayCount,
+      });
       if (!availability.activityWindow) {
         days.push({
           date: availability.date,
@@ -393,6 +433,10 @@ export async function createItinerary(
         notices: [...new Set(notices)],
       });
     }
+    progress("路线核对完成，正在整理方案。", "routes", {
+      completed: brief.dayCount,
+      total: brief.dayCount,
+    });
     const allItems = days.flatMap((day) => day.schedule?.items ?? []);
     const scheduledIds = new Set(
       allItems
@@ -456,6 +500,7 @@ export async function createItinerary(
       total - allocation.reduce((value, item) => value + item.targetFen, 0);
     return itinerarySchema.parse({
       brief,
+      ...(socialSource ? { socialSource } : {}),
       title: outline.title,
       summary: outline.summary,
       days,
@@ -470,14 +515,17 @@ export async function createItinerary(
           ? "infeasible"
           : "unverified",
       notices: [
+        ...selection.notices,
         `按“${tripPurposeLabels[brief.mainPurpose]}”优先组织；选择与菜品描述为 AI 建议，非商家事实。`,
         "目前各段采用实际步行查询；公共交通方案、开放、预约、实际价格与天气仍待核实，不保证可直接执行。",
         "费用图表示预算目标的分配建议，不是实际报价或预算达标证明；早餐、午晚餐按真实可用时段纳入。",
         "10 分钟为独立规划缓冲，不是排队、候车或路段耗时；未发送精确住宿字段和自定义地图点，请勿在偏好中填写票据或联系方式。",
         "方案暂存在本页，刷新会丢失。",
-        ...(brief.socialInspiration
+        ...(references
           ? [
-              "参考了用户选用的社交摘录，仅为未核实的旅行经验；来源列表不代表每处都已安排，地点、道路与营业／价格证据独立。",
+              socialSource?.status === "available"
+                ? "参考了后台检索的同城社交资料，仅为未核实的旅行经验；来源列表不是逐活动引用或事实核验。"
+                : "参考了用户选用的社交摘录，仅为未核实的旅行经验；来源列表不代表每处都已安排，地点、道路与营业／价格证据独立。",
               ...socialNotices,
             ]
           : []),

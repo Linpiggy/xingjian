@@ -17,7 +17,8 @@ export function DayOverview({
   if (!schedule) {
     return null;
   }
-  const visits = schedule.items.filter((item) => item.activity.kind === "visit").length;
+  const attractions = schedule.items.filter((item) => item.activity.kind === "visit");
+  const visits = attractions.length;
   const meals = schedule.items.length - visits;
   const measured = schedule.legs.filter((leg) => leg.route?.meters != null);
   const meters = measured.reduce((sum, leg) => sum + (leg.route?.meters ?? 0), 0);
@@ -39,30 +40,47 @@ export function DayOverview({
           {unknown > 0 && <small>{unknown} 段待核实</small>}
         </span>
       </div>
-      <div className="trip-rhythm-heading">
-        <h3>这一天的节奏</h3>
-        <span>按行程次序 · 点选定位</span>
-      </div>
-      <ol className="trip-rhythm">
-        {schedule.items.map((item, index) => {
-          const Icon = visuals[item.activity.kind];
-          return (
-            <li key={item.activity.id}>
-              <button
-                type="button"
-                aria-label={`在地图中定位第 ${index + 1} 站：${item.activity.place.name}`}
-                aria-pressed={selected === item.activity.id}
-                title={item.activity.place.name}
-                onClick={() => onSelect(item.activity.id)}
-              >
-                <Icon size={23} strokeWidth={1.6} aria-hidden="true" />
-                <strong>{labels[item.activity.kind]}</strong>
-                <time>{formatMinute(item.startMinute)}</time>
-              </button>
-            </li>
-          );
-        })}
-      </ol>
+      {attractions.length > 0 && (
+        <div className="trip-day-highlights">
+          <strong>当天重点</strong>
+          <ul>
+            {attractions.map((item) => (
+              <li key={item.activity.id}>
+                <button
+                  type="button"
+                  aria-label={`查看当天重点：${item.activity.place.name}`}
+                  onClick={() => onSelect(item.activity.id)}
+                >
+                  {item.activity.place.name}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      <details className="trip-rhythm-details">
+        <summary>查看行程节奏 · {schedule.items.length} 站</summary>
+        <ol className="trip-rhythm">
+          {schedule.items.map((item, index) => {
+            const Icon = visuals[item.activity.kind];
+            return (
+              <li key={item.activity.id}>
+                <button
+                  type="button"
+                  aria-label={`在地图中定位第 ${index + 1} 站：${item.activity.place.name}`}
+                  aria-pressed={selected === item.activity.id}
+                  title={item.activity.place.name}
+                  onClick={() => onSelect(item.activity.id)}
+                >
+                  <Icon size={23} strokeWidth={1.6} aria-hidden="true" />
+                  <strong>{labels[item.activity.kind]}</strong>
+                  <time>{formatMinute(item.startMinute)}</time>
+                </button>
+              </li>
+            );
+          })}
+        </ol>
+      </details>
     </section>
   );
 }

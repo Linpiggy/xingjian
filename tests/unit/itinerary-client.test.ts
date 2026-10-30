@@ -158,6 +158,44 @@ describe("streamed planning client", () => {
       requestItinerary(fixtureBrief(), new AbortController().signal, vi.fn(), transport),
     ).rejects.toThrow("未完成");
   });
+  it("relays real stage counters and rejects impossible counts without applying a result", async () => {
+    const progress = vi.fn();
+    const transport = vi.fn<typeof fetch>().mockResolvedValue(
+      stream([
+        {
+          type: "progress",
+          stage: "routes",
+          message: "已处理第一天",
+          work: { completed: 1, total: 2 },
+        },
+        { type: "result", plan: fixtureItinerary() },
+      ]),
+    );
+    await requestItinerary(
+      fixtureBrief(),
+      new AbortController().signal,
+      progress,
+      transport,
+    );
+    expect(progress).toHaveBeenCalledWith("已处理第一天", "routes", {
+      completed: 1,
+      total: 2,
+    });
+    transport.mockResolvedValue(
+      stream([
+        {
+          type: "progress",
+          stage: "routes",
+          message: "错误进度",
+          work: { completed: 3, total: 2 },
+        },
+        { type: "result", plan: fixtureItinerary() },
+      ]),
+    );
+    await expect(
+      requestItinerary(fixtureBrief(), new AbortController().signal, progress, transport),
+    ).rejects.toMatchObject({ code: "invalid_response" });
+  });
   it("rejects an old request result, a duplicate final result and arbitrary photo URLs", async () => {
     const old = fixtureItinerary();
     old.brief.travelers = 1;

@@ -26,116 +26,109 @@ async function generate(page: Page, long = false) {
   );
 }
 
-test("map-first panes keep their viewport and isolate native wheel scrolling, with current date and context visible", async ({
+test("map comes before daily planning on both screens and native wheel moves the single document, not nested panes", async ({
   page,
 }, testInfo) => {
   await generate(page);
   const banner = page.getByRole("banner");
-  const brand = banner.getByRole("link", { name: "行间", exact: true });
-  expect((await brand.boundingBox())!.height).toBeLessThanOrEqual(40);
+  expect(
+    (await banner.getByRole("link", { name: "行间", exact: true }).boundingBox())!.height,
+  ).toBeLessThanOrEqual(40);
   expect((await banner.boundingBox())!.height).toBeLessThanOrEqual(72);
+  const map = page.getByRole("complementary", { name: "当天路线地图", exact: true });
   const day = page.getByRole("region", { name: "当日完整安排", exact: true });
-  if (testInfo.project.name === "desktop") {
-    const map = page.getByRole("complementary", { name: "当天路线地图", exact: true });
-    const mapBox = (await map.boundingBox())!;
-    const dayBox = (await day.boundingBox())!;
-    expect(mapBox.x + mapBox.width).toBeLessThan(dayBox.x);
-    expect(mapBox.width).toBeGreaterThan(dayBox.width);
-    expect(mapBox.height).toBeGreaterThan(300);
-    expect(Math.abs(mapBox.height - dayBox.height)).toBeLessThan(2);
-    const leftBefore = await map.evaluate((element) => element.scrollTop);
-    await page.mouse.move(dayBox.x + dayBox.width / 2, dayBox.y + dayBox.height / 2);
-    await page.mouse.wheel(0, 650);
-    await expect
-      .poll(() => day.evaluate((element) => element.scrollTop))
-      .toBeGreaterThan(100);
-    expect(await map.evaluate((element) => element.scrollTop)).toBe(leftBefore);
-    expect(await page.evaluate(() => window.scrollY)).toBe(0);
-    const heading = (await page.locator(".trip-day-heading").boundingBox())!;
-    expect(heading.y).toBeGreaterThanOrEqual(dayBox.y);
-    expect(heading.y + heading.height).toBeLessThan(dayBox.y + dayBox.height);
-    expect((await map.boundingBox())!.y).toBe(mapBox.y);
-    const rightBefore = await day.evaluate((element) => element.scrollTop);
-    await page.mouse.move(mapBox.x + mapBox.width / 2, mapBox.y + mapBox.height / 2);
-    await page.mouse.wheel(0, 900);
-    expect(await day.evaluate((element) => element.scrollTop)).toBe(rightBefore);
-    expect(await page.evaluate(() => window.scrollY)).toBe(0);
-  } else {
-    await expect(
-      page.getByRole("region", { name: "当天真实地图", exact: true }),
-    ).toHaveCount(0);
-    await page.getByRole("button", { name: "查看地图", exact: true }).click();
-    await expect(
-      page.getByRole("region", { name: "当天真实地图", exact: true }),
-    ).toBeVisible();
-    await page.getByRole("button", { name: "收起地图", exact: true }).click();
-    await expect(
-      page.getByRole("region", { name: "当天真实地图", exact: true }),
-    ).toHaveCount(0);
+  await expect(
+    page.getByRole("region", { name: "当天真实地图", exact: true }),
+  ).toBeVisible();
+  const mapBox = (await map.boundingBox())!;
+  const dayBox = (await day.boundingBox())!;
+  expect(mapBox.y + mapBox.height).toBeLessThanOrEqual(dayBox.y);
+  expect(Math.abs(mapBox.x - dayBox.x)).toBeLessThan(2);
+  expect(Math.abs(mapBox.width - dayBox.width)).toBeLessThan(2);
+  for (const section of [map, day]) {
+    expect(await section.evaluate((element) => getComputedStyle(element).overflowY)).toBe(
+      "visible",
+    );
+    expect(await section.evaluate((element) => element.scrollTop)).toBe(0);
   }
-  const last = page.getByRole("button", { name: /第 14 天/ });
-  await last.click();
-  await expect(last).toHaveAttribute("aria-current", "date");
-  await expect(last).toBeInViewport();
-  if (testInfo.project.name === "desktop") {
-    await expect.poll(() => day.evaluate((element) => element.scrollTop)).toBe(0);
-  }
+  await page.mouse.move(testInfo.project.name === "mobile" ? 190 : 720, 650);
+  const before = await page.evaluate(() => window.scrollY);
+  await page.mouse.wheel(0, 600);
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(before);
+  expect(await day.evaluate((element) => element.scrollTop)).toBe(0);
+  expect(await map.evaluate((element) => element.scrollTop)).toBe(0);
+  const dates = page.getByRole("navigation", { name: "选择行程日期", exact: true });
+  await expect
+    .poll(() => dates.evaluate((element) => element.getBoundingClientRect().top))
+    .toBe(0);
+  await page.getByRole("button", { name: /第 14 天/ }).click();
+  await expect(page.getByRole("button", { name: /第 14 天/ })).toHaveAttribute(
+    "aria-current",
+    "date",
+  );
+  await expect(page.getByRole("button", { name: /第 14 天/ })).toBeInViewport();
+  await expect(day).toContainText("第14天");
+  await expect
+    .poll(async () => {
+      const route = (await map.boundingBox())!;
+      const navigation = (await dates.boundingBox())!;
+      return route.y - navigation.y - navigation.height;
+    })
+    .toBeGreaterThanOrEqual(11);
+  await page.getByRole("button", { name: "查看当天安排", exact: true }).click();
+  await expect(day.getByRole("heading", { level: 2 }).first()).toBeFocused();
+  await expect
+    .poll(async () => {
+      const heading = (await page.locator(".trip-day-heading").boundingBox())!;
+      const navigation = (await dates.boundingBox())!;
+      return heading.y - navigation.y - navigation.height;
+    })
+    .toBeGreaterThanOrEqual(11);
+  await expect(
+    page.getByRole("button", { name: "查看当天重点：测试文化场馆27", exact: true }),
+  ).toBeVisible();
   expect(
     await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
   ).toBe(true);
   await page.screenshot({
-    path: `test-results/${testInfo.project.name}-map-first-workspace.png`,
+    path: `test-results/${testInfo.project.name}-vertical-daily-plan.png`,
+    animations: "disabled",
+  });
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.screenshot({
+    path: `test-results/${testInfo.project.name}-vertical-map-first.png`,
     animations: "disabled",
   });
 });
 
-test("long day headings keep measured scroll clearance and narrow layouts return to one main scrolling flow", async ({
+test("long titles and changing viewport keep map-first order and readable document flow without a hidden mobile map", async ({
   page,
 }, testInfo) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
   await generate(page, true);
-  if (testInfo.project.name === "desktop") {
-    await page.setViewportSize({ width: 960, height: 800 });
-    await expect
-      .poll(() =>
-        page
-          .locator(".trip-day-content")
-          .evaluate((element) =>
-            Number.parseFloat(element.style.getPropertyValue("--day-heading-height")),
-          ),
-      )
-      .toBeGreaterThan(70);
-    const measured = await page
-      .locator(".trip-day-content")
-      .evaluate((element) =>
-        Number.parseFloat(element.style.getPropertyValue("--day-heading-height")),
-      );
-    expect(measured).toBeGreaterThanOrEqual(
-      Math.floor((await page.locator(".trip-day-heading").boundingBox())!.height),
+  for (const width of testInfo.project.name === "desktop" ? [960, 620] : [390, 360]) {
+    await page.setViewportSize({ width, height: 800 });
+    const map = page.getByRole("complementary", { name: "当天路线地图", exact: true });
+    const day = page.getByRole("region", { name: "当日完整安排", exact: true });
+    const first = (await map.boundingBox())!;
+    const second = (await day.boundingBox())!;
+    expect(first.y + first.height).toBeLessThanOrEqual(second.y);
+    expect(first.width).toBeGreaterThan(280);
+    expect(await day.evaluate((element) => getComputedStyle(element).overflowY)).toBe(
+      "visible",
     );
-    await page.setViewportSize({ width: 620, height: 800 });
-  } else {
-    await page.setViewportSize({ width: 360, height: 800 });
+    expect(second.height).toBeGreaterThan(800);
+    await expect(
+      page.getByRole("region", { name: "当天真实地图", exact: true }),
+    ).toBeVisible();
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
+    ).toBe(true);
   }
-  await expect(page.getByRole("button", { name: "查看地图", exact: true })).toBeVisible();
-  const day = page.locator(".trip-day-content");
-  const flow = await day.evaluate((element) => ({
-    overflow: getComputedStyle(element).overflowY,
-    height: element.getBoundingClientRect().height,
-  }));
-  expect(flow.overflow).toBe("visible");
-  expect(flow.height).toBeGreaterThan(800);
-  expect(
-    (await page
-      .getByRole("banner")
-      .getByRole("link", { name: "行间", exact: true })
-      .boundingBox())!.height,
-  ).toBeLessThanOrEqual(40);
-  expect(
-    await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
-  ).toBe(true);
+  await page.getByRole("button", { name: "查看当天安排", exact: true }).click();
+  await expect(page.locator(".trip-day-heading h2")).toBeInViewport();
   await page.screenshot({
-    path: `test-results/${testInfo.project.name}-map-first-responsive.png`,
+    path: `test-results/${testInfo.project.name}-vertical-responsive.png`,
     fullPage: true,
     animations: "disabled",
   });

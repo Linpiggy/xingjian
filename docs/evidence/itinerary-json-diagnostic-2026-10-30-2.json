@@ -1,0 +1,36 @@
+{
+  "kind": "real_model_synthetic_candidate_format_diagnostic",
+  "checkedAt": "2026-10-30T00:43:13.278Z",
+  "attempt": 2,
+  "status": "passed",
+  "input": {
+    "days": 14,
+    "candidates": 45,
+    "synthetic": true
+  },
+  "limits": {
+    "model": 1,
+    "places": 0,
+    "routes": 0,
+    "weather": 0,
+    "automaticRetries": 0
+  },
+  "modelCalls": 1,
+  "elapsedMs": 11320,
+  "response": {
+    "httpStatus": 200,
+    "contentType": "json",
+    "bodyCharacters": 7047,
+    "envelopeJson": true,
+    "finishReason": "stop",
+    "contentCharacters": 5512,
+    "validOutline": true,
+    "days": 14
+  },
+  "errorCode": null,
+  "limitations": [
+    "Synthetic inputs, not the user's failed request or a real city itinerary",
+    "No raw content, credentials or supplier host retained",
+    "No social retrieval, routing, UI or production rights verification"
+  ]
+}

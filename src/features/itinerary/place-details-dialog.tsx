@@ -8,9 +8,13 @@ import type { ItineraryChange } from "@/domain/itinerary-editing";
 import { ItineraryVenueEditor } from "./itinerary-venue-editor";
 import type { ItineraryGuide } from "@/domain/itinerary";
 import { ItineraryPlaceGuide } from "./itinerary-place-guide";
+import { PhotoImportDialog } from "./photo-import-dialog";
+import { PlacePhoto } from "./place-photo";
+import { placePhotoKey, usePhotoStore } from "./photo-store";
 
 export function PlaceDetailsDialog({
   item,
+  city,
   date,
   dish,
   guide,
@@ -20,6 +24,7 @@ export function PlaceDetailsDialog({
   initialMoveOpen = false,
 }: {
   item: ScheduledActivity;
+  city: string;
   date: string;
   dish: string | null;
   guide?: ItineraryGuide;
@@ -32,6 +37,9 @@ export function PlaceDetailsDialog({
     items: { id: string; name: string }[];
   }[];
 }) {
+  const [photoOpen, setPhotoOpen] = useState(false);
+  const photoKey = placePhotoKey(city, item.activity.place.id);
+  const photo = usePhotoStore((state) => state.photos[photoKey]);
   const [moveExpanded, setMoveExpanded] = useState(initialMoveOpen);
   const originDay = Math.max(
     0,
@@ -176,6 +184,33 @@ export function PlaceDetailsDialog({
         </button>
       </header>
       <div className="trip-detail-content">
+        <PlacePhoto
+          city={city}
+          placeId={item.activity.place.id}
+          name={item.activity.place.name}
+        />
+        <div className="trip-photo-actions">
+          <button type="button" className="button" onClick={() => setPhotoOpen(true)}>
+            {photo ? "更换参考图片" : "添加平台参考图片"}
+          </button>
+          {photo && (
+            <button
+              type="button"
+              className="button"
+              onClick={() => usePhotoStore.getState().remove(photoKey)}
+            >
+              移除参考图片
+            </button>
+          )}
+        </div>
+        {photoOpen && (
+          <PhotoImportDialog
+            city={city}
+            placeId={item.activity.place.id}
+            name={item.activity.place.name}
+            onClose={() => setPhotoOpen(false)}
+          />
+        )}
         <h3>本次安排</h3>
         <p>
           {formatMinute(item.startMinute)}—{formatMinute(item.endMinute)} · 建议停留{" "}

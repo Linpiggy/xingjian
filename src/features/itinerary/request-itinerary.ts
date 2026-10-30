@@ -1,5 +1,5 @@
 import type { TripBrief } from "@/domain/trip-brief";
-import type { Itinerary, ItineraryStage } from "@/domain/itinerary";
+import type { Itinerary, ItineraryStage, ItineraryWork } from "@/domain/itinerary";
 import { itineraryEventSchema, planningFailureSchema } from "@/lib/itinerary-contracts";
 import { tripBriefSchema } from "@/lib/trip-brief-contracts";
 
@@ -17,7 +17,7 @@ export class PlanningRequestError extends Error {
 export async function requestItinerary(
   brief: TripBrief,
   signal: AbortSignal,
-  onProgress: (message: string, stage?: ItineraryStage) => void,
+  onProgress: (message: string, stage?: ItineraryStage, work?: ItineraryWork) => void,
   transport: typeof fetch = fetch,
 ): Promise<Itinerary> {
   const combined = AbortSignal.any([signal, AbortSignal.timeout(240_000)]);
@@ -97,7 +97,9 @@ export async function requestItinerary(
           const event = parsed.data;
           combined.throwIfAborted();
           if (event.type === "progress") {
-            if (event.stage) {
+            if (event.work) {
+              onProgress(event.message, event.stage, event.work);
+            } else if (event.stage) {
               onProgress(event.message, event.stage);
             } else {
               onProgress(event.message);

@@ -8,7 +8,7 @@ import {
   useState,
   type RefObject,
 } from "react";
-import { MapPin, RotateCw, Scan, Maximize2, Plus, Minus } from "lucide-react";
+import { MapPin, RotateCw, Scan, Maximize2, Plus, Minus, Play } from "lucide-react";
 import type { Day } from "@/domain/models";
 import { stopIdentity } from "@/domain/meals";
 import { initializeMap, type MapFailure } from "./initialize-map";
@@ -33,12 +33,14 @@ export function RouteMap({
   onSelect,
   mapKey,
   configured,
+  compact = false,
 }: {
   day: Day;
   selectedId: string | null;
   onSelect: (id: string) => void;
   mapKey: string;
   configured: boolean;
+  compact?: boolean;
 }) {
   const container = useRef<HTMLDivElement>(null);
   const enlarged = useRef<HTMLDivElement>(null);
@@ -317,19 +319,44 @@ export function RouteMap({
     <div className={`route-map${expanded ? " is-expanded" : ""}`}>
       <div className="route-map-toolbar">
         <span>
-          {day.items.length} 站 · {mappedLegs}/{day.legs.length} 段含轨迹
+          {compact
+            ? `${day.items.length} 站`
+            : `${day.items.length} 站 · ${mappedLegs}/${day.legs.length} 段含轨迹`}
         </span>
-        <button type="button" className="button" onClick={() => setExpanded(true)}>
-          <Maximize2 size={16} aria-hidden="true" />
-          放大地图
-        </button>
+        <div className="route-map-toolbar-actions">
+          <button
+            type="button"
+            className="button"
+            disabled={!track.parts.length}
+            onClick={() => {
+              setExpanded(true);
+              if (!replay.playing) {
+                replay.toggle();
+              }
+            }}
+          >
+            <Play size={16} aria-hidden="true" />
+            {replay.reduced ? "逐段看路线" : "演示路线"}
+          </button>
+          <button type="button" className="button" onClick={() => setExpanded(true)}>
+            <Maximize2 size={16} aria-hidden="true" />
+            放大地图
+          </button>
+        </div>
       </div>
       {stage(container, false)}
       {!expanded && (
         <>
           {stopIndex}
           {status}
-          <RouteReplayControls track={track} replay={replay} />
+          {compact ? (
+            <details className="route-inline-inspection">
+              <summary>路线演示与检查</summary>
+              <RouteReplayControls track={track} replay={replay} />
+            </details>
+          ) : (
+            <RouteReplayControls track={track} replay={replay} />
+          )}
         </>
       )}
       <footer className="route-map-legend" aria-label="地图图例与轨迹覆盖">

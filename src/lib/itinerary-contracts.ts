@@ -7,6 +7,12 @@ import type { ItineraryChange } from "@/domain/itinerary-editing";
 import type { ItineraryRouteResolution } from "@/domain/itinerary-moves";
 import { budgetEstimateSchema, coordinateSchema, walkingSchema } from "./contracts";
 import { venueRulesSchema } from "./venue-contracts";
+import { socialInspirationSchema } from "./social-inspiration-contracts";
+
+export const socialSourceSchema = z.discriminatedUnion("status", [
+  z.strictObject({ status: z.literal("available"), references: socialInspirationSchema }),
+  z.strictObject({ status: z.enum(["not_configured", "no_results", "unavailable"]) }),
+]);
 
 export const itineraryExpensesSchema = budgetEstimateSchema.pick({ items: true });
 const activityId = z.string().regex(/^activity:[a-zA-Z0-9-]{1,850}$/);
@@ -148,6 +154,7 @@ const schedule = z.strictObject({
 export const itinerarySchema: z.ZodType<Itinerary> = z
   .strictObject({
     brief: tripBriefSchema,
+    socialSource: socialSourceSchema.optional(),
     expenses: itineraryExpensesSchema.optional(),
     title: z.string().min(1).max(60),
     summary: z.string().min(1).max(400),
@@ -196,6 +203,19 @@ export const itinerarySchema: z.ZodType<Itinerary> = z
     notices: z.array(z.string()).max(20),
   })
   .superRefine((plan, context) => {
+    if (
+      plan.socialSource?.status === "available" &&
+      plan.socialSource.references.city
+        .normalize("NFKC")
+        .trim()
+        .toLocaleLowerCase("zh-CN") !==
+        plan.brief.destinationCity.normalize("NFKC").trim().toLocaleLowerCase("zh-CN")
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: "后台社交参考城市与本次目的地不一致。",
+      });
+    }
     const dates = briefDays(plan.brief).map((day) => day.date);
     if (
       plan.days.length !== dates.length ||
@@ -277,6 +297,13 @@ export const itineraryEventSchema = z.discriminatedUnion("type", [
     type: z.literal("progress"),
     message: z.string().max(120),
     stage: planningStageSchema.optional(),
+    work: z
+      .strictObject({
+        completed: z.number().int().min(0).max(1000),
+        total: z.number().int().min(1).max(1000),
+      })
+      .refine((work) => work.completed <= work.total)
+      .optional(),
   }),
   z.strictObject({ type: z.literal("result"), plan: itinerarySchema }),
   z.strictObject({

@@ -39,7 +39,7 @@ test("rich visit and meal guidance stays explicitly AI advice through detail, ed
   page.on("pageerror", (error) => errors.push(error.message));
   const routes = await setup(page);
   await page.getByRole("button", { name: /第 14 天/ }).click();
-  await expect(page.locator(".trip-cover-city")).toContainText("测试城市");
+  await expect(page.locator(".trip-cover-facts")).toContainText("测试城市");
   await expect(page.locator(".trip-experience")).toHaveCount(5);
   await page.evaluate(() => window.scrollTo(0, 0));
   await page.screenshot({
@@ -87,7 +87,7 @@ test("rich visit and meal guidance stays explicitly AI advice through detail, ed
   await expect(page.locator(".route-map-legend")).toContainText("缺失轨迹不以直线补连");
   await expect(page.getByRole("button", { name: "查看全日路线" })).toHaveCount(0);
   if (testInfo.project.name === "mobile") {
-    await page.getByRole("button", { name: "收起地图" }).click();
+    await page.getByRole("button", { name: "查看当天安排", exact: true }).click();
   }
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.getByRole("button", { name: /第 1 天/ }).click();

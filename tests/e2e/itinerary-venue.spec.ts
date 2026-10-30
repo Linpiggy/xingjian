@@ -110,7 +110,16 @@ test("venue keyboard focus stays below a variable-height sticky title after scro
   const name = "测试文化场馆与城市历史陈列空间".repeat(3);
   const requests = await setup(page, 14, 20, name);
   await page.getByRole("button", { name: /第 14 天/ }).click();
+  expect(
+    await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
+  ).toBe(true);
   const dialog = await editor(page, name);
+  const dialogBounds = (await dialog.boundingBox())!;
+  expect(dialogBounds.x).toBeGreaterThanOrEqual(0);
+  expect(dialogBounds.x + dialogBounds.width).toBeLessThanOrEqual(
+    testInfo.project.name === "desktop" ? 960 : 390,
+  );
+  expect(await page.evaluate(() => window.scrollX)).toBe(0);
   await opening(dialog);
   const field = dialog.getByLabel("景点规则适用日期", { exact: true });
   await field.focus();

@@ -2,6 +2,7 @@ import { test, expect } from "@playwright/test";
 import { places, fixtureDraft } from "../fixtures/draft";
 import { fixtureItinerary } from "../fixtures/itinerary";
 import { tripBriefSchema } from "../../src/lib/trip-brief-contracts";
+import { openPlanningTools } from "./fixtures";
 
 const aiPanel = (page: import("@playwright/test").Page) =>
   page.locator("#planning-panel-ai");
@@ -29,6 +30,7 @@ test("AI and manual inputs and selected places remain separate and survive keybo
   const ai = aiPanel(page);
   await ai.getByLabel("目的地城市").fill("AI 旅行城市");
   await ai.getByLabel("旅行天数").fill("5");
+  await openPlanningTools(page);
   await page.getByRole("tab", { name: /手动选点/ }).click();
   const manual = manualPanel(page);
   await manual.getByLabel("目的地城市").fill("手动旅行城市");
@@ -99,6 +101,7 @@ test("switching cannot start another planning mode during an in-flight request, 
   const started = page.waitForRequest("**/api/itineraries");
   await ai.getByRole("button", { name: "生成我的完整方案" }).click();
   await started;
+  await openPlanningTools(page);
   await page.getByRole("tab", { name: /手动选点/ }).click();
   await expect(page.getByRole("tab", { name: /完整 AI 规划/ })).toHaveAttribute(
     "aria-selected",
@@ -157,11 +160,13 @@ test("manual route drafts and full AI proposals both remain in the same workspac
   await ai.getByRole("button", { name: "生成我的完整方案" }).click();
   await expect(ai.getByRole("heading", { name: "在城市的文化与烟火之间" })).toBeVisible();
   await expect(page).toHaveURL(/\/plan\?mode=manual$/);
+  await openPlanningTools(page);
   await page.getByRole("tab", { name: /手动选点/ }).click();
   await expect(
     manual.getByRole("heading", { name: "测试城市2日路线草稿" }),
   ).toBeVisible();
   await page.getByRole("tab", { name: /完整 AI 规划/ }).click();
+  await ai.getByRole("button", { name: "返回当前方案", exact: true }).click();
   await expect(ai.getByRole("heading", { name: "在城市的文化与烟火之间" })).toBeVisible();
   expect(manualCalls).toBe(1);
   expect(aiCalls).toBe(1);

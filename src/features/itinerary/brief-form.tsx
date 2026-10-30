@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import {
   ArrowRight,
   CalendarDays,
@@ -28,6 +28,8 @@ import { parseYuanFen } from "@/lib/money";
 import type { PlanningRequestError } from "./request-itinerary";
 import type { SocialInspiration } from "@/domain/social-inspiration";
 import { SocialInspirationInput } from "./social-inspiration-input";
+import { PlanningProgress, type GenerationProgress } from "./planning-progress";
+import { BriefPlaceSearch } from "./brief-place-search";
 
 const purposeVisuals = {
   local_life: { icon: Store, description: "街巷、市场与当地日常" },
@@ -43,6 +45,7 @@ export function BriefForm({
   initial,
   pending,
   progress,
+  generation,
   error,
   failure,
   cooldown = 0,
@@ -55,6 +58,7 @@ export function BriefForm({
   initial: TripBrief | null;
   pending: boolean;
   progress: string;
+  generation?: GenerationProgress | null;
   error: string | null;
   failure?: PlanningRequestError | null;
   cooldown?: number;
@@ -63,11 +67,27 @@ export function BriefForm({
   onBackToPlan?: () => void;
   onDraftChange?: () => void;
 }) {
+  const form = useRef<HTMLFormElement>(null);
+  const wasPending = useRef(false);
+  useEffect(() => {
+    if (wasPending.current && !pending) {
+      const submit = form.current?.querySelector<HTMLButtonElement>(
+        'button[type="submit"]',
+      );
+      if (submit && !submit.disabled) {
+        submit.focus();
+      } else {
+        form.current?.querySelector<HTMLElement>('[role="alert"]')?.focus();
+      }
+    }
+    wasPending.current = pending;
+  }, [pending]);
   const [purpose, setPurpose] = useState<TripPurpose>(initial?.mainPurpose ?? "culture");
   const [secondary, setSecondary] = useState<TripPurpose[]>(
     initial?.secondaryPurposes ?? [],
   );
   const [validation, setValidation] = useState<string | null>(null);
+  const [mustVisitText, setMustVisitText] = useState(initial?.mustVisit.join("\n") ?? "");
   const [section, setSection] = useState(0);
   const [socialInspiration, setSocialInspiration] = useState<
     SocialInspiration | undefined
@@ -213,6 +233,8 @@ export function BriefForm({
     `${String(Math.floor(value / 60) % 24).padStart(2, "0")}:${String(value % 60).padStart(2, "0")}`;
   return (
     <form
+      ref={form}
+      data-generating={pending ? "true" : undefined}
       className="trip-brief-form"
       onSubmit={submit}
       onInput={trackInput}
@@ -467,7 +489,7 @@ export function BriefForm({
             </fieldset>
             <fieldset disabled={pending}>
               <legend>
-                不能错过的，留给我来安排 <small>选填</small>
+                必去与必吃 <small>选填</small>
               </legend>
               <div className="trip-fields">
                 <label>
@@ -475,7 +497,8 @@ export function BriefForm({
                   <textarea
                     name="mustVisit"
                     placeholder="每行一个明确地点名称；没有也可留空"
-                    defaultValue={initial?.mustVisit.join("\n")}
+                    value={mustVisitText}
+                    onChange={(event) => setMustVisitText(event.target.value)}
                   />
                 </label>
                 <label>
@@ -524,6 +547,23 @@ export function BriefForm({
               </details>
             </fieldset>
             <fieldset disabled={pending}>
+              <BriefPlaceSearch
+                city={summary.city}
+                names={mustVisitText
+                  .split(/[\n、]/)
+                  .map((name) => name.trim())
+                  .filter(Boolean)}
+                pending={pending}
+                onAdd={(name) => {
+                  setMustVisitText((previous) =>
+                    previous.trim() ? `${previous.trim()}\n${name}` : name,
+                  );
+                  setValidation(null);
+                  onDraftChange?.();
+                }}
+              />
+            </fieldset>
+            <fieldset disabled={pending}>
               <legend>
                 带上社交旅行灵感 <small>选填</small>
               </legend>
@@ -553,7 +593,7 @@ export function BriefForm({
               我确认本次生成会使用模型与地图查询配额
             </label>
             {(validation || error) && (
-              <p className="trip-error" role="alert">
+              <p className="trip-error" role="alert" tabIndex={-1}>
                 {validation || error}
               </p>
             )}
@@ -578,12 +618,11 @@ export function BriefForm({
               </p>
             )}
             {pending ? (
-              <div className="trip-pending">
-                <p role="status">{progress || "正在准备旅行方案…"}</p>
-                <button type="button" className="button" onClick={onCancel}>
-                  取消生成
-                </button>
-              </div>
+              <PlanningProgress
+                state={generation}
+                message={progress}
+                onCancel={onCancel}
+              />
             ) : (
               <button
                 type="submit"

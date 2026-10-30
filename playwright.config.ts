@@ -46,6 +46,7 @@ export default defineConfig({
       DEEPSEEK_API_KEY: "",
       OPENAI_BASE_URL: "",
       OPENAI_MODEL: "",
+      SOCIAL_REFERENCE_FILE: "",
       NEXT_TELEMETRY_DISABLED: "1",
     },
   },

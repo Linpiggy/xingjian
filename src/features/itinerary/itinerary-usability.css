@@ -1,0 +1,89 @@
+body .trip-app .unified-mode-bar {
+  justify-content: flex-end;
+  padding-block: 8px;
+}
+.unified-manual-tools {
+  width: 100%;
+}
+.unified-manual-tools > summary {
+  min-height: 36px;
+  padding: 6px 0;
+  color: var(--trip-muted);
+  font-size: 14px;
+  cursor: pointer;
+  text-align: right;
+}
+.unified-manual-tools .unified-mode-tabs {
+  margin-top: 8px;
+}
+.unified-planner:has(.unified-ai:not([hidden]) .map-workspace) .unified-mode-bar {
+  display: none;
+}
+.brief-place-search summary {
+  min-height: 44px;
+  padding-block: 8px;
+  color: var(--trip-accent);
+  cursor: pointer;
+}
+.brief-place-search summary svg {
+  display: inline;
+  margin-right: 8px;
+  vertical-align: middle;
+}
+.brief-place-search-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  margin-top: 12px;
+}
+.brief-place-search-row label {
+  flex: 1;
+  min-width: 0;
+}
+.brief-place-search input {
+  width: 100%;
+  min-height: 44px;
+  margin-top: 6px;
+  border: 1px solid #899774;
+  border-radius: 6px;
+  padding: 10px;
+  font: inherit;
+}
+.brief-place-search ul {
+  margin: 12px 0;
+  padding: 0;
+  list-style: none;
+}
+.brief-place-search li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--trip-line);
+}
+.brief-place-search li > div {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.brief-place-search li p {
+  margin-top: 4px;
+  color: var(--trip-muted);
+  font-size: 13px;
+}
+.trip-brief-form[data-generating="true"] .trip-form-footer {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
+}
+@media (max-width: 767px) {
+  .brief-place-search-row {
+    flex-wrap: wrap;
+  }
+  .brief-place-search-row label {
+    flex-basis: 100%;
+  }
+  .brief-place-search li {
+    align-items: flex-start;
+  }
+}
