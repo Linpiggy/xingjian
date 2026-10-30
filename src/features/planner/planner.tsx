@@ -1,4 +1,6 @@
 "use client";
+import { Dialog } from "@/components/arc/dialog/dialog";
+import { useConfirmDialog } from "@/components/arc/dialog/confirm-dialog";
 import { useCallback, useMemo, useRef, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import Link from "next/link";
@@ -134,12 +136,13 @@ function Workspace({
   }
   const wideScreen = useWideScreen();
   const dialog = useRef<HTMLDialogElement>(null);
+  const [detailsOpen, setDetailsOpen] = useState(false);
   const select = ui.select;
   const selectPlace = useCallback(
     (id: string) => {
       select(id);
       if (window.matchMedia("(max-width: 1100px)").matches) {
-        dialog.current?.showModal();
+        setDetailsOpen(true);
       }
     },
     [select],
@@ -409,8 +412,10 @@ function Workspace({
         />
       )}
       {editor && <BudgetPanel state={editor} />}
-      <dialog
+      <Dialog
         ref={dialog}
+        open={detailsOpen}
+        onClose={() => setDetailsOpen(false)}
         className="details-dialog"
         aria-labelledby="place-dialog-title"
       >
@@ -425,7 +430,7 @@ function Workspace({
           </button>
         </div>
         {selected && <PlaceDetails place={selected} meal={selectedMeal} />}
-      </dialog>
+      </Dialog>
       {editing && editor && (
         <EditDialog
           state={editor}
@@ -454,6 +459,7 @@ export function Planner({
   active?: boolean;
 }) {
   const Content = embedded ? "section" : "main";
+  const { confirm: askConfirmation, confirmation } = useConfirmDialog();
   const resetUi = usePlannerUi((state) => state.reset);
   const mutation = useMutation({
     mutationFn: async (input: TripInput) => {
@@ -485,8 +491,11 @@ export function Planner({
       resetUi();
     },
   });
-  function newPlan() {
-    if (mutation.data && !window.confirm("当前草稿未保存，确定清空并新建计划吗？")) {
+  async function newPlan() {
+    if (
+      mutation.data &&
+      !(await askConfirmation("当前草稿未保存，确定清空并新建计划吗？"))
+    ) {
       return;
     }
     mutation.reset();
@@ -495,6 +504,7 @@ export function Planner({
   }
   return (
     <>
+      {confirmation}
       {!embedded && (
         <header className="site-header">
           <span className="brand">

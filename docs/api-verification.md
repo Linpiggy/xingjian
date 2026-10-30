@@ -259,3 +259,14 @@ GitHub 未识别标准许可证，根目录未发现 LICENSE，README 明确仅�
 - 纯检索、真实合成临时文件读取、使用权／大小／路径／隐私门禁、单次模型及原请求绑定有单测；双端以 fixture 验证无上传生成、来源查看与无配置提示。图片不在此通路，继续独立核对权利，不让 AI 编造媒体 URL。
 
 当前仅自动资料适配和离线编排闭环可用；实际 MediaCrawler 采集、后台资料供给、平台权限、真实内容效果与逐活动证据归属仍待验证。未连接真实源时，页面明确“未连接后台社交资料库”，不把测试图文或这份索引协议称为已接通小红书。
+
+## 17. UIArc 免费组件与依赖
+
+用户明确选用 UIArc，且只用免费组件。通过 authenticated gh 克隆官方公开仓库 [kuratlielia/arc-library](https://github.com/kuratlielia/arc-library)，固定提交 `df3a600fd9ffca85ec8607438b599a4408ab8562`；实际读取 LICENSE、registry 组件、CSS 与 motion tokens，而非仅据站点宣传判断许可。
+
+- 上游 MIT，Copyright (c) 2026 Elia Kuratli；完整许可保留在 `src/components/arc/LICENSE`。来源为该提交 `registry/components/{button,tabs,accordion,badge,input,progress}/` 及 `registry/motion-tokens.ts`，未获取 Pro 源码、模板、字体或付费资产。
+- 本地是有标注的适配源码，不是未修改镜像：精简未用接口／动画；映射浅色品牌变量、中文字号与零字距、至少 44px 控件；日期手动激活及水平溢出、隐藏关闭内容、未知进度无定量值。移除宽高变形、模糊、滚动数字与默认字体；不导入 foundation 全局重置。不把原生 dialog 或拖拽手柄宣称为 Arc 组件。
+- 依赖精确锁定 `motion@14.8.0`、`@radix-ui/react-tabs@1.2.1`、`@radix-ui/react-accordion@1.3.1`；已核对包内 MIT 许可。Radix peer 声明包含 React 19；Motion React peer 为 optional。实际兼容性以当前 React 19.3.0／Next 16.4.3 的类型、构建和浏览器记录为准，不以 peer 声明代替实测。
+- 使用 npm 安装并禁用生命周期脚本，没有执行远程 registry 安装脚本。安装后生产依赖 audit 为 0，开发依赖链仍有既有 4 moderate；未执行 force fix。没有引入 Mantine、Ant Design、HeroUI 或另一套 shadcn 视觉组件。
+
+这项许可只覆盖所用组件代码与各依赖，不扩展高德、模型、社交正文、照片、缓存或分享的使用权。检查 134 在当前 React／Next 版本下通过 499 单测、228 双端 E2E 与生产构建；首轮 hydration、面板定位及日期底板层叠失败保留在测试记录检查 129—133，不覆盖真实供应商或 SDK 验收。

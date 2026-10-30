@@ -33,6 +33,7 @@ type State = {
     result: ItineraryRouteResolution,
   ) => void;
   previous: Itinerary | null;
+  history: { plan: Itinerary; label: string }[];
   version: number;
   receive: (plan: Itinerary, baseVersion: number) => void;
   proposeChange: (change: ItineraryChange) => void;
@@ -45,6 +46,7 @@ export const useItineraryStore = create<State>((set, get) => ({
   plan: null,
   review: null,
   previous: null,
+  history: [],
   version: 0,
   proposalSequence: 0,
   resolveMoveRoute(proposalId, baseVersion, input) {
@@ -79,7 +81,7 @@ export const useItineraryStore = create<State>((set, get) => ({
       const id = state.proposalSequence + 1;
       set({ review: { id, plan, baseVersion, routes: [] }, proposalSequence: id });
     } else {
-      set({ plan, version: state.version + 1 });
+      set({ plan, previous: null, history: [], version: state.version + 1 });
     }
   },
   proposeChange(input) {
@@ -141,7 +143,36 @@ export const useItineraryStore = create<State>((set, get) => ({
     if (plan.status === "infeasible") {
       throw new Error("修改存在时间或预约冲突，当前方案保持不变。");
     }
-    set({ previous: state.plan, plan, review: null, version: state.version + 1 });
+    const previousHistory =
+      state.previous && state.history.at(-1)?.plan === state.previous
+        ? state.history
+        : [];
+    const name =
+      change && change.kind !== "expenses"
+        ? (state.plan?.days
+            .flatMap((day) => day.schedule?.items ?? [])
+            .find((item) => item.activity.id === change.activityId)?.activity.place
+            .name ?? "活动")
+        : "";
+    const labels = {
+      duration: "停留时间",
+      time_lock: "时间锁",
+      position_lock: "位置锁",
+      move: "日期与次序",
+      venue_rules: "营业预约记录",
+      expenses: "全程费用估算",
+    };
+    const label = change ? `${name}${labels[change.kind]}` : "整份旅行方案";
+    const history = state.plan
+      ? [...previousHistory.slice(-9), { plan: state.plan, label }]
+      : previousHistory;
+    set({
+      previous: state.plan,
+      history,
+      plan,
+      review: null,
+      version: state.version + 1,
+    });
   },
   cancelReview() {
     set({ review: null });
@@ -151,9 +182,15 @@ export const useItineraryStore = create<State>((set, get) => ({
     if (!state.previous) {
       throw new Error("没有可撤销的方案替换。");
     }
+    const available =
+      state.history.at(-1)?.plan === state.previous
+        ? state.history
+        : [{ plan: state.previous, label: "上次修改" }];
+    const history = available.slice(0, -1);
     set({
       plan: state.previous,
-      previous: null,
+      previous: history.at(-1)?.plan ?? null,
+      history,
       review: null,
       version: state.version + 1,
     });

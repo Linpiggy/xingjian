@@ -28,7 +28,11 @@ async function setup(page: Page, days = 1, travelers = 1) {
 }
 async function open(page: Page) {
   const details = page.locator(".trip-expense-details");
-  if (!(await details.evaluate((element) => (element as HTMLDetailsElement).open))) {
+  if (
+    (await details
+      .getByRole("button", { name: "查看或补充手动费用估算", exact: true })
+      .getAttribute("aria-expanded")) !== "true"
+  ) {
     await details.getByText("查看或补充手动费用估算", { exact: true }).click();
   }
   await details.getByRole("button", { name: "编辑全程费用估算", exact: true }).click();

@@ -32,7 +32,7 @@ for (const days of [1, 14]) {
   }, testInfo) => {
     const routes = await setup(page, days);
     if (days === 14) {
-      await page.getByRole("button", { name: /第 14 天/ }).click();
+      await page.getByRole("tab", { name: /第 14 天/ }).click();
     }
     const name = `测试文化场馆${(days - 1) * 2 + 1}`;
     const trigger = page.getByRole("button", { name: `查看${name}的资料`, exact: true });
@@ -79,7 +79,7 @@ test("fourteen-day position locks preview and undo explicitly and generated plan
   page,
 }, testInfo) => {
   const routes = await setup(page, 14);
-  await page.getByRole("button", { name: /第 14 天/ }).click();
+  await page.getByRole("tab", { name: /第 14 天/ }).click();
   const trigger = page.getByRole("button", {
     name: "查看测试文化场馆27的资料",
     exact: true,
@@ -121,7 +121,7 @@ test("fourteen-day position locks preview and undo explicitly and generated plan
   await expect(page.getByRole("main").getByRole("alert")).toContainText("位置锁");
   await expect(page.locator(".trip-app")).toHaveAttribute("data-plan-revision", "2");
   await page.getByRole("button", { name: "返回当前方案" }).click();
-  await page.getByRole("button", { name: /第 14 天/ }).click();
+  await page.getByRole("tab", { name: /第 14 天/ }).click();
   await expect(page.locator(".trip-position-lock")).toHaveCount(1);
   await trigger.click();
   await page.getByRole("button", { name: "预览解除位置锁" }).click();

@@ -1,4 +1,5 @@
 "use client";
+import { Dialog } from "@/components/arc/dialog/dialog";
 
 import { useEffect, useRef, useState } from "react";
 import { X } from "lucide-react";
@@ -200,10 +201,7 @@ function MealDialog({
   const [resolvedCount, setResolvedCount] = useState(0);
   const date = base.draft.days[dayIndex].date;
   const before = deriveMealTrip(base.draft, base.locks, base.meals).draft;
-  useEffect(() => {
-    dialog.current?.showModal();
-    return () => request.current?.abort();
-  }, []);
+  useEffect(() => () => request.current?.abort(), []);
   useEffect(() => {
     if (dialog.current) {
       dialog.current.scrollTop = 0;
@@ -327,8 +325,9 @@ function MealDialog({
     }
   }
   return (
-    <dialog
+    <Dialog
       ref={dialog}
+      onClose={onClose}
       className="details-dialog edit-dialog meal-dialog"
       aria-labelledby="meal-dialog-title"
       onCancel={(event) => {
@@ -597,7 +596,7 @@ function MealDialog({
           {error} 当前行程未改变。
         </p>
       )}
-    </dialog>
+    </Dialog>
   );
 }
 export function MealPanel({ state, dayIndex }: { state: EditState; dayIndex: number }) {

@@ -38,7 +38,7 @@ test("rich visit and meal guidance stays explicitly AI advice through detail, ed
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
   const routes = await setup(page);
-  await page.getByRole("button", { name: /第 14 天/ }).click();
+  await page.getByRole("tab", { name: /第 14 天/ }).click();
   await expect(page.locator(".trip-cover-facts")).toContainText("测试城市");
   await expect(page.locator(".trip-experience")).toHaveCount(5);
   await page.evaluate(() => window.scrollTo(0, 0));
@@ -90,7 +90,7 @@ test("rich visit and meal guidance stays explicitly AI advice through detail, ed
     await page.getByRole("button", { name: "查看当天安排", exact: true }).click();
   }
   await page.emulateMedia({ reducedMotion: "reduce" });
-  await page.getByRole("button", { name: /第 1 天/ }).click();
+  await page.getByRole("tab", { name: /第 1 天/ }).click();
   expect(
     await page
       .locator(".trip-timeline > li")

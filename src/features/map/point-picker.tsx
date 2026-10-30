@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { X } from "lucide-react";
+import { Dialog } from "@/components/arc/dialog/dialog";
 import type { Coordinate, PlaceCandidate } from "@/domain/models";
 import { coordinateSchema } from "@/lib/contracts";
 import { initializeMap, type MapFailure } from "./initialize-map";
@@ -29,12 +30,6 @@ export function PointPicker({
   const [name, setName] = useState("");
   const initialCenter = useRef(center);
   const detachClick = useRef<(() => void) | null>(null);
-
-  useEffect(() => {
-    const element = dialog.current;
-    element?.showModal();
-    return () => element?.close();
-  }, []);
 
   useEffect(() => {
     if (!configured || !canvas.current) {
@@ -111,8 +106,9 @@ export function PointPicker({
   }
 
   return (
-    <dialog
+    <Dialog
       ref={dialog}
+      onClose={onClose}
       className="point-dialog"
       aria-labelledby="point-title"
       onCancel={(event) => {
@@ -192,6 +188,6 @@ export function PointPicker({
           添加到清单
         </button>
       </div>
-    </dialog>
+    </Dialog>
   );
 }

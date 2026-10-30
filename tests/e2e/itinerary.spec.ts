@@ -95,7 +95,7 @@ for (const [days, travelers] of [
       page.getByText("测试 fixture：此方案用于离线交互验证，不是真实接口规划结果。"),
     ).toBeVisible();
     await expect(
-      page.getByRole("navigation", { name: "选择行程日期" }).getByRole("button"),
+      page.getByRole("navigation", { name: "选择行程日期" }).getByRole("tab"),
     ).toHaveCount(days);
     await expect(page.locator(".trip-timeline > li")).toHaveCount(5);
     await expect(page.getByRole("region", { name: "当日完整安排" })).toContainText(
@@ -135,8 +135,8 @@ for (const [days, travelers] of [
       await expect(place).toBeVisible();
     }
     if (days === 14) {
-      await page.getByRole("button", { name: /第 14 天/ }).click();
-      await expect(page.getByRole("button", { name: /第 14 天/ })).toBeInViewport();
+      await page.getByRole("tab", { name: /第 14 天/ }).click();
+      await expect(page.getByRole("tab", { name: /第 14 天/ })).toBeInViewport();
       await expect(page.getByRole("region", { name: "当日完整安排" })).toContainText(
         "2027-01-13",
       );
@@ -155,7 +155,7 @@ for (const [days, travelers] of [
     await heading.focus();
     await page.evaluate(() => window.scrollTo(0, 0));
     if (days === 14) {
-      await expect(page.getByRole("button", { name: /第 14 天/ })).toBeInViewport();
+      await expect(page.getByRole("tab", { name: /第 14 天/ })).toBeInViewport();
     }
     await page.screenshot({
       path: `test-results/${testInfo.project.name}-full-proposal-${days}d-viewport.png`,

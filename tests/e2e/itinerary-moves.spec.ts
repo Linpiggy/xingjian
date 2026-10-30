@@ -114,7 +114,7 @@ test("cross-day move reaches day fourteen for twenty travelers and moves its exp
   await expect(
     page.getByRole("region", { name: "受影响的步行路线" }).getByRole("status"),
   ).toHaveText("已查询 3／3 段");
-  await page.getByRole("button", { name: /第 14 天/ }).click();
+  await page.getByRole("tab", { name: /第 14 天/ }).click();
   expect(await order(page)).toContain("测试文化场馆1");
   await page.screenshot({
     path: `test-results/${testInfo.project.name}-full-cross-day-move.png`,
@@ -137,7 +137,7 @@ test("cross-day move reaches day fourteen for twenty travelers and moves its exp
   await page.keyboard.press("Escape");
   await page.getByRole("button", { name: "撤销上次修改" }).click();
   expect(await order(page)).not.toContain("测试文化场馆1");
-  await page.getByRole("button", { name: /第 1 天/ }).click();
+  await page.getByRole("tab", { name: /第 1 天/ }).click();
   expect(await order(page)).toContain("测试文化场馆1");
   await expect(page.locator(".trip-app")).toHaveAttribute("data-plan-revision", "3");
   expect(requests).toBe(3);

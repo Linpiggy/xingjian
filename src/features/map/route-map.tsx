@@ -18,6 +18,7 @@ import { useRouteReplay } from "./use-route-replay";
 import { RouteReplayControls } from "./route-replay-controls";
 import { RouteDiagram } from "./route-diagram";
 import { RouteMapDialog } from "./route-map-dialog";
+import { Button } from "@/components/arc/button/button";
 import "./route-map.css";
 
 const failureMessages: Record<MapFailure, string> = {
@@ -129,6 +130,7 @@ export function RouteMap({
     for (const [index, item] of day.items.entries()) {
       const element = document.createElement("button");
       element.type = "button";
+      element.tabIndex = -1;
       element.className = "map-marker route-marker";
       element.dataset.purpose = item.purpose ?? "visit";
       element.textContent = String(index + 1);
@@ -212,6 +214,7 @@ export function RouteMap({
         role="region"
         aria-label={large ? "放大的当天地图" : "当天真实地图"}
         aria-hidden={!large && expanded ? true : undefined}
+        inert={!large && expanded ? true : undefined}
       >
         {(!runtime || failed) && (
           <RouteDiagram
@@ -324,9 +327,9 @@ export function RouteMap({
             : `${day.items.length} 站 · ${mappedLegs}/${day.legs.length} 段含轨迹`}
         </span>
         <div className="route-map-toolbar-actions">
-          <button
-            type="button"
+          <Button
             className="button"
+            aria-haspopup="dialog"
             disabled={!track.parts.length}
             onClick={() => {
               setExpanded(true);
@@ -337,11 +340,15 @@ export function RouteMap({
           >
             <Play size={16} aria-hidden="true" />
             {replay.reduced ? "逐段看路线" : "演示路线"}
-          </button>
-          <button type="button" className="button" onClick={() => setExpanded(true)}>
+          </Button>
+          <Button
+            className="button"
+            aria-haspopup="dialog"
+            onClick={() => setExpanded(true)}
+          >
             <Maximize2 size={16} aria-hidden="true" />
             放大地图
-          </button>
+          </Button>
         </div>
       </div>
       {stage(container, false)}

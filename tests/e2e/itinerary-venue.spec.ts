@@ -51,7 +51,7 @@ for (const [days, travelers] of [
   }, testInfo) => {
     const requests = await setup(page, days, travelers);
     if (days === 14) {
-      await page.getByRole("button", { name: /第 14 天/ }).click();
+      await page.getByRole("tab", { name: /第 14 天/ }).click();
     }
     const name = `测试文化场馆${(days - 1) * 2 + 1}`;
     const dialog = await editor(page, name);
@@ -109,7 +109,7 @@ test("venue keyboard focus stays below a variable-height sticky title after scro
   }
   const name = "测试文化场馆与城市历史陈列空间".repeat(3);
   const requests = await setup(page, 14, 20, name);
-  await page.getByRole("button", { name: /第 14 天/ }).click();
+  await page.getByRole("tab", { name: /第 14 天/ }).click();
   expect(
     await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
   ).toBe(true);
@@ -167,7 +167,7 @@ for (const label of ["早餐", "午餐", "晚餐"]) {
     page,
   }, testInfo) => {
     const requests = await setup(page, 14, 20);
-    await page.getByRole("button", { name: /第 14 天/ }).click();
+    await page.getByRole("tab", { name: /第 14 天/ }).click();
     const name = `测试${label}店`;
     const dialog = await editor(page, name);
     await dialog.getByLabel(`录入${label}营业与预约`, { exact: true }).check();

@@ -58,7 +58,7 @@ test("full fourteen-day workspace queries weather explicitly, preserves locks an
     path: `test-results/${testInfo.project.name}-full-weather-panel.png`,
     animations: "disabled",
   });
-  await page.getByRole("button", { name: /第 14 天/ }).click();
+  await page.getByRole("tab", { name: /第 14 天/ }).click();
   await expect(panel).not.toContainText("测试降雨");
   await expect(panel).not.toContainText("测试署名");
   await expect(

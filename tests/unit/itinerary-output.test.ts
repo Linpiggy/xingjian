@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
-  parseItineraryOutput,
+  applyDayCompletion,
   itineraryCandidateKey,
+  parseDayCompletion,
+  parseItineraryDraft,
+  parseItineraryOutput,
 } from "@/server/ai/itinerary-output";
 import { uniqueItineraryVisits } from "@/domain/itinerary-selection";
 import { fixtureCandidates, fixtureOutline } from "../fixtures/itinerary";
@@ -64,17 +67,65 @@ describe("bounded compact model protocol", () => {
       expect(() => parseItineraryOutput(JSON.stringify(wire), candidates)).toThrow();
     }
   });
-  it("cannot accept extra image fields, prose fragments, invalid commas or a truncated object", () => {
+  it("cannot accept prose fragments, invalid commas or a truncated object", () => {
     const wire = compact();
     const text = JSON.stringify(wire);
-    for (const value of [
-      text.slice(0, -1),
-      `${text.slice(0, -1)},}`,
-      `解释：${text}`,
-      JSON.stringify({ ...wire, photoUrl: "https://untrusted.invalid/image.jpg" }),
-    ]) {
+    for (const value of [text.slice(0, -1), `${text.slice(0, -1)},}`, `解释：${text}`]) {
       expect(() => parseItineraryOutput(value, candidates)).toThrow();
     }
+  });
+  it("drops unknown keys instead of discarding a recognisable plan", () => {
+    const wire = compact();
+    const chatty = {
+      ...wire,
+      photoUrl: "https://untrusted.invalid/image.jpg",
+      days: wire.days.map((day) => ({
+        ...day,
+        source: "verified",
+        visits: day.visits.map((visit) => ({ ...visit, name: "模型自造名", id: "P1" })),
+      })),
+    };
+    const parsed = parseItineraryOutput(JSON.stringify(chatty), candidates);
+    expect(parsed.days).toEqual(fixtureOutline().days);
+    expect(JSON.stringify(parsed)).not.toContain("untrusted.invalid");
+    expect(JSON.stringify(parsed)).not.toContain("模型自造名");
+  });
+  it("reports only the days that fail their own schema", () => {
+    const wire = compact();
+    wire.days[0].visits[0].key = "P999";
+    const draft = parseItineraryDraft(JSON.stringify(wire), candidates);
+    expect(draft.failedDays).toEqual([0]);
+    expect(draft.days[1]).toEqual(fixtureOutline().days[1]);
+  });
+  it("accepts a follow-up answer for the requested days only", () => {
+    const outline = fixtureOutline();
+    const wire = compact();
+    const completion = parseDayCompletion(
+      JSON.stringify({
+        days: [{ ...wire.days[0], dayIndex: 0, note: "ignored" }],
+      }),
+      candidates,
+      [0],
+    );
+    expect(completion).toEqual([outline.days[0]]);
+    const draft = parseItineraryDraft(
+      JSON.stringify({ ...wire, days: [null, wire.days[1]] }),
+      candidates,
+    );
+    expect(draft.failedDays).toEqual([0]);
+    const merged = applyDayCompletion(draft, completion, [0]);
+    expect(merged.failedDays).toEqual([]);
+    expect(merged.days).toEqual(outline.days);
+  });
+  it("matches follow-up days by order when no index is supplied", () => {
+    const outline = fixtureOutline();
+    const wire = compact();
+    const completion = parseDayCompletion(
+      JSON.stringify({ days: [wire.days[1]] }),
+      candidates,
+      [1],
+    );
+    expect(completion).toEqual([outline.days[1]]);
   });
   it("optional bad guides do not discard a valid compact core and cannot introduce URLs", () => {
     const wire = {

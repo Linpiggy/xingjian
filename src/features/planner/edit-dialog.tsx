@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { X } from "lucide-react";
+import { Dialog } from "@/components/arc/dialog/dialog";
 import { z } from "zod";
 import { formatMinute } from "@/domain/draft";
 import { deriveMealTrip, stopIdentity } from "@/domain/meals";
@@ -57,10 +58,7 @@ export function EditDialog({
   const resolved = useRef<WalkingRoute[]>([]);
   const positions = state.draft.days[toDay].items.length + (toDay === originDay ? 0 : 1);
 
-  useEffect(() => {
-    dialog.current?.showModal();
-    return () => request.current?.abort();
-  }, []);
+  useEffect(() => () => request.current?.abort(), []);
 
   function close() {
     request.current?.abort();
@@ -153,8 +151,9 @@ export function EditDialog({
   }
 
   return (
-    <dialog
+    <Dialog
       ref={dialog}
+      onClose={onClose}
       className="details-dialog edit-dialog"
       aria-labelledby="edit-dialog-title"
       onCancel={(event) => {
@@ -346,6 +345,6 @@ export function EditDialog({
           {error} 当前行程未改变。
         </p>
       )}
-    </dialog>
+    </Dialog>
   );
 }

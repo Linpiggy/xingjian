@@ -71,6 +71,7 @@ export function RouteDiagram({
           <button
             key={stopIdentity(item)}
             type="button"
+            tabIndex={-1}
             className={`map-marker route-marker${selectedId === stopIdentity(item) ? " selected" : ""}`}
             data-purpose={item.purpose ?? "visit"}
             aria-label={`选中地点：${item.place.name}`}

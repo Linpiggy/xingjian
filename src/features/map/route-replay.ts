@@ -35,6 +35,25 @@ function distance(a: Coordinate, b: Coordinate) {
   return 6_371_000 * 2 * Math.asin(Math.sqrt(Math.min(1, value)));
 }
 
+// Steps of one walking route meet within the supplier's 6-decimal rounding: measured
+// boundaries are 0.4-1.0 m apart, so an exact float comparison reported almost every
+// step as a geometry gap and made the replay cursor vanish mid-route. Only a larger
+// offset is a real gap; separate route queries keep the strict endpoint rule.
+const stepJoinToleranceMeters = 2;
+
+function isDisconnected(previous: ReplayPart, part: ReplayPart): boolean {
+  if (previous.legIndex + 1 < part.legIndex) {
+    return true;
+  }
+  const end = previous.path.at(-1)!;
+  const start = part.path[0];
+  if (previous.legIndex === part.legIndex) {
+    return distance(end, start) > stepJoinToleranceMeters;
+  }
+  // Steps of separate walking queries share no continuity guarantee.
+  return end[0] !== start[0] || end[1] !== start[1];
+}
+
 // This is a presentation clock, not a prediction of walking time. Each supplied
 // segment stays separate; missing geometry never becomes an endpoint shortcut.
 export function routeReplay(day: Day): ReplayTrack {
@@ -76,13 +95,7 @@ export function routeReplay(day: Day): ReplayTrack {
   let clock = 0;
   for (const [index, part] of parts.entries()) {
     const previous = parts[index - 1];
-    const end = previous?.path.at(-1);
-    part.gapBefore = Boolean(
-      previous &&
-      (previous.legIndex + 1 < part.legIndex ||
-        end?.[0] !== part.path[0][0] ||
-        end?.[1] !== part.path[0][1]),
-    );
+    part.gapBefore = Boolean(previous && isDisconnected(previous, part));
     if (part.gapBefore) {
       clock += 700;
     }

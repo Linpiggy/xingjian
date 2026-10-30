@@ -68,7 +68,7 @@ test("generation has truthful staged progress, real day counters and keeps cance
   const progress = page.getByRole("region", { name: "方案生成进度" });
   await expect(progress).toBeVisible();
   const bar = progress.getByRole("progressbar", { name: "当前阶段进度" });
-  await expect(bar).not.toHaveAttribute("value");
+  await expect(bar).not.toHaveAttribute("aria-valuenow");
   await expect(page.getByRole("button", { name: "取消生成", exact: true })).toBeVisible();
   await page.evaluate(() => {
     const controls = window as Window & {
@@ -80,7 +80,7 @@ test("generation has truthful staged progress, real day counters and keeps cance
     controls.advancePlanning?.("model");
   });
   await expect(progress.locator('[aria-current="step"]')).toHaveText("编排行程");
-  await expect(bar).not.toHaveAttribute("value");
+  await expect(bar).not.toHaveAttribute("aria-valuenow");
   await page.evaluate(() => {
     const controls = window as Window & {
       advancePlanning?: (
@@ -90,8 +90,8 @@ test("generation has truthful staged progress, real day counters and keeps cance
     };
     controls.advancePlanning?.("routes", { completed: 1, total: 2 });
   });
-  await expect(bar).toHaveAttribute("value", "1");
-  await expect(bar).toHaveAttribute("max", "2");
+  await expect(bar).toHaveAttribute("aria-valuenow", "1");
+  await expect(bar).toHaveAttribute("aria-valuemax", "2");
   await expect(progress).toContainText("路线核对 1/2 天");
   await page.screenshot({
     path: `test-results/${testInfo.project.name}-generation-progress.png`,

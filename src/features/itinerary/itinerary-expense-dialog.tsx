@@ -1,7 +1,9 @@
 "use client";
 
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useRef, useState, type FormEvent } from "react";
+import { Dialog } from "@/components/arc/dialog/dialog";
 import { X } from "lucide-react";
+import { Button } from "@/components/arc/button/button";
 import type { Itinerary } from "@/domain/itinerary";
 import type { ItineraryChange } from "@/domain/itinerary-editing";
 import { budgetCategories } from "@/domain/budget";
@@ -23,24 +25,6 @@ export function ItineraryExpenseDialog({
   const skipRestore = useRef(false);
   const [error, setError] = useState<string | null>(null);
   const previous = plan.expenses ?? emptyItineraryExpenses();
-  useEffect(() => {
-    const dialog = ref.current;
-    const trigger = document.activeElement;
-    if (!dialog) {
-      return;
-    }
-    const overflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    dialog.showModal();
-    dialog.querySelector<HTMLElement>("h2")?.focus();
-    return () => {
-      dialog.close();
-      document.body.style.overflow = overflow;
-      if (!skipRestore.current && trigger instanceof HTMLElement && trigger.isConnected) {
-        trigger.focus({ preventScroll: true });
-      }
-    };
-  }, []);
   function preview(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
@@ -80,8 +64,9 @@ export function ItineraryExpenseDialog({
     }
   }
   return (
-    <dialog
+    <Dialog
       ref={ref}
+      skipRestoreRef={skipRestore}
       className="trip-expense-dialog"
       aria-labelledby="trip-expense-title"
       onClose={() => {
@@ -103,27 +88,6 @@ export function ItineraryExpenseDialog({
           event.currentTarget.close();
         }
       }}
-      onKeyDown={(event) => {
-        if (event.key !== "Tab" || event.ctrlKey || event.metaKey || event.altKey) {
-          return;
-        }
-        const controls = event.currentTarget.querySelectorAll<HTMLElement>(
-          "button:not(:disabled), input:not(:disabled), select:not(:disabled)",
-        );
-        const first = controls[0];
-        const last = controls[controls.length - 1];
-        if (!event.shiftKey && document.activeElement === last) {
-          event.preventDefault();
-          first?.focus();
-        } else if (
-          event.shiftKey &&
-          (document.activeElement === first ||
-            document.activeElement === event.currentTarget.querySelector("h2"))
-        ) {
-          event.preventDefault();
-          last?.focus();
-        }
-      }}
     >
       <header>
         <div>
@@ -132,14 +96,14 @@ export function ItineraryExpenseDialog({
             补齐全程费用参考
           </h2>
         </div>
-        <button
-          type="button"
+        <Button
+          variant="ghost"
           className="trip-detail-close"
           aria-label="关闭费用估算"
           onClick={() => ref.current?.close()}
         >
           <X size={18} aria-hidden="true" />
-        </button>
+        </Button>
       </header>
       <form onSubmit={preview} noValidate onInput={() => setError(null)}>
         <p>
@@ -191,14 +155,14 @@ export function ItineraryExpenseDialog({
           </p>
         )}
         <footer>
-          <button type="submit" className="button primary">
+          <Button type="submit" variant="primary" className="button primary">
             预览费用估算
-          </button>
-          <button type="button" className="button" onClick={() => ref.current?.close()}>
+          </Button>
+          <Button className="button" onClick={() => ref.current?.close()}>
             暂不修改费用
-          </button>
+          </Button>
         </footer>
       </form>
-    </dialog>
+    </Dialog>
   );
 }

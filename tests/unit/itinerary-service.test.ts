@@ -40,6 +40,12 @@ function dependencies() {
 async function service() {
   return (await import("@/server/services/create-itinerary")).createItinerary;
 }
+// The service is imported after vi.resetModules(), so its ProviderError class must come
+// from the same fresh registry for the transient-failure checks to match.
+async function providerFailure(code: string) {
+  const { ProviderError } = await import("@/server/providers/errors");
+  return new ProviderError("unavailable", "fixture", code);
+}
 describe("complete itinerary orchestration, offline only", () => {
   it("automatically provides reviewed catalog context to the model while keeping the requested brief unchanged", async () => {
     const { provider, model } = dependencies();
@@ -311,6 +317,57 @@ describe("complete itinerary orchestration, offline only", () => {
       ),
     ).toBe(true);
   });
+  it("identifies a required venue written with a bracket or branch variant", async () => {
+    const { provider, model } = dependencies();
+    const brief = fixtureBrief();
+    brief.mustVisit = ["测试文化场馆(1)"];
+    const plan = await (
+      await service()
+    )(brief, provider, model, new AbortController().signal);
+    expect(plan.constraints[0]).toMatchObject({
+      label: "必去：测试文化场馆(1)",
+      status: "scheduled",
+    });
+  });
+  it("still refuses an ambiguous required venue", async () => {
+    const { provider, model } = dependencies();
+    const brief = fixtureBrief();
+    brief.mustVisit = ["测试文化场馆"];
+    await expect(
+      (await service())(brief, provider, model, new AbortController().signal),
+    ).rejects.toMatchObject({ code: "no_place" });
+  });
+  it("retries one transient walking failure and keeps the returned geometry", async () => {
+    const { provider, model } = dependencies();
+    vi.mocked(provider.walking)
+      .mockRejectedValueOnce(await providerFailure("rate_limited"))
+      .mockResolvedValue(structuredClone(route));
+    const plan = await (
+      await service()
+    )(fixtureBrief(), provider, model, new AbortController().signal);
+    expect(provider.walking).toHaveBeenCalledTimes(9);
+    expect(plan.days[0].schedule?.legs[0].route?.segments).toEqual(route.segments);
+    expect(plan.days[0].notices.join("")).not.toContain("未核实");
+  });
+  it("keeps the leg unknown when the retried walking query also fails", async () => {
+    const { provider, model } = dependencies();
+    vi.mocked(provider.walking).mockRejectedValue(await providerFailure("upstream_http"));
+    const plan = await (
+      await service()
+    )(fixtureBrief(), provider, model, new AbortController().signal);
+    expect(provider.walking).toHaveBeenCalledTimes(16);
+    expect(plan.days[0].schedule?.legs.every((leg) => leg.route === null)).toBe(true);
+    expect(plan.days[0].notices.join("")).toContain("未核实");
+  });
+  it("does not retry a definitive no-route answer", async () => {
+    const { provider, model } = dependencies();
+    vi.mocked(provider.walking).mockRejectedValue(await providerFailure("no_route"));
+    await (
+      await service()
+    )(fixtureBrief(), provider, model, new AbortController().signal);
+    expect(provider.walking).toHaveBeenCalledTimes(8);
+  });
+
   it("keeps unknown route timing null, queries no synthetic straight-line replacement", async () => {
     const { provider, model } = dependencies();
     vi.mocked(provider.walking).mockRejectedValue(new Error("fixture failure"));

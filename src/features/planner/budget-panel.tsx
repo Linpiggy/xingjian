@@ -1,4 +1,5 @@
 "use client";
+import { Dialog } from "@/components/arc/dialog/dialog";
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { X } from "lucide-react";
@@ -121,9 +122,6 @@ function BudgetDialog({
   const [acknowledged, setAcknowledged] = useState(false);
   const dialog = useRef<HTMLDialogElement>(null);
   useEffect(() => {
-    dialog.current?.showModal();
-  }, []);
-  useEffect(() => {
     const element = dialog.current;
     if (element) {
       element.scrollTop = 0;
@@ -208,8 +206,9 @@ function BudgetDialog({
   }
 
   return (
-    <dialog
+    <Dialog
       ref={dialog}
+      onClose={onClose}
       className="details-dialog edit-dialog"
       aria-labelledby="budget-dialog-title"
       onCancel={(event) => {
@@ -417,7 +416,7 @@ function BudgetDialog({
           {error}
         </p>
       )}
-    </dialog>
+    </Dialog>
   );
 }
 

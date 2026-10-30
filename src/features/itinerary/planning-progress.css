@@ -48,29 +48,6 @@
 .planning-progress li[data-state="active"] {
   font-weight: 600;
 }
-.planning-progress progress {
-  display: block;
-  width: 100%;
-  height: 10px;
-  appearance: none;
-  border: 0;
-  border-radius: 6px;
-  overflow: hidden;
-  background: #e7eadf;
-  accent-color: var(--trip-accent);
-}
-.planning-progress progress::-webkit-progress-bar {
-  border-radius: 6px;
-  background: #e7eadf;
-}
-.planning-progress progress::-webkit-progress-value {
-  border-radius: 6px;
-  background: #2a5d43;
-}
-.planning-progress progress::-moz-progress-bar {
-  border-radius: 6px;
-  background: #2a5d43;
-}
 .planning-progress > p {
   margin-top: 20px;
   color: var(--trip-ink);
@@ -84,7 +61,7 @@
   font-size: 14px;
   font-variant-numeric: tabular-nums;
 }
-.planning-progress > .button {
+.planning-progress > :is(.button, .arc-button) {
   margin-top: 24px;
 }
 @media (max-width: 767px) {

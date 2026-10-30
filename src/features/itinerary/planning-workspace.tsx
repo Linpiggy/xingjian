@@ -2,6 +2,14 @@
 
 import { useRef, useState } from "react";
 import { Sparkles, MapPin } from "lucide-react";
+import { useRouter } from "next/navigation";
+import {
+  Segmented,
+  SegmentedList,
+  SegmentedTrigger,
+  SegmentedContent,
+} from "@/components/arc/segmented/segmented";
+import { useConfirmDialog } from "@/components/arc/dialog/confirm-dialog";
 import { FullPlanner } from "./full-planner";
 import { Planner } from "@/features/planner/planner";
 import { TripSiteHeader } from "./trip-site-header";
@@ -21,139 +29,130 @@ export function PlanningWorkspace({
   initialMode?: "ai" | "manual";
 }) {
   const revision = useItineraryStore((state) => state.version);
-  const [mode, setMode] = useState(initialMode);
+  const [selection, setSelection] = useState({ mode: initialMode, from: initialMode });
+  const mode = selection.from === initialMode ? selection.mode : initialMode;
   const [manualReady, setManualReady] = useState(initialMode === "manual");
   const [message, setMessage] = useState("");
-  const [toolsOpen, setToolsOpen] = useState(initialMode === "manual");
   const panels = useRef<(HTMLDivElement | null)[]>([]);
   const dirty = useRef([false, false]);
   const index = mode === "ai" ? 0 : 1;
-  function select(next: "ai" | "manual") {
-    if (next === mode) {
-      return true;
+  const { confirm, confirmation } = useConfirmDialog();
+  const router = useRouter();
+  if (selection.from !== initialMode) {
+    setSelection({ mode: initialMode, from: initialMode });
+    if (initialMode === "manual") {
+      setManualReady(true);
+    }
+  }
+  function select(next: string) {
+    if ((next !== "ai" && next !== "manual") || next === mode) {
+      return;
     }
     if (panels.current[index]?.querySelector('[aria-busy="true"]')) {
       setMessage("请先取消或等待当前生成完成，再切换规划方式；不会自动发起另一份请求。");
-      return false;
+      return;
     }
     setMessage("");
     if (next === "manual") {
       setManualReady(true);
     }
-    setMode(next);
-    return true;
+    setSelection({ mode: next, from: initialMode });
+    router.replace(next === "manual" ? "/plan?mode=manual" : "/plan", { scroll: false });
   }
-  function protectNavigation() {
-    const panel = panels.current[index];
-    const hasForm = panel?.querySelector(
+  function protectNavigation(href: string) {
+    if (panels.current[index]?.querySelector('[aria-busy="true"]')) {
+      setMessage("请先取消或等待当前生成完成，再离开规划工作台。");
+      return false;
+    }
+    if (href === "/plan") {
+      return true;
+    }
+    const hasForm = panels.current[index]?.querySelector(
       ".trip-brief-form, .form-layout > .panel > form",
     );
-    if (dirty.current[index] && hasForm) {
-      return window.confirm(
-        "离开会丢弃本页尚未提交的需求，当前已生成方案不会删除。继续吗？",
-      );
-    }
-    return true;
+    return dirty.current[index] && hasForm
+      ? confirm("离开会丢弃本页尚未提交的需求，当前已生成方案不会删除。继续吗？")
+      : true;
   }
   return (
     <div className="trip-app unified-planner" data-plan-revision={revision}>
+      {confirmation}
       <TripSiteHeader beforeNavigate={protectNavigation} />
       <main id="main" tabIndex={-1}>
-        <div className="unified-mode-bar">
-          <details
-            className="unified-manual-tools"
-            open={toolsOpen}
-            onToggle={(event) => setToolsOpen(event.currentTarget.open)}
-          >
-            <summary>手动草稿工具</summary>
-            <div className="unified-mode-tabs" role="tablist" aria-label="规划方式">
-              {(["ai", "manual"] as const).map((value, tabIndex) => (
-                <button
-                  key={value}
-                  id={`planning-tab-${value}`}
-                  type="button"
-                  role="tab"
-                  aria-selected={mode === value}
-                  aria-controls={`planning-panel-${value}`}
-                  tabIndex={mode === value ? 0 : -1}
-                  onClick={() => select(value)}
-                  onKeyDown={(event) => {
-                    if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) {
-                      return;
-                    }
-                    event.preventDefault();
-                    const next =
-                      event.key === "Home"
-                        ? "ai"
-                        : event.key === "End"
-                          ? "manual"
-                          : tabIndex === 0
-                            ? "manual"
-                            : "ai";
-                    if (select(next)) {
-                      document.getElementById(`planning-tab-${next}`)?.focus();
-                    }
-                  }}
-                >
-                  {value === "ai" ? (
-                    <Sparkles size={18} aria-hidden="true" />
-                  ) : (
-                    <MapPin size={18} aria-hidden="true" />
-                  )}
-                  <span>{value === "ai" ? "完整 AI 规划" : "手动选点"}</span>
-                  <small>
-                    {value === "ai" ? "1—14 天 · 1—20 人" : "2—3 天 · 1—8 人"}
-                  </small>
-                </button>
-              ))}
-            </div>
-          </details>
-          {message && (
-            <p className="unified-mode-message" role="status">
-              {message}
-            </p>
-          )}
-        </div>
-        {(["ai", "manual"] as const).map((value, panelIndex) => (
-          <div
-            key={value}
-            ref={(element) => {
-              panels.current[panelIndex] = element;
-            }}
-            id={`planning-panel-${value}`}
-            role="tabpanel"
-            aria-labelledby={`planning-tab-${value}`}
-            hidden={mode !== value}
-            className={`unified-panel unified-${value}`}
-            onInputCapture={() => {
-              dirty.current[panelIndex] = true;
-            }}
-            onClickCapture={(event) => {
-              if (event.target instanceof Element && event.target.closest("button")) {
-                dirty.current[panelIndex] = true;
-              }
-            }}
-          >
-            {value === "ai" ? (
-              <FullPlanner
-                embedded
-                active={mode === "ai"}
-                view="new"
-                startDate={startDate}
-                mapKey={mapKey}
-                mapsConfigured={mapsConfigured}
-              />
-            ) : manualReady ? (
-              <Planner
-                embedded
-                active={mode === "manual"}
-                startDate={startDate}
-                mapKey={mapKey}
-                mapsConfigured={mapsConfigured}
-              />
-            ) : null}
+        <Segmented value={mode} onValueChange={select}>
+          <div className="unified-mode-bar">
+            <SegmentedList aria-label="规划方式">
+              <SegmentedTrigger
+                value="ai"
+                id="planning-tab-ai"
+                aria-controls="planning-panel-ai"
+              >
+                <Sparkles size={18} aria-hidden="true" />
+                <span>完整 AI 规划</span>
+                <small>1—14 天 · 1—20 人</small>
+              </SegmentedTrigger>
+              <SegmentedTrigger
+                value="manual"
+                id="planning-tab-manual"
+                aria-controls="planning-panel-manual"
+              >
+                <MapPin size={18} aria-hidden="true" />
+                <span>手动选点</span>
+                <small>2—3 天 · 1—8 人</small>
+              </SegmentedTrigger>
+            </SegmentedList>
+            {message && (
+              <p className="unified-mode-message" role="status">
+                {message}
+              </p>
+            )}
           </div>
-        ))}
+          {(["ai", "manual"] as const).map((value, panelIndex) => (
+            <SegmentedContent
+              value={value}
+              key={value}
+              id={`planning-panel-${value}`}
+              aria-labelledby={`planning-tab-${value}`}
+            >
+              <div
+                ref={(element) => {
+                  panels.current[panelIndex] = element;
+                }}
+                className={`unified-panel unified-${value}`}
+                onInputCapture={() => {
+                  dirty.current[panelIndex] = true;
+                }}
+                onClickCapture={(event) => {
+                  if (
+                    event.target instanceof Element &&
+                    event.target.closest(".trip-brief-form .trip-purpose-grid button")
+                  ) {
+                    dirty.current[panelIndex] = true;
+                  }
+                }}
+              >
+                {value === "ai" ? (
+                  <FullPlanner
+                    embedded
+                    active={mode === "ai"}
+                    view="new"
+                    startDate={startDate}
+                    mapKey={mapKey}
+                    mapsConfigured={mapsConfigured}
+                  />
+                ) : manualReady ? (
+                  <Planner
+                    embedded
+                    active={mode === "manual"}
+                    startDate={startDate}
+                    mapKey={mapKey}
+                    mapsConfigured={mapsConfigured}
+                  />
+                ) : null}
+              </div>
+            </SegmentedContent>
+          ))}
+        </Segmented>
       </main>
     </div>
   );

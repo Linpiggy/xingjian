@@ -1,0 +1,50 @@
+{
+  "kind": "offline_ui_design_invariants",
+  "viewports": [360, 390, 960, 1440],
+  "stageZero": {
+    "formatCheck": "passed",
+    "check": "passed",
+    "unitTests": 499,
+    "arcBrowserChecks": 6,
+    "browserRetries": 0,
+    "log": "node_modules/.cache/arc-stage-zero-e2e.log"
+  },
+  "stages": {
+    "currentDateVisibility": {
+      "status": "passed",
+      "browserChecks": 8,
+      "log": "node_modules/.cache/design-date-e2e.log",
+      "screenshots": "test-results/{desktop,mobile}-design-date-{360,390,960,1440}.png",
+      "reviewedWidths": [360, 390, 960, 1440]
+    },
+    "proposalLanding": {
+      "status": "passed",
+      "browserChecks": 20,
+      "log": "node_modules/.cache/design-proposal-final.log",
+      "screenshots": "test-results/{desktop,mobile}-design-proposal-{360,390,960,1440}.png",
+      "reviewedWidths": [360, 390, 960, 1440],
+      "retainedFailures": ["design-proposal-e2e.log: 18/20", "proposal-bounds-red.log: 0/2"]
+    },
+    "singleTimelineEdit": {
+      "status": "passed",
+      "check": "format, lint, typecheck and 499 unit tests",
+      "browserChecks": 14,
+      "log": "node_modules/.cache/design-timeline-final.log",
+      "priorRelatedChecks": "node_modules/.cache/design-timeline-e2e.log: 22/22",
+      "screenshots": "test-results/{desktop,mobile}-design-timeline-{360,390,960,1440}.png",
+      "reviewedWidths": [360, 390, 960, 1440]
+    },
+    "entryDeduplication": {
+      "status": "passed",
+      "browserChecks": 34,
+      "log": "node_modules/.cache/design-entry-green.log",
+      "screenshots": "test-results/{desktop,mobile}-design-entry-{360,390,960,1440}.png",
+      "reviewedWidths": [360, 390, 960, 1440],
+      "retainedFailures": ["design-entry-e2e.log: 32/34", "design-entry-final.log: 32/34"]
+    },
+    "rootScales": "pending"
+  },
+  "liveProviderCalls": 0,
+  "backendErrorMappingChanged": false,
+  "limitations": ["No live map SDK or supplier validation", "Full regression has not yet run for this worktree"]
+}

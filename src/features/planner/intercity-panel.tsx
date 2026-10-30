@@ -1,4 +1,5 @@
 "use client";
+import { Dialog } from "@/components/arc/dialog/dialog";
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { X } from "lucide-react";
@@ -145,9 +146,6 @@ function IntercityDialog({ state, onClose }: { state: EditState; onClose: () => 
   const [acknowledged, setAcknowledged] = useState(false);
   const dialog = useRef<HTMLDialogElement>(null);
   useEffect(() => {
-    dialog.current?.showModal();
-  }, []);
-  useEffect(() => {
     const element = dialog.current;
     if (element) {
       element.scrollTop = 0;
@@ -200,8 +198,9 @@ function IntercityDialog({ state, onClose }: { state: EditState; onClose: () => 
     }
   }
   return (
-    <dialog
+    <Dialog
       ref={dialog}
+      onClose={onClose}
       className="details-dialog edit-dialog"
       aria-labelledby="intercity-dialog-title"
       onCancel={(event) => {
@@ -349,7 +348,7 @@ function IntercityDialog({ state, onClose }: { state: EditState; onClose: () => 
           {error}
         </p>
       )}
-    </dialog>
+    </Dialog>
   );
 }
 

@@ -75,6 +75,55 @@ describe("route replay uses only supplied geometry, never a route estimate", () 
     expect(track.parts[1].startMs).toBe(track.parts[0].endMs);
     expect(track.parts[1].gapBefore).toBe(false);
   });
+  it("keeps sub-meter supplier rounding between steps of one route continuous", () => {
+    // Real Amap step polylines meet 0.4-1.0 m apart, never at identical decimals.
+    const day = structuredClone(fixtureDraft().days[0]);
+    day.legs[0].route!.segments = [
+      [
+        [120.1, 30.2],
+        [120.11, 30.2],
+      ],
+      [
+        [120.110005, 30.2],
+        [120.12, 30.2],
+      ],
+    ];
+    const track = routeReplay(day);
+    expect(track.parts[1].gapBefore).toBe(false);
+    expect(track.parts[1].startMs).toBe(track.parts[0].endMs);
+    expect(replayFrame(track, track.parts[0].endMs).position).not.toBeNull();
+    expect(replayFrame(track, track.parts[1].startMs + 1).position).not.toBeNull();
+  });
+  it("still hides the cursor at a multi-meter gap inside one route", () => {
+    const day = structuredClone(fixtureDraft().days[0]);
+    day.legs[0].route!.segments = [
+      [
+        [120.1, 30.2],
+        [120.11, 30.2],
+      ],
+      [
+        [120.1101, 30.2],
+        [120.12, 30.2],
+      ],
+    ];
+    const track = routeReplay(day);
+    expect(track.parts[1].gapBefore).toBe(true);
+    expect(replayFrame(track, track.parts[0].endMs + 350).position).toBeNull();
+  });
+  it("keeps separate route queries discontinuous even when endpoints nearly match", () => {
+    const day = structuredClone(fixtureDraft().days[0]);
+    day.items.push(structuredClone(day.items[1]));
+    day.legs.push(structuredClone(day.legs[0]));
+    day.legs[1].route!.segments = [
+      [
+        [120.110005, 30.2],
+        [120.12, 30.2],
+      ],
+    ];
+    const track = routeReplay(day);
+    expect(track.parts[1].legIndex).toBe(1);
+    expect(track.parts[1].gapBefore).toBe(true);
+  });
   it("rejects an entire invalid segment rather than connecting its valid prefix and suffix", () => {
     const day = structuredClone(fixtureDraft().days[0]);
     day.legs[0].route!.segments = [

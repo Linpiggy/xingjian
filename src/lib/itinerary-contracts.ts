@@ -85,6 +85,13 @@ const choice = z.strictObject({
   stayMinutes: z.number().int().min(15).max(180),
 });
 const food = choice.extend({ dish: z.string().trim().min(1).max(80) });
+export const itineraryOutlineDaySchema = z.strictObject({
+  theme: z.string().trim().min(1).max(80),
+  visits: z.array(choice).min(1).max(3),
+  breakfast: food,
+  lunch: food,
+  dinner: food,
+});
 export const itineraryOutlineSchema: z.ZodType<ItineraryOutline> = z
   .strictObject({
     guides: z
@@ -97,18 +104,7 @@ export const itineraryOutlineSchema: z.ZodType<ItineraryOutline> = z
       .optional(),
     title: z.string().trim().min(1).max(60),
     summary: z.string().trim().min(1).max(400),
-    days: z
-      .array(
-        z.strictObject({
-          theme: z.string().trim().min(1).max(80),
-          visits: z.array(choice).min(1).max(3),
-          breakfast: food,
-          lunch: food,
-          dinner: food,
-        }),
-      )
-      .min(1)
-      .max(14),
+    days: z.array(itineraryOutlineDaySchema).min(1).max(14),
   })
   .superRefine((outline, context) => {
     const selected = new Set(

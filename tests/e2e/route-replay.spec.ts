@@ -179,7 +179,7 @@ test("replay follows authored fixture geometry, pauses, changes speed, seeks and
   await page.getByRole("button", { name: "播放全天路线", exact: true }).click();
   await page.clock.runFor(500);
   expect(Number(await progress.inputValue())).toBeGreaterThan(initial);
-  await page.getByRole("button", { name: /第 14 天/ }).click();
+  await page.getByRole("tab", { name: /第 14 天/ }).click();
   await expect(progress).toHaveValue("0");
   await expect(
     page.getByRole("button", { name: "播放全天路线", exact: true }),
@@ -226,8 +226,11 @@ test("reduced motion retains manual route inspection and no geometry never creat
   await expect(glance).toContainText("2 处游览");
   await expect(glance).toContainText("3 次用餐");
   await glance.getByText(/查看行程节奏/).click();
-  await glance
-    .getByRole("button", { name: "在地图中定位第 1 站：测试早餐店", exact: true })
+  await expect(glance.getByRole("button", { name: /^在地图中定位/ })).toHaveCount(0);
+  await expect(glance.locator(".trip-rhythm li")).toHaveCount(5);
+  await page
+    .getByRole("navigation", { name: "地图地点索引", exact: true })
+    .getByRole("button", { name: "在路线中查看第 1 站：测试早餐店", exact: true })
     .click();
   await expect(
     page.getByRole("button", { name: "选中地点：测试早餐店", exact: true }),

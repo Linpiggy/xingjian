@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { OpenAiItineraryModel } from "@/server/ai/itinerary-model";
+import { itineraryCandidateKey } from "@/server/ai/itinerary-output";
 import { requestItinerary } from "@/features/itinerary/request-itinerary";
 import { fixtureBrief, fixtureCandidates, fixtureOutline } from "../fixtures/itinerary";
 
@@ -8,6 +9,36 @@ const config = {
   endpoint: new URL("https://api.deepseek.com/chat/completions"),
   model: "fixture-model",
 };
+
+function compactOutline() {
+  const outline = fixtureOutline();
+  const candidates = fixtureCandidates();
+  const choice = (item: (typeof outline.days)[number]["visits"][number]) => {
+    const { placeId, ...rest } = item;
+    return {
+      ...rest,
+      key: itineraryCandidateKey(
+        candidates.findIndex((candidate) => candidate.place.id === placeId),
+      ),
+    };
+  };
+  return {
+    title: outline.title,
+    summary: outline.summary,
+    days: outline.days.map((day) => ({
+      theme: day.theme,
+      visits: day.visits.map(choice),
+      breakfast: choice(day.breakfast),
+      lunch: choice(day.lunch),
+      dinner: choice(day.dinner),
+    })),
+  };
+}
+function answer(content: string) {
+  return Response.json({
+    choices: [{ finish_reason: "stop", message: { content } }],
+  });
+}
 
 describe("generation failure regressions, offline only", () => {
   it("does not charge the AI attempt budget when candidate discovery fails before the model", async () => {
@@ -48,6 +79,74 @@ describe("generation failure regressions, offline only", () => {
       expect(transport).toHaveBeenCalledOnce();
     },
   );
+
+  it("asks once more only for the day that failed its own schema", async () => {
+    const outline = fixtureOutline();
+    const wire = compactOutline();
+    const broken = structuredClone(wire);
+    broken.days[0].visits[0].key = "P999";
+    const transport = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(answer(JSON.stringify(broken)))
+      .mockResolvedValueOnce(
+        answer(
+          JSON.stringify({
+            days: [{ ...wire.days[0], dayIndex: 0 }],
+          }),
+        ),
+      );
+    const result = await new OpenAiItineraryModel(config, transport).compose(
+      fixtureBrief(),
+      fixtureCandidates(),
+      new AbortController().signal,
+    );
+    expect(result.days).toEqual(outline.days);
+    expect(transport).toHaveBeenCalledTimes(2);
+    const second = JSON.parse(String(transport.mock.calls[1][1]?.body));
+    expect(second.messages[0].content).toContain("只补写指定天数");
+    expect(JSON.parse(second.messages[1].content).missingDays).toEqual([0]);
+    expect(JSON.parse(String(transport.mock.calls[0][1]?.body)).messages).toHaveLength(2);
+  });
+
+  it("does not keep asking when the corrected day is still invalid", async () => {
+    const wire = compactOutline();
+    wire.days[0].visits[0].key = "P999";
+    const transport = vi
+      .fn<typeof fetch>()
+      .mockResolvedValue(answer(JSON.stringify(wire)));
+    await expect(
+      new OpenAiItineraryModel(config, transport).compose(
+        fixtureBrief(),
+        fixtureCandidates(),
+        new AbortController().signal,
+      ),
+    ).rejects.toMatchObject({ code: "ai_invalid_response" });
+    expect(transport).toHaveBeenCalledTimes(2);
+  });
+
+  it("drops unknown keys from a chatty plan instead of losing every day", async () => {
+    const outline = fixtureOutline();
+    const wire = compactOutline();
+    const chatty = {
+      ...wire,
+      photoUrl: "https://untrusted.invalid/image.jpg",
+      days: wire.days.map((day) => ({
+        ...day,
+        tips: ["ignore me"],
+        visits: day.visits.map((visit) => ({ ...visit, id: "P1", name: "自造" })),
+      })),
+    };
+    const transport = vi
+      .fn<typeof fetch>()
+      .mockResolvedValue(answer(JSON.stringify(chatty)));
+    const result = await new OpenAiItineraryModel(config, transport).compose(
+      fixtureBrief(),
+      fixtureCandidates(),
+      new AbortController().signal,
+    );
+    expect(result.days).toEqual(outline.days);
+    expect(transport).toHaveBeenCalledOnce();
+  });
 
   it("distinguishes a truncated output from a schema failure without retrying", async () => {
     const transport = vi.fn<typeof fetch>().mockResolvedValue(

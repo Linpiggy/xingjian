@@ -1,24 +1,3 @@
-body .trip-app .unified-mode-bar {
-  justify-content: flex-end;
-  padding-block: 8px;
-}
-.unified-manual-tools {
-  width: 100%;
-}
-.unified-manual-tools > summary {
-  min-height: 36px;
-  padding: 6px 0;
-  color: var(--trip-muted);
-  font-size: 14px;
-  cursor: pointer;
-  text-align: right;
-}
-.unified-manual-tools .unified-mode-tabs {
-  margin-top: 8px;
-}
-.unified-planner:has(.unified-ai:not([hidden]) .map-workspace) .unified-mode-bar {
-  display: none;
-}
 .brief-place-search summary {
   min-height: 44px;
   padding-block: 8px;

@@ -1,15 +1,16 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { Compass } from "lucide-react";
 import type { MouseEvent } from "react";
 
 export function TripSiteHeader({
   beforeNavigate,
-}: { beforeNavigate?: () => boolean } = {}) {
+}: { beforeNavigate?: (href: string) => boolean | Promise<boolean> } = {}) {
+  const router = useRouter();
   function protectDraft(event: MouseEvent<HTMLAnchorElement>) {
-    if (event.currentTarget.getAttribute("href") === pathname) {
+    if (event.currentTarget.href === window.location.href) {
       return;
     }
     if (
@@ -17,10 +18,22 @@ export function TripSiteHeader({
       !event.ctrlKey &&
       !event.shiftKey &&
       !event.altKey &&
-      beforeNavigate &&
-      !beforeNavigate()
+      beforeNavigate
     ) {
-      event.preventDefault();
+      const href = event.currentTarget.getAttribute("href");
+      const allowed = beforeNavigate(href ?? "");
+      if (typeof allowed === "boolean") {
+        if (!allowed) {
+          event.preventDefault();
+        }
+      } else {
+        event.preventDefault();
+        void allowed.then((confirmed) => {
+          if (confirmed && href) {
+            router.push(href);
+          }
+        });
+      }
     }
   }
   const pathname = usePathname();

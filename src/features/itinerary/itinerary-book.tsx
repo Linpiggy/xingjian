@@ -16,6 +16,10 @@ import {
   GripVertical,
 } from "lucide-react";
 import type { Itinerary } from "@/domain/itinerary";
+import { Button } from "@/components/arc/button/button";
+import { Badge } from "@/components/arc/badge/badge";
+import { Disclosure } from "@/components/arc/disclosure/disclosure";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/arc/tabs/tabs";
 import { socialNoteUrl } from "@/domain/social-inspiration";
 import type { Day } from "@/domain/models";
 import { formatMinute } from "@/domain/draft";
@@ -55,6 +59,10 @@ export function ItineraryBook({
   mapsConfigured,
   onEdit,
   onActivityChange,
+  onReviewHost,
+  reviewActivityId,
+  reviewExpenses = false,
+  reviewAtCover = false,
   active = true,
 }: {
   plan: Itinerary;
@@ -62,6 +70,10 @@ export function ItineraryBook({
   mapsConfigured: boolean;
   onEdit: () => void;
   onActivityChange?: (change: ItineraryChange) => void;
+  onReviewHost?: (node: HTMLDivElement | null) => void;
+  reviewActivityId?: string;
+  reviewExpenses?: boolean;
+  reviewAtCover?: boolean;
   active?: boolean;
 }) {
   const [dayIndex, setDayIndex] = useState(0);
@@ -178,8 +190,7 @@ export function ItineraryBook({
               <h2>第 {currentDay + 1} 天路线</h2>
               <span>{selectedItem?.activity.place.name ?? day.date}</span>
             </div>
-            <button
-              type="button"
+            <Button
               className="button"
               onClick={() => {
                 dayHeading.current?.scrollIntoView({
@@ -192,7 +203,7 @@ export function ItineraryBook({
               }}
             >
               查看当天安排 <ChevronRight size={15} aria-hidden="true" />
-            </button>
+            </Button>
           </div>
           <RouteMap
             day={mapDay}
@@ -274,13 +285,18 @@ export function ItineraryBook({
     }
   }
   return (
-    <div className="trip-book map-workspace vertical-itinerary">
+    <Tabs
+      className="trip-book map-workspace vertical-itinerary"
+      value={String(currentDay)}
+      activationMode="manual"
+      onValueChange={(value) => chooseDay(Number(value))}
+    >
       <section className="trip-cover" aria-label="完整旅行方案总览">
         <div className="trip-cover-meta">
           <span>{tripPurposeLabels[plan.brief.mainPurpose]}</span>
-          <span>
+          <Badge variant={plan.status === "infeasible" ? "danger" : "warning"}>
             {plan.status === "infeasible" ? "存在需要调整的冲突" : "时间与费用仍待核实"}
-          </span>
+          </Badge>
         </div>
         <h1 tabIndex={-1} id="itinerary-heading">
           {plan.title}
@@ -301,20 +317,17 @@ export function ItineraryBook({
             </span>
             <span>全体预算目标 {money(total)}</span>
           </div>
-          <details className="trip-cover-intro">
-            <summary>查看规划思路</summary>
+          <Disclosure className="trip-cover-intro" title="查看规划思路">
             <p>{plan.summary}</p>
-          </details>
-          {onActivityChange && (
-            <button type="button" className="button" onClick={() => setExpenseOpen(true)}>
-              费用估算
-            </button>
-          )}
-          <button className="button" onClick={onEdit}>
+          </Disclosure>
+          <Button className="button" onClick={onEdit}>
             调整旅行需求 <ArrowUpRight size={15} aria-hidden="true" />
-          </button>
+          </Button>
         </div>
       </section>
+      {onReviewHost && reviewAtCover && (
+        <div className="trip-review-slot" ref={onReviewHost} />
+      )}
       {plan.socialSource && (
         <p className="trip-source-notice" role="status">
           {plan.socialSource.status === "available" ? (
@@ -341,377 +354,401 @@ export function ItineraryBook({
       )}
       <nav ref={dayNavigation} className="trip-day-nav" aria-label="选择行程日期">
         <span className="trip-nav-label">每日行程</span>
-        {plan.days.map((value, index) => (
-          <button
-            key={value.date}
-            type="button"
-            aria-current={currentDay === index ? "date" : undefined}
-            onClick={() => chooseDay(index)}
-          >
-            <span>第 {index + 1} 天</span>
-            <small>{value.date.slice(5).replace("-", ".")}</small>
-          </button>
-        ))}
+        <TabsList aria-label="选择当天路线与安排">
+          {plan.days.map((value, index) => (
+            <TabsTrigger
+              key={value.date}
+              value={String(index)}
+              aria-current={currentDay === index ? "date" : undefined}
+            >
+              <span>第 {index + 1} 天</span>
+              <small>{value.date.slice(5).replace("-", ".")}</small>
+            </TabsTrigger>
+          ))}
+        </TabsList>
       </nav>
-      {mapPane}
-      <div className="trip-book-grid">
-        <section ref={dayPane} className="trip-day-content" aria-label="当日完整安排">
-          <div ref={dayHeading} className="trip-day-heading" id="trip-day-heading">
-            <div>
-              <span>{day.date} · 上海时区</span>
-              <h2 tabIndex={-1}>{day.theme}</h2>
-            </div>
-            <div className="trip-day-actions">
-              <button
-                className="button"
-                onClick={() =>
-                  mapAnchor.current?.scrollIntoView({
-                    block: "start",
-                    behavior: "instant",
-                  })
-                }
-              >
-                <Map size={16} aria-hidden="true" />
-                查看地图
-              </button>
-              <button
-                className="button"
-                disabled={currentDay === plan.days.length - 1}
-                onClick={() => chooseDay(currentDay + 1)}
-              >
-                下一天 <ChevronRight size={15} aria-hidden="true" />
-              </button>
-            </div>
-          </div>
-          <DayOverview day={day} selected={selected} onSelect={locate} />
-          <p className="trip-timing-note">
-            时间按实际有向步行耗时、建议停留与独立 10
-            分钟缓冲推算；营业、预约与菜品供应尚未核实。
-          </p>
-          {moveError && (
-            <p id="trip-move-error" tabIndex={-1} className="trip-error" role="alert">
-              {moveError}
-            </p>
-          )}
-          {day.notices.length > 0 && (
-            <details className="trip-day-notices">
-              <summary>{day.notices.length} 项用餐／交通说明</summary>
-              {day.notices.map((notice, index) => (
-                <p key={index}>{notice}</p>
-              ))}
-            </details>
-          )}
-          <ol className="trip-timeline" key={day.date}>
-            {schedule?.items.map((item, index) => {
-              const recommendation = day.recommendations.find(
-                (value) => value.activityId === item.activity.id,
-              );
-              const leg = index > 0 ? schedule.legs[index - 1] : null;
-              return (
-                <li key={item.activity.id} style={{ animationDelay: `${index * 35}ms` }}>
-                  {leg && (
-                    <p className="trip-transfer">
-                      <Footprints size={14} aria-hidden="true" />
-                      {leg.route?.seconds == null
-                        ? "步行耗时待核实，后续时间未知"
-                        : `步行约 ${Math.ceil(leg.route.seconds / 60)} 分钟${leg.route.meters == null ? "" : ` · ${(leg.route.meters / 1000).toFixed(1)} km`}`}
-                      <span>另留 10 分钟缓冲</span>
-                    </p>
-                  )}
-                  <article
-                    data-kind={item.activity.kind}
-                    className={`trip-activity ${selected === item.activity.id ? "is-selected" : ""} ${wide && onActivityChange && item.activity.kind === "visit" ? "has-drag-handle" : ""} ${dropTarget?.index === index ? `is-drop-${dropTarget.edge}` : ""}`}
-                    onDragOver={(event) => dragOver(event, index)}
-                    onDragLeave={(event) => {
-                      if (!(
-                        event.relatedTarget instanceof Node &&
-                        event.currentTarget.contains(event.relatedTarget)
-                      )) {
-                        setDropTarget(null);
-                      }
-                    }}
-                    onDrop={(event) => drop(event, index)}
-                  >
-                    {wide && onActivityChange && item.activity.kind === "visit" && (
-                      <button
-                        type="button"
-                        className="trip-drag-handle"
-                        aria-label={`调整${item.activity.place.name}的位置`}
-                        title="拖动调整当天次序，或点击选择日期与位置"
-                        disabled={item.activity.positionLocked}
-                        draggable={!item.activity.positionLocked}
-                        onClick={() => {
-                          if (item.activity.positionLocked) {
-                            return;
-                          }
-                          setMoveError(null);
-                          setDetailMoveOpen(true);
-                          setSelected(item.activity.id);
-                          setDetailId(item.activity.id);
-                        }}
-                        onDragStart={(event) => {
-                          if (item.activity.positionLocked) {
-                            event.preventDefault();
-                            return;
-                          }
-                          drag.current = { plan, activityId: item.activity.id };
-                          setMoveError(null);
-                          event.dataTransfer.setData(
-                            "application/x-xingjian-activity",
-                            item.activity.id,
-                          );
-                          event.dataTransfer.effectAllowed = "move";
-                          const article = event.currentTarget.closest("article");
-                          if (article) {
-                            event.dataTransfer.setDragImage(article, 20, 20);
-                          }
-                        }}
-                        onDragEnd={() => {
-                          drag.current = null;
-                          setDropTarget(null);
-                        }}
-                      >
-                        <GripVertical size={18} aria-hidden="true" />
-                      </button>
-                    )}
-                    <div className="trip-activity-top">
-                      <span
-                        className="trip-stop-number"
-                        aria-label={`地图编号 ${index + 1}`}
-                      >
-                        {index + 1}
-                      </span>
-                      <time>{formatMinute(item.startMinute)}</time>
-                      <span className="trip-activity-duration">
-                        <span>{purposes[item.activity.kind]}</span>
-                        <span>建议 {item.activity.stayMinutes} 分钟</span>
-                      </span>
-                      {item.activity.positionLocked && (
-                        <span className="trip-position-lock">
-                          <Lock size={12} aria-hidden="true" />
-                          位置已锁
-                        </span>
-                      )}
-                      {item.activity.fixedStartMinute !== null && (
-                        <span className="trip-time-lock">
-                          <Lock size={12} aria-hidden="true" />
-                          时间锁 {formatMinute(item.activity.fixedStartMinute)}
-                        </span>
-                      )}
-                    </div>
-                    <div className="trip-activity-body">
-                      <button
-                        type="button"
-                        className="trip-place-select"
-                        aria-pressed={selected === item.activity.id}
-                        onClick={() => locate(item.activity.id)}
-                      >
-                        <span>
-                          {item.activity.kind === "visit" ? (
-                            <MapPin size={17} aria-hidden="true" />
-                          ) : (
-                            <Utensils size={17} aria-hidden="true" />
-                          )}
-                          {item.activity.place.name}
-                        </span>
-                        <ArrowUpRight size={17} aria-hidden="true" />
-                      </button>
-                      <PlacePhoto
-                        city={plan.brief.destinationCity}
-                        placeId={item.activity.place.id}
-                        name={item.activity.place.name}
-                      />
-                      <p className="trip-activity-address">
-                        {item.activity.place.address ?? "地址待核实"}
-                      </p>
-                      {recommendation?.dish && (
-                        <p className="trip-dish">
-                          菜品建议 · {recommendation.dish}
-                          <small>供应与饮食适配需向商家核实</small>
-                        </p>
-                      )}
-                      <p className="trip-reason">{recommendation?.reason}</p>
-                      {recommendation?.guide && (
-                        <details className="trip-experience">
-                          <summary>体验建议</summary>
-                          <p>
-                            <span>
-                              AI {item.activity.kind === "visit" ? "游玩" : "用餐"}建议
-                            </span>
-                            {recommendation.guide.experience}
-                          </p>
-                        </details>
-                      )}
-                      <button
-                        type="button"
-                        className="trip-place-evidence"
-                        aria-label={`查看${item.activity.place.name}的资料`}
-                        onClick={() => {
-                          select(item.activity.id);
-                          setMoveError(null);
-                          setDetailMoveOpen(false);
-                          setDetailId(item.activity.id);
-                        }}
-                      >
-                        查看与编辑 <ChevronRight size={12} aria-hidden="true" />
-                      </button>
-                    </div>
-                  </article>
-                </li>
-              );
-            })}
-          </ol>
-          {schedule && (
-            <details className="trip-day-notices">
-              <summary>{schedule.issues.length} 项行程核实与冲突</summary>
-              {schedule.issues.map((issue, index) => (
-                <p
-                  className={issue.severity === "conflict" ? "trip-conflict" : ""}
-                  key={index}
-                >
-                  {issue.message}
-                </p>
-              ))}
-            </details>
-          )}
-          <section className="trip-budget-panel" aria-label="预算目标分配">
-            <div className="trip-budget-heading">
-              <WalletMark />
+      <TabsContent value={String(currentDay)} className="trip-day-panel">
+        {mapPane}
+        <div className="trip-book-body">
+          <section ref={dayPane} className="trip-day-content" aria-label="当日完整安排">
+            <div ref={dayHeading} className="trip-day-heading" id="trip-day-heading">
               <div>
-                <h2>预算目标分配</h2>
-                <p>全体目标 {money(total)}，不是实际报价</p>
+                <span>{day.date} · 上海时区</span>
+                <h2 tabIndex={-1}>{day.theme}</h2>
+              </div>
+              <div className="trip-day-actions">
+                <Button
+                  className="button"
+                  onClick={() =>
+                    mapAnchor.current?.scrollIntoView({
+                      block: "start",
+                      behavior: "instant",
+                    })
+                  }
+                >
+                  <Map size={16} aria-hidden="true" />
+                  查看地图
+                </Button>
+                <Button
+                  className="button"
+                  disabled={currentDay === plan.days.length - 1}
+                  onClick={() => chooseDay(currentDay + 1)}
+                >
+                  下一天 <ChevronRight size={15} aria-hidden="true" />
+                </Button>
               </div>
             </div>
-            <div className="trip-budget-visual">
-              <div
-                className="trip-donut"
-                style={{
-                  background: total
-                    ? `conic-gradient(${stops.join(",")})`
-                    : "var(--border)",
-                }}
-              >
+            {onReviewHost &&
+              !reviewAtCover &&
+              !reviewExpenses &&
+              !schedule?.items.some((item) => item.activity.id === reviewActivityId) && (
+                <div className="trip-review-slot" ref={onReviewHost} />
+              )}
+            <DayOverview day={day} />
+            <p className="trip-timing-note">
+              时间按实际有向步行耗时、建议停留与独立 10
+              分钟缓冲推算；营业、预约与菜品供应尚未核实。
+            </p>
+            {moveError && (
+              <p id="trip-move-error" tabIndex={-1} className="trip-error" role="alert">
+                {moveError}
+              </p>
+            )}
+            {day.notices.length > 0 && (
+              <details className="trip-day-notices">
+                <summary>{day.notices.length} 项用餐／交通说明</summary>
+                {day.notices.map((notice, index) => (
+                  <p key={index}>{notice}</p>
+                ))}
+              </details>
+            )}
+            <ol className="trip-timeline" key={day.date}>
+              {schedule?.items.map((item, index) => {
+                const recommendation = day.recommendations.find(
+                  (value) => value.activityId === item.activity.id,
+                );
+                const leg = index > 0 ? schedule.legs[index - 1] : null;
+                return (
+                  <li
+                    key={item.activity.id}
+                    style={{ animationDelay: `${index * 35}ms` }}
+                  >
+                    {leg && (
+                      <p className="trip-transfer">
+                        <Footprints size={14} aria-hidden="true" />
+                        {leg.route?.seconds == null
+                          ? "步行耗时待核实，后续时间未知"
+                          : `步行约 ${Math.ceil(leg.route.seconds / 60)} 分钟${leg.route.meters == null ? "" : ` · ${(leg.route.meters / 1000).toFixed(1)} km`}`}
+                        <span>另留 10 分钟缓冲</span>
+                      </p>
+                    )}
+                    <article
+                      data-kind={item.activity.kind}
+                      className={`trip-activity ${selected === item.activity.id ? "is-selected" : ""} ${wide && onActivityChange && item.activity.kind === "visit" ? "has-drag-handle" : ""} ${dropTarget?.index === index ? `is-drop-${dropTarget.edge}` : ""}`}
+                      onDragOver={(event) => dragOver(event, index)}
+                      onDragLeave={(event) => {
+                        if (!(
+                          event.relatedTarget instanceof Node &&
+                          event.currentTarget.contains(event.relatedTarget)
+                        )) {
+                          setDropTarget(null);
+                        }
+                      }}
+                      onDrop={(event) => drop(event, index)}
+                    >
+                      {wide && onActivityChange && item.activity.kind === "visit" && (
+                        <button
+                          type="button"
+                          className="trip-drag-handle"
+                          aria-label={`调整${item.activity.place.name}的位置`}
+                          title="拖动调整当天次序，或点击选择日期与位置"
+                          disabled={item.activity.positionLocked}
+                          draggable={!item.activity.positionLocked}
+                          onClick={() => {
+                            if (item.activity.positionLocked) {
+                              return;
+                            }
+                            setMoveError(null);
+                            setDetailMoveOpen(true);
+                            setSelected(item.activity.id);
+                            setDetailId(item.activity.id);
+                          }}
+                          onDragStart={(event) => {
+                            if (item.activity.positionLocked) {
+                              event.preventDefault();
+                              return;
+                            }
+                            drag.current = { plan, activityId: item.activity.id };
+                            setMoveError(null);
+                            event.dataTransfer.setData(
+                              "application/x-xingjian-activity",
+                              item.activity.id,
+                            );
+                            event.dataTransfer.effectAllowed = "move";
+                            const article = event.currentTarget.closest("article");
+                            if (article) {
+                              event.dataTransfer.setDragImage(article, 20, 20);
+                            }
+                          }}
+                          onDragEnd={() => {
+                            drag.current = null;
+                            setDropTarget(null);
+                          }}
+                        >
+                          <GripVertical size={18} aria-hidden="true" />
+                        </button>
+                      )}
+                      <div className="trip-activity-top">
+                        <time>{formatMinute(item.startMinute)}</time>
+                        <span
+                          className="trip-stop-number"
+                          aria-label={`地图编号 ${index + 1}`}
+                        >
+                          {index + 1}
+                        </span>
+                        <span className="trip-activity-duration">
+                          <span>{purposes[item.activity.kind]}</span>
+                          <span>建议 {item.activity.stayMinutes} 分钟</span>
+                        </span>
+                        {item.activity.positionLocked && (
+                          <span className="trip-position-lock">
+                            <Lock size={12} aria-hidden="true" />
+                            位置已锁
+                          </span>
+                        )}
+                        {item.activity.fixedStartMinute !== null && (
+                          <span className="trip-time-lock">
+                            <Lock size={12} aria-hidden="true" />
+                            时间锁 {formatMinute(item.activity.fixedStartMinute)}
+                          </span>
+                        )}
+                      </div>
+                      <div className="trip-activity-body">
+                        <div className="trip-place-heading">
+                          <button
+                            type="button"
+                            className="trip-place-select"
+                            aria-pressed={selected === item.activity.id}
+                            onClick={() => locate(item.activity.id)}
+                          >
+                            <span>
+                              {item.activity.kind === "visit" ? (
+                                <MapPin size={17} aria-hidden="true" />
+                              ) : (
+                                <Utensils size={17} aria-hidden="true" />
+                              )}
+                              {item.activity.place.name}
+                            </span>
+                          </button>
+                          <Button
+                            variant="ghost"
+                            id={`edit-activity-${item.activity.id}`}
+                            className="trip-place-evidence"
+                            aria-label={`查看${item.activity.place.name}的资料`}
+                            onClick={() => {
+                              select(item.activity.id);
+                              setMoveError(null);
+                              setDetailMoveOpen(false);
+                              setDetailId(item.activity.id);
+                            }}
+                          >
+                            编辑
+                          </Button>
+                        </div>
+                        <PlacePhoto
+                          city={plan.brief.destinationCity}
+                          placeId={item.activity.place.id}
+                          name={item.activity.place.name}
+                        />
+                        <p className="trip-activity-address">
+                          {item.activity.place.address ?? "地址待核实"}
+                        </p>
+                        {recommendation?.dish && (
+                          <p className="trip-dish">
+                            菜品建议 · {recommendation.dish}
+                            <small>供应与饮食适配需向商家核实</small>
+                          </p>
+                        )}
+                        <p className="trip-reason">{recommendation?.reason}</p>
+                        {recommendation?.guide && (
+                          <Disclosure className="trip-experience" title="体验建议">
+                            <p>
+                              <span>
+                                AI {item.activity.kind === "visit" ? "游玩" : "用餐"}建议
+                              </span>
+                              {recommendation.guide.experience}
+                            </p>
+                          </Disclosure>
+                        )}
+                      </div>
+                    </article>
+                    {onReviewHost && item.activity.id === reviewActivityId && (
+                      <div className="trip-review-slot" ref={onReviewHost} />
+                    )}
+                  </li>
+                );
+              })}
+            </ol>
+            {schedule && (
+              <details className="trip-day-notices">
+                <summary>{schedule.issues.length} 项行程核实与冲突</summary>
+                {schedule.issues.map((issue, index) => (
+                  <p
+                    className={issue.severity === "conflict" ? "trip-conflict" : ""}
+                    key={index}
+                  >
+                    {issue.message}
+                  </p>
+                ))}
+              </details>
+            )}
+            {onReviewHost && reviewExpenses && (
+              <div className="trip-review-slot" ref={onReviewHost} />
+            )}
+            <section className="trip-budget-panel" aria-label="预算目标分配">
+              <div className="trip-budget-heading">
+                <WalletMark />
                 <div>
-                  <span>目标分配</span>
-                  <strong>{plan.brief.travelers} 人</strong>
+                  <h2>预算目标分配</h2>
+                  <p>全体目标 {money(total)}，不是实际报价</p>
                 </div>
               </div>
-              <dl>
-                {plan.allocation.map((item, index) => (
-                  <div key={item.category}>
-                    <dt>
-                      <i style={{ background: colors[index] }} />
-                      {labels[item.category]}
-                    </dt>
-                    <dd>
-                      {(item.category === "intercity" &&
-                        !plan.brief.budget.includeIntercity) ||
-                      (item.category === "lodging" && !plan.brief.budget.includeLodging)
-                        ? "未计入"
-                        : money(item.targetFen)}
-                    </dd>
-                  </div>
-                ))}
-              </dl>
-            </div>
-            <p className="trip-daily-target">
-              第 {currentDay + 1} 天均分参考目标{" "}
-              {money(dailyBudgetTargetFen(plan.brief, currentDay))}（全体）
-            </p>
-            <p>
-              图中为目标分配建议，不是已查询价格。每日金额仅均分参考，非当日实际费用；实际支出未知，不能据此认定预算充足，零目标也不代表免费。
-            </p>
-            <details className="trip-expense-details">
-              <summary>查看或补充手动费用估算</summary>
-              <ItineraryExpenseSummary plan={plan} />
-              {onActivityChange && (
-                <button
-                  type="button"
-                  className="button"
-                  onClick={() => setExpenseOpen(true)}
+              <div className="trip-budget-visual">
+                <div
+                  className="trip-donut"
+                  style={{
+                    background: total
+                      ? `conic-gradient(${stops.join(",")})`
+                      : "var(--border)",
+                  }}
                 >
-                  编辑全程费用估算
-                </button>
-              )}
-            </details>
-          </section>
-          <details
-            className="trip-weather-disclosure"
-            onToggle={(event) => setWeatherOpen(event.currentTarget.open)}
-          >
-            <summary>
-              <CloudSun size={17} aria-hidden="true" />
-              当天天气与出行提示
-            </summary>
-            {weatherOpen &&
-              (mapDay.items[0] ? (
-                <WeatherPanel
-                  key={`${day.date}:${mapDay.items[0].place.id}:${mapDay.items[0].place.location.join(",")}`}
-                  date={day.date}
-                  place={mapDay.items[0].place}
-                />
-              ) : (
-                <p>当天没有活动参考点，天气未知；不会用其他日期或位置替代。</p>
-              ))}
-          </details>
-          <details className="trip-final-details">
-            <summary>必去／必吃覆盖与出行前核实</summary>
-            {plan.constraints.map((item, index) => (
-              <p
-                className={item.status === "conflict" ? "trip-conflict" : ""}
-                key={index}
-              >
-                <strong>{item.label}</strong> · {item.message}
+                  <div>
+                    <span>目标分配</span>
+                    <strong>{plan.brief.travelers} 人</strong>
+                  </div>
+                </div>
+                <dl>
+                  {plan.allocation.map((item, index) => (
+                    <div key={item.category}>
+                      <dt>
+                        <i style={{ background: colors[index] }} />
+                        {labels[item.category]}
+                      </dt>
+                      <dd>
+                        {(item.category === "intercity" &&
+                          !plan.brief.budget.includeIntercity) ||
+                        (item.category === "lodging" && !plan.brief.budget.includeLodging)
+                          ? "未计入"
+                          : money(item.targetFen)}
+                      </dd>
+                    </div>
+                  ))}
+                </dl>
+              </div>
+              <p className="trip-daily-target">
+                第 {currentDay + 1} 天均分参考目标{" "}
+                {money(dailyBudgetTargetFen(plan.brief, currentDay))}（全体）
               </p>
-            ))}
-            {plan.notices.map((notice, index) => (
-              <p key={index}>{notice}</p>
-            ))}
-            <p>
-              AI 模型：{plan.model} · 生成时间：{plan.generatedAt}
-            </p>
-          </details>
-          {socialReferences && (
+              <p>
+                图中为目标分配建议，不是已查询价格。每日金额仅均分参考，非当日实际费用；实际支出未知，不能据此认定预算充足，零目标也不代表免费。
+              </p>
+              <Disclosure className="trip-expense-details" title="查看或补充手动费用估算">
+                <ItineraryExpenseSummary plan={plan} />
+                {onActivityChange && (
+                  <Button
+                    id="itinerary-expenses-trigger"
+                    onClick={() => setExpenseOpen(true)}
+                  >
+                    编辑全程费用估算
+                  </Button>
+                )}
+              </Disclosure>
+            </section>
             <details
-              id="trip-social-sources"
-              className="trip-final-details"
-              aria-label="社交参考来源"
-              open={sourcesOpen}
-              onToggle={(event) => setSourcesOpen(event.currentTarget.open)}
+              className="trip-weather-disclosure"
+              onToggle={(event) => setWeatherOpen(event.currentTarget.open)}
             >
               <summary>
-                社交参考来源 · {socialReferences.notes.length} 篇
-                {plan.socialSource?.status === "available" ? "后台匹配资料" : "选用摘录"}
+                <CloudSun size={17} aria-hidden="true" />
+                当天天气与出行提示
               </summary>
-              <p>
-                {plan.socialSource?.status === "available"
-                  ? "这些资料由后台按同城与旅行偏好检索，供模型参考；不是实时平台搜索。"
-                  : "这是用户选用、供模型参考的未核实经验。"}
-                不是逐活动采用证明，也不确认营业、价格、过敏安全或图片使用权。规范链接不携带访问令牌，可能需在平台内查看。
-              </p>
-              {socialReferences.notes.map((note) => (
-                <div className="trip-social-reference" key={note.noteId}>
-                  <a href={socialNoteUrl(note)} target="_blank" rel="noreferrer noopener">
-                    {note.title}
-                  </a>
-                  <p>{note.excerpt}</p>
-                  <p>
-                    笔记自带时间（未核实）：{note.publishedAt ?? "未知"} · 资料索引记录：
-                    {note.importedAt}
-                  </p>
-                  {note.places.length > 0 && (
-                    <p>
-                      资料中待核对的候选：
-                      {note.places.map((place) => place.name).join("、")}
-                      ；不代表全部已安排。
-                    </p>
-                  )}
-                </div>
-              ))}
+              {weatherOpen &&
+                (mapDay.items[0] ? (
+                  <WeatherPanel
+                    key={`${day.date}:${mapDay.items[0].place.id}:${mapDay.items[0].place.location.join(",")}`}
+                    date={day.date}
+                    place={mapDay.items[0].place}
+                  />
+                ) : (
+                  <p>当天没有活动参考点，天气未知；不会用其他日期或位置替代。</p>
+                ))}
             </details>
-          )}
-        </section>
-      </div>
+            <details className="trip-final-details">
+              <summary>必去／必吃覆盖与出行前核实</summary>
+              {plan.constraints.map((item, index) => (
+                <p
+                  className={item.status === "conflict" ? "trip-conflict" : ""}
+                  key={index}
+                >
+                  <strong>{item.label}</strong> · {item.message}
+                </p>
+              ))}
+              {plan.notices.map((notice, index) => (
+                <p key={index}>{notice}</p>
+              ))}
+              <p>
+                AI 模型：{plan.model} · 生成时间：{plan.generatedAt}
+              </p>
+            </details>
+            {socialReferences && (
+              <details
+                id="trip-social-sources"
+                className="trip-final-details"
+                aria-label="社交参考来源"
+                open={sourcesOpen}
+                onToggle={(event) => setSourcesOpen(event.currentTarget.open)}
+              >
+                <summary>
+                  社交参考来源 · {socialReferences.notes.length} 篇
+                  {plan.socialSource?.status === "available"
+                    ? "后台匹配资料"
+                    : "选用摘录"}
+                </summary>
+                <p>
+                  {plan.socialSource?.status === "available"
+                    ? "这些资料由后台按同城与旅行偏好检索，供模型参考；不是实时平台搜索。"
+                    : "这是用户选用、供模型参考的未核实经验。"}
+                  不是逐活动采用证明，也不确认营业、价格、过敏安全或图片使用权。规范链接不携带访问令牌，可能需在平台内查看。
+                </p>
+                {socialReferences.notes.map((note) => (
+                  <div className="trip-social-reference" key={note.noteId}>
+                    <a
+                      href={socialNoteUrl(note)}
+                      target="_blank"
+                      rel="noreferrer noopener"
+                    >
+                      {note.title}
+                    </a>
+                    <p>{note.excerpt}</p>
+                    <p>
+                      笔记自带时间（未核实）：{note.publishedAt ?? "未知"} ·
+                      资料索引记录：
+                      {note.importedAt}
+                    </p>
+                    {note.places.length > 0 && (
+                      <p>
+                        资料中待核对的候选：
+                        {note.places.map((place) => place.name).join("、")}
+                        ；不代表全部已安排。
+                      </p>
+                    )}
+                  </div>
+                ))}
+              </details>
+            )}
+          </section>
+        </div>
+      </TabsContent>
       {expenseOpen && onActivityChange && (
         <ItineraryExpenseDialog
           plan={plan}
@@ -755,7 +792,7 @@ export function ItineraryBook({
         <Clock3 size={14} aria-hidden="true" />
         行程暂存于当前页面，刷新会清空。时间为估算，开放、预约、天气和实际费用请在出行前再次确认。
       </p>
-    </div>
+    </Tabs>
   );
 }
 function WalletMark() {

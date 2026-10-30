@@ -1,7 +1,10 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useMutation } from "@tanstack/react-query";
+import { Button } from "@/components/arc/button/button";
+import { useConfirmDialog } from "@/components/arc/dialog/confirm-dialog";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { TripSiteHeader } from "./trip-site-header";
@@ -34,7 +37,11 @@ export function FullPlanner({
   active?: boolean;
 }) {
   const router = useRouter();
-  const { plan, review, previous, version } = useItineraryStore();
+  const { confirm: askConfirmation, confirmation } = useConfirmDialog();
+  const returnTarget = useRef<HTMLElement | null>(null);
+  const focusedReview = useRef<number | null>(null);
+  const [reviewHost, setReviewHost] = useState<HTMLDivElement | null>(null);
+  const { plan, review, previous, history, version } = useItineraryStore();
   const [editing, setEditing] = useState(
     () =>
       view === "new" || (view === "auto" && useItineraryStore.getState().plan === null),
@@ -71,18 +78,23 @@ export function FullPlanner({
   });
   useEffect(() => () => controller.current?.abort(), []);
   const reviewId = review?.id;
-  const activityReview = Boolean(review?.change);
   useEffect(() => {
-    if (!editing) {
-      document
-        .getElementById(
-          reviewId !== undefined && activityReview
-            ? "trip-review-heading"
-            : "itinerary-heading",
-        )
-        ?.focus();
+    if (
+      !editing &&
+      reviewId !== undefined &&
+      reviewHost &&
+      focusedReview.current !== reviewId
+    ) {
+      const heading = document.getElementById("trip-review-heading");
+      if (heading) {
+        focusedReview.current = reviewId;
+        heading.focus({ preventScroll: true });
+        document
+          .getElementById("trip-confirm-change")
+          ?.scrollIntoView({ block: "nearest", behavior: "instant" });
+      }
     }
-  }, [editing, plan, reviewId, activityReview]);
+  }, [editing, reviewId, reviewHost]);
   async function generate(brief: TripBrief) {
     if (controller.current || cooldown > 0) {
       return;
@@ -110,6 +122,14 @@ export function FullPlanner({
       dirty.current = false;
       setEditing(false);
       setProgress("");
+      requestAnimationFrame(() => {
+        if (!useItineraryStore.getState().review) {
+          document.getElementById("itinerary-heading")?.focus({ preventScroll: true });
+          document
+            .getElementById("itinerary-heading")
+            ?.scrollIntoView({ block: "start", behavior: "instant" });
+        }
+      });
       if (view === "new" && !embedded) {
         router.push("/itinerary");
       }
@@ -137,8 +157,11 @@ export function FullPlanner({
     setProgress("已取消生成，原方案保持不变。");
     mutation.reset();
   }
-  function edit() {
-    if (review && !window.confirm("放弃这份尚未确认的新方案，返回填写需求吗？")) {
+  async function edit() {
+    if (
+      review &&
+      !(await askConfirmation("放弃这份尚未确认的新方案，返回填写需求吗？"))
+    ) {
       return;
     }
     useItineraryStore.getState().cancelReview();
@@ -153,6 +176,11 @@ export function FullPlanner({
     try {
       useItineraryStore.getState().confirm();
       setError(null);
+      requestAnimationFrame(
+        () =>
+          returnTarget.current?.isConnected &&
+          returnTarget.current.focus({ preventScroll: true }),
+      );
     } catch (cause) {
       if (!review?.change) {
         useItineraryStore.getState().cancelReview();
@@ -168,13 +196,14 @@ export function FullPlanner({
       className={embedded ? "itinerary-embedded" : "trip-app"}
       data-plan-revision={version}
     >
+      {confirmation}
       {!embedded && (
         <>
           <TripSiteHeader
             beforeNavigate={() =>
               !editing ||
               !dirty.current ||
-              window.confirm(
+              askConfirmation(
                 "离开会丢弃本页尚未提交的需求，当前已生成方案不会删除。继续吗？",
               )
             }
@@ -244,89 +273,111 @@ export function FullPlanner({
           </>
         ) : visible ? (
           <>
-            {review && (
-              <section className="trip-review-bar" aria-label="新方案确认">
-                <p id="trip-review-heading" tabIndex={-1}>
-                  {review.change
-                    ? review.change.kind === "expenses"
-                      ? "这是一份费用估算预览，当前方案尚未改变。"
-                      : "这是一项活动修改预览，当前方案尚未改变。"
-                    : "这是一份新方案预览，当前方案尚未改变。"}
-                </p>
-                <button
-                  className="button"
-                  onClick={() => {
-                    useItineraryStore.getState().cancelReview();
-                    setError(null);
-                  }}
-                >
-                  保留原方案
-                </button>
-                <button
-                  className="button primary"
-                  id="trip-confirm-change"
-                  disabled={
-                    review.plan.status === "infeasible" ||
-                    (review.change?.kind === "move" &&
-                      plan !== null &&
-                      prepareItineraryMove(plan, review.change, review.routes).missing
-                        .length > 0)
-                  }
-                  onClick={confirm}
-                >
-                  <Check size={16} aria-hidden="true" />
-                  {review.change ? "确认此项修改" : "确认使用新方案"}
-                </button>
-                {review.change && plan && (
-                  <ItineraryChangePreview
-                    before={plan}
-                    after={review.plan}
-                    change={review.change}
-                  />
-                )}
-                {!review.change &&
-                  plan &&
-                  JSON.stringify(plan.expenses) !==
-                    JSON.stringify(review.plan.expenses) &&
-                  (Object.values(plan.expenses?.items ?? {}).some(
-                    (entry) => entry.amountFen !== null,
-                  ) ||
-                    Object.values(review.plan.expenses?.items ?? {}).some(
-                      (entry) => entry.amountFen !== null,
-                    )) && (
-                    <ItineraryExpenseComparison before={plan} after={review.plan} />
+            {review &&
+              reviewHost &&
+              createPortal(
+                <section className="trip-review-bar" aria-label="新方案确认">
+                  <p id="trip-review-heading" tabIndex={-1}>
+                    {review.change
+                      ? review.change.kind === "expenses"
+                        ? "这是一份费用估算预览，当前方案尚未改变。"
+                        : "这是一项活动修改预览，当前方案尚未改变。"
+                      : "这是一份新方案预览，当前方案尚未改变。"}
+                  </p>
+                  <Button
+                    className="button"
+                    onClick={() => {
+                      useItineraryStore.getState().cancelReview();
+                      setError(null);
+                      requestAnimationFrame(
+                        () =>
+                          returnTarget.current?.isConnected &&
+                          returnTarget.current.focus({ preventScroll: true }),
+                      );
+                    }}
+                  >
+                    保留原方案
+                  </Button>
+                  <Button
+                    variant="primary"
+                    className="button primary"
+                    id="trip-confirm-change"
+                    disabled={
+                      review.plan.status === "infeasible" ||
+                      (review.change?.kind === "move" &&
+                        plan !== null &&
+                        prepareItineraryMove(plan, review.change, review.routes).missing
+                          .length > 0)
+                    }
+                    onClick={confirm}
+                  >
+                    <Check size={16} aria-hidden="true" />
+                    {review.change ? "确认此项修改" : "确认使用新方案"}
+                  </Button>
+                  {review.change && plan && (
+                    <ItineraryChangePreview
+                      before={plan}
+                      after={review.plan}
+                      change={review.change}
+                    />
                   )}
-                {review.change?.kind === "move" && plan && (
-                  <ItineraryRouteReview
-                    key={review.id}
-                    before={plan}
-                    change={review.change}
-                    routes={review.routes}
-                    proposalId={review.id}
-                    baseVersion={review.baseVersion}
-                    conflicted={review.plan.status === "infeasible"}
-                  />
-                )}
-                {error && (
-                  <p role="alert" className="trip-error">
-                    {error}
-                  </p>
-                )}
-                {review.plan.status === "infeasible" && (
-                  <p className="trip-conflict">
-                    请先解决行程冲突后再确认，当前方案保持不变。
-                  </p>
-                )}
-              </section>
-            )}
+                  {!review.change &&
+                    plan &&
+                    JSON.stringify(plan.expenses) !==
+                      JSON.stringify(review.plan.expenses) &&
+                    (Object.values(plan.expenses?.items ?? {}).some(
+                      (entry) => entry.amountFen !== null,
+                    ) ||
+                      Object.values(review.plan.expenses?.items ?? {}).some(
+                        (entry) => entry.amountFen !== null,
+                      )) && (
+                      <ItineraryExpenseComparison before={plan} after={review.plan} />
+                    )}
+                  {review.change?.kind === "move" && plan && (
+                    <ItineraryRouteReview
+                      key={review.id}
+                      before={plan}
+                      change={review.change}
+                      routes={review.routes}
+                      proposalId={review.id}
+                      baseVersion={review.baseVersion}
+                      conflicted={review.plan.status === "infeasible"}
+                    />
+                  )}
+                  {error && (
+                    <p role="alert" className="trip-error">
+                      {error}
+                    </p>
+                  )}
+                  {review.plan.status === "infeasible" && (
+                    <p className="trip-conflict">
+                      请先解决行程冲突后再确认，当前方案保持不变。
+                    </p>
+                  )}
+                </section>,
+                reviewHost,
+              )}
             {previous && !review && (
-              <button
+              <Button
                 className="button trip-undo"
-                onClick={() => useItineraryStore.getState().undo()}
+                onClick={() => {
+                  useItineraryStore.getState().undo();
+                  requestAnimationFrame(
+                    () =>
+                      returnTarget.current?.isConnected &&
+                      returnTarget.current.focus({ preventScroll: true }),
+                  );
+                }}
               >
                 <RotateCcw size={16} aria-hidden="true" />
-                撤销上次修改
-              </button>
+                <span>
+                  撤销上次修改
+                  <small className="trip-undo-context">
+                    {history.at(-1)?.label ?? "方案调整"} · 还可撤销 {history.length || 1}{" "}
+                    步
+                  </small>
+                </span>
+              </Button>
             )}
             <ItineraryBook
               plan={visible}
@@ -334,10 +385,23 @@ export function FullPlanner({
               mapsConfigured={mapsConfigured}
               active={active}
               onEdit={edit}
+              onReviewHost={review ? setReviewHost : undefined}
+              reviewActivityId={
+                review?.change && review.change.kind !== "expenses"
+                  ? review.change.activityId
+                  : undefined
+              }
+              reviewExpenses={review?.change?.kind === "expenses"}
+              reviewAtCover={Boolean(review && !review.change)}
               onActivityChange={
                 review
                   ? undefined
                   : (change) => {
+                      returnTarget.current = document.getElementById(
+                        change.kind === "expenses"
+                          ? "itinerary-expenses-trigger"
+                          : `edit-activity-${change.activityId}`,
+                      );
                       useItineraryStore.getState().proposeChange(change);
                       setError(null);
                     }

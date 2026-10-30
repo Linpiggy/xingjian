@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { Check, MapPin, Route, Sparkles } from "lucide-react";
 import type { ItineraryStage, ItineraryWork } from "@/domain/itinerary";
+import { Button } from "@/components/arc/button/button";
+import { Progress } from "@/components/arc/progress/progress";
 import "./planning-progress.css";
 
 export type GenerationProgress = {
@@ -66,7 +68,7 @@ export function PlanningProgress({
           </li>
         ))}
       </ol>
-      <progress
+      <Progress
         aria-label="当前阶段进度"
         max={work?.total}
         value={work?.completed}
@@ -82,9 +84,9 @@ export function PlanningProgress({
           路线核对 {work.completed}/{work.total} 天
         </span>
       )}
-      <button type="button" className="button" onClick={onCancel}>
+      <Button className="button" onClick={onCancel}>
         取消生成
-      </button>
+      </Button>
     </section>
   );
 }

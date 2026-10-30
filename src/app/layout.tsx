@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import "./globals.css";
 import "./workbench-theme.css";
+import "@/components/arc/theme.css";
 import { Providers } from "./providers";
 
 export const metadata: Metadata = {

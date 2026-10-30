@@ -8,41 +8,6 @@
   border-bottom: 1px solid var(--trip-line);
   background: #ffffff;
 }
-.unified-mode-tabs {
-  display: inline-flex;
-  flex-shrink: 0;
-  gap: 4px;
-  padding: 4px;
-  border-radius: 10px;
-  background: #f0f4f1;
-}
-.unified-mode-tabs button {
-  display: grid;
-  grid-template-columns: 18px auto auto;
-  align-items: center;
-  gap: 10px;
-  min-height: 44px;
-  padding: 9px 12px;
-  border: 1px solid transparent;
-  border-radius: 7px;
-  background: transparent;
-  color: #53675c;
-  text-align: left;
-}
-.unified-mode-tabs button > span {
-  font-size: 14px;
-  font-weight: 500;
-}
-.unified-mode-tabs small {
-  font-size: 12px;
-  white-space: nowrap;
-}
-.unified-mode-tabs button[aria-selected="true"] {
-  border-color: #81958a;
-  background: #ffffff;
-  box-shadow: 0 1px 3px #213b310a;
-  color: #185d4b;
-}
 .unified-mode-bar > p {
   flex: 1 1 260px;
   margin: 0;
@@ -98,19 +63,6 @@
 @media (max-width: 767px) {
   .unified-mode-bar {
     padding: 12px;
-  }
-  .unified-mode-tabs {
-    width: 100%;
-  }
-  .unified-mode-tabs button {
-    flex: 1;
-    grid-template-columns: 18px minmax(0, 1fr);
-    gap: 3px 8px;
-    padding: 8px 10px;
-  }
-  .unified-mode-tabs small {
-    grid-column: 1 / -1;
-    font-size: 12px;
   }
   .unified-panel .trip-entry,
   .unified-panel .form-shell {

@@ -1,5 +1,6 @@
 "use client";
-import { useState, type FormEvent, type ReactNode } from "react";
+import { useRef, useState, type FormEvent, type ReactNode } from "react";
+import { useConfirmDialog } from "@/components/arc/dialog/confirm-dialog";
 import { ArrowRight, Info } from "lucide-react";
 import type { PlaceCandidate, TripInput } from "@/domain/models";
 import { PlacePicker } from "./place-picker";
@@ -51,12 +52,43 @@ export function TripForm({
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [selected, setSelected] = useState<PlaceCandidate[]>([]);
   const [city, setCity] = useState("杭州");
+  const [cityDraft, setCityDraft] = useState("杭州");
+  const cityDecision = useRef<Promise<boolean> | null>(null);
+  const { confirm, confirmation } = useConfirmDialog();
+  async function commitCity() {
+    const next = cityDraft.trim();
+    if (next === city) {
+      return true;
+    }
+    if (cityDecision.current) {
+      return cityDecision.current;
+    }
+    const decision = selected.length
+      ? confirm("更换城市会清空已选地点，继续吗？")
+      : Promise.resolve(true);
+    cityDecision.current = decision;
+    const allowed = await decision;
+    if (allowed) {
+      setCity(next);
+      setCityDraft(next);
+      setSelected([]);
+    } else {
+      setCityDraft(city);
+    }
+    cityDecision.current = null;
+    return allowed;
+  }
   const [dayCount, setDayCount] = useState("2");
   const [budget, setBudget] = useState("1500");
   const [departureDate, setDepartureDate] = useState(startDate);
   const [travelers, setTravelers] = useState("2");
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (cityDraft.trim() !== city || cityDecision.current) {
+      setErrors({ city: "请先确认城市变更，再选择该城市地点。" });
+      void commitCity();
+      return;
+    }
     const data = new FormData(event.currentTarget);
     const numeric = (name: string) => {
       const value = String(data.get(name) ?? "").trim();
@@ -92,6 +124,7 @@ export function TripForm({
     `${name}-help${errors[name] ? ` ${name}-error` : ""}`;
   return (
     <div className="form-layout">
+      {confirmation}
       <section className="panel">
         <form noValidate onSubmit={submit} aria-busy={pending}>
           <fieldset disabled={pending}>
@@ -106,16 +139,10 @@ export function TripForm({
                 <input
                   id="city"
                   name="city"
-                  value={city}
-                  onChange={(event) => {
-                    if (
-                      selected.length &&
-                      !window.confirm("更换城市会清空已选地点，继续吗？")
-                    ) {
-                      return;
-                    }
-                    setCity(event.target.value);
-                    setSelected([]);
+                  value={cityDraft}
+                  onChange={(event) => setCityDraft(event.target.value)}
+                  onBlur={() => {
+                    void commitCity();
                   }}
                   autoComplete="address-level2"
                   maxLength={40}

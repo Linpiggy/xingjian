@@ -2,13 +2,10 @@ import { expect, type Page } from "@playwright/test";
 import { places } from "../fixtures/draft";
 
 export async function openPlanningTools(page: Page) {
-  const tools = page.locator(".unified-manual-tools");
-  if (!(await tools.isVisible())) {
-    await page.getByRole("button", { name: "调整旅行需求", exact: true }).click();
-  }
-  if ((await tools.getAttribute("open")) === null) {
-    await tools.locator("summary").click();
-  }
+  await expect(
+    page.getByRole("tablist", { name: "规划方式", exact: true }),
+  ).toBeVisible();
+  await expect(page.getByRole("tab", { name: /手动选点/ })).toHaveCount(1);
 }
 export async function searchFixture(page: Page) {
   await page.route("**/api/places?*", (route) => route.fulfill({ json: { places } }));

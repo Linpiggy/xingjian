@@ -2,6 +2,7 @@ import type { Coordinate, Place, WalkingRoute } from "@/domain/models";
 import type { DayActivity, ActivityLeg } from "@/domain/meal-planning";
 import { scheduleAvailableDay } from "@/domain/meal-planning";
 import { uniqueItineraryVisits } from "@/domain/itinerary-selection";
+import { matchingByName } from "@/domain/place-name";
 import {
   briefDays,
   briefBudget,
@@ -73,6 +74,36 @@ async function turn(
     wait = providerWaitMs();
   }
 }
+// A transient supplier failure (network, timeout, local or upstream rate limit) is
+// queried once more; "no route" and permission failures are reported immediately.
+// Geometry is never invented for a leg that still fails.
+function retryableRouteFailure(error: unknown): boolean {
+  return (
+    error instanceof ProviderError &&
+    ["rate_limited", "upstream_http", "unavailable"].includes(error.code)
+  );
+}
+async function fetchWalking(
+  provider: ItineraryProvider,
+  origin: Coordinate,
+  destination: Coordinate,
+  signal: AbortSignal,
+  progress: (message: string, stage?: ItineraryStage) => void,
+): Promise<WalkingRoute | null> {
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    await turn(signal, progress, "routes");
+    try {
+      return walkingSchema.parse(await provider.walking(origin, destination, signal));
+    } catch (error) {
+      signal.throwIfAborted();
+      if (attempt === 1 || !retryableRouteFailure(error)) {
+        return null;
+      }
+    }
+  }
+  return null;
+}
+
 export async function createItinerary(
   raw: TripBrief,
   provider: ItineraryProvider,
@@ -124,7 +155,7 @@ export async function createItinerary(
         searches.set(query, found);
       }
       const usable = exactOnly
-        ? found.filter((place) => normalize(place.name) === normalize(query))
+        ? matchingByName(query, found, (place) => place.name)
         : found;
       if (exactOnly && usable.length !== 1) {
         return found;
@@ -143,8 +174,10 @@ export async function createItinerary(
     progress("正在核对必去地点、必吃需求与目的地候选。", "places");
     const required = new Map<string, string>();
     for (const name of brief.mustVisit) {
-      const found = (await search(name, "visit")).filter(
-        (place) => normalize(place.name) === normalize(name),
+      const found = matchingByName(
+        name,
+        await search(name, "visit"),
+        (place) => place.name,
       );
       if (found.length !== 1) {
         throw new ProviderError(
@@ -159,9 +192,7 @@ export async function createItinerary(
     for (const request of brief.mustEat) {
       const found = await search(request.name, "restaurant");
       if (request.kind === "restaurant") {
-        const exact = found.filter(
-          (place) => normalize(place.name) === normalize(request.name),
-        );
+        const exact = matchingByName(request.name, found, (place) => place.name);
         if (exact.length !== 1) {
           throw new ProviderError(
             "unavailable",
@@ -183,8 +214,10 @@ export async function createItinerary(
         checkedSocialPlaces.add(key);
         progress("正在核对社交参考中的推荐地点，不把帖子当作路线或营业证据。", "places");
         try {
-          const exact = (await search(place.name, place.kind, true)).filter(
-            (found) => normalize(found.name) === normalize(place.name),
+          const exact = matchingByName(
+            place.name,
+            await search(place.name, place.kind, true),
+            (found) => found.name,
           );
           if (exact.length !== 1) {
             socialNotices.push(
@@ -376,19 +409,16 @@ export async function createItinerary(
       }
       const legs: ActivityLeg[] = [];
       for (let i = 1; i < activities.length; i++) {
-        await turn(signal, progress, "routes");
-        let route: WalkingRoute | null = null;
-        try {
-          route = walkingSchema.parse(
-            await provider.walking(
-              activities[i - 1].place.location,
-              activities[i].place.location,
-              signal,
-            ),
-          );
-          if (route.source.kind === "user") {
-            throw new Error("Unverified route source");
-          }
+        const fetched = await fetchWalking(
+          provider,
+          activities[i - 1].place.location,
+          activities[i].place.location,
+          signal,
+          progress,
+        );
+        // A route recorded from the user's own input is not a verified supplier answer.
+        let route: WalkingRoute | null = fetched?.source.kind === "user" ? null : fetched;
+        if (route) {
           let points = 0;
           const segments = route.segments.filter((segment) => {
             points += segment.length;
@@ -398,9 +428,7 @@ export async function createItinerary(
             notices.push("部分路线轨迹过长，仅展示完整的可用轨迹段，不虚接缺失部分。");
           }
           route = { ...route, segments };
-        } catch {
-          signal.throwIfAborted();
-          route = null;
+        } else {
           notices.push(
             "一段实际步行路线未核实，相关后续时刻保持未知；不会以直线距离补交通时间。",
           );

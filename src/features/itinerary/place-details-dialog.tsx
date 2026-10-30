@@ -2,6 +2,9 @@
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { X } from "lucide-react";
+import { Dialog } from "@/components/arc/dialog/dialog";
+import { Button } from "@/components/arc/button/button";
+import { Input } from "@/components/arc/input/input";
 import type { ScheduledActivity } from "@/domain/meal-planning";
 import { formatMinute } from "@/domain/draft";
 import type { ItineraryChange } from "@/domain/itinerary-editing";
@@ -77,13 +80,9 @@ export function PlaceDetailsDialog({
   const ref = useRef<HTMLDialogElement>(null);
   useEffect(() => {
     const dialog = ref.current;
-    const previous = document.activeElement;
     if (!dialog) {
       return;
     }
-    const overflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    dialog.showModal();
     const header = dialog.querySelector<HTMLElement>(".trip-detail-header");
     const measureHeader = () => {
       dialog.style.setProperty(
@@ -96,19 +95,7 @@ export function PlaceDetailsDialog({
     if (header) {
       observer.observe(header);
     }
-    dialog.querySelector<HTMLElement>("h2")?.focus();
-    return () => {
-      observer.disconnect();
-      dialog.close();
-      document.body.style.overflow = overflow;
-      if (
-        !skipRestore.current &&
-        previous instanceof HTMLElement &&
-        previous.isConnected
-      ) {
-        previous.focus({ preventScroll: true });
-      }
-    };
+    return () => observer.disconnect();
   }, []);
   const source = item.activity.place.source;
   const rules = item.activity.rules;
@@ -119,37 +106,14 @@ export function PlaceDetailsDialog({
     confirmed: "用户记录已预约，非平台核验",
   };
   return (
-    <dialog
+    <Dialog
       ref={ref}
+      skipRestoreRef={skipRestore}
       className="trip-detail-dialog"
       aria-labelledby="trip-detail-name"
       onClose={() => {
         if (!ref.current?.open) {
           onClose();
-        }
-      }}
-      onKeyDown={(event) => {
-        if (event.key !== "Tab" || event.ctrlKey || event.metaKey || event.altKey) {
-          return;
-        }
-        const buttons = event.currentTarget.querySelectorAll<HTMLButtonElement>(
-          "button:not(:disabled)",
-        );
-        const first = buttons[0];
-        const last = buttons[buttons.length - 1];
-        if (!first || !last) {
-          return;
-        }
-        if (!event.shiftKey && document.activeElement === last) {
-          event.preventDefault();
-          first.focus();
-        } else if (
-          event.shiftKey &&
-          (document.activeElement === first ||
-            document.activeElement === event.currentTarget.querySelector("h2"))
-        ) {
-          event.preventDefault();
-          last.focus();
         }
       }}
       onClick={(event) => {
@@ -174,14 +138,14 @@ export function PlaceDetailsDialog({
             {item.activity.place.name}
           </h2>
         </div>
-        <button
-          type="button"
+        <Button
+          variant="ghost"
           className="trip-detail-close"
           aria-label="关闭地点资料"
           onClick={() => ref.current?.close()}
         >
           <X size={18} aria-hidden="true" />
-        </button>
+        </Button>
       </header>
       <div className="trip-detail-content">
         <PlacePhoto
@@ -224,20 +188,18 @@ export function PlaceDetailsDialog({
           <section className="trip-activity-edit" aria-label="调整此活动">
             <h3>调整此活动</h3>
             <form onSubmit={duration} noValidate>
-              <label>
-                建议停留（分钟）
-                <input
-                  type="number"
-                  name="stayMinutes"
-                  min={15}
-                  max={240}
-                  defaultValue={item.activity.stayMinutes}
-                  onInput={() => setError(null)}
-                />
-              </label>
-              <button type="submit" className="button">
+              <Input
+                label="建议停留（分钟）"
+                type="number"
+                name="stayMinutes"
+                min={15}
+                max={240}
+                defaultValue={item.activity.stayMinutes}
+                onInput={() => setError(null)}
+              />
+              <Button type="submit" className="button">
                 预览停留调整
-              </button>
+              </Button>
             </form>
             <button
               type="button"
@@ -448,10 +410,10 @@ export function PlaceDetailsDialog({
           活动安排与菜品是 AI
           建议。时间由建议停留、实际相邻步行与独立缓冲推算；开放、预约和饮食安全仍须向场所核实。
         </p>
-        <button type="button" className="button" onClick={() => ref.current?.close()}>
+        <Button className="button" onClick={() => ref.current?.close()}>
           返回当天行程
-        </button>
+        </Button>
       </div>
-    </dialog>
+    </Dialog>
   );
 }

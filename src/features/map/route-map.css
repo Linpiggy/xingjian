@@ -109,7 +109,7 @@
   font-weight: 500;
   color: #405532;
 }
-.route-map-status .button {
+.route-map-status :is(.button, .arc-button) {
   flex-shrink: 0;
   margin-left: auto;
 }
@@ -118,7 +118,10 @@
   margin-top: 12px;
 }
 .route-map-stop-index ol {
-  display: flex;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(176px, 1fr);
+  align-items: stretch;
   gap: 8px;
   margin: 0;
   padding: 4px;
@@ -128,7 +131,8 @@
   list-style: none;
 }
 .route-map-stop-index li {
-  flex: 0 0 160px;
+  min-width: 0;
+  margin: 0;
 }
 .route-map-stop-index button {
   display: grid;
@@ -136,24 +140,33 @@
   align-items: center;
   gap: 8px;
   width: 100%;
-  min-height: 52px;
-  padding: 8px;
-  border: 1px solid #d9ddcc;
+  height: 100%;
+  min-height: 64px;
+  padding: 12px;
+  border: 1px solid transparent;
   border-radius: 6px;
   background: #fffef9;
   color: #53634c;
   font-size: 14px;
   text-align: left;
+  white-space: normal;
   overflow-wrap: anywhere;
 }
+.route-map-stop-index button > span {
+  min-width: 0;
+  line-height: 1.6;
+}
 .route-map-stop-index button[aria-pressed="true"] {
-  border-color: #899774;
+  border-color: transparent;
   color: #2a5d43;
   background: #eaf0e3;
 }
 .route-map-stop-index strong {
   width: 24px;
   height: 24px;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
   border-radius: 50%;
   background: #2a5d43;
   color: #fffef9;

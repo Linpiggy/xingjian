@@ -159,13 +159,16 @@ test("manual route drafts and full AI proposals both remain in the same workspac
   await ai.getByLabel("我确认本次生成会使用模型与地图查询配额").check();
   await ai.getByRole("button", { name: "生成我的完整方案" }).click();
   await expect(ai.getByRole("heading", { name: "在城市的文化与烟火之间" })).toBeVisible();
-  await expect(page).toHaveURL(/\/plan\?mode=manual$/);
+  await expect(page).toHaveURL(/\/plan$/);
   await openPlanningTools(page);
   await page.getByRole("tab", { name: /手动选点/ }).click();
   await expect(
     manual.getByRole("heading", { name: "测试城市2日路线草稿" }),
   ).toBeVisible();
   await page.getByRole("tab", { name: /完整 AI 规划/ }).click();
+  await expect(ai.getByRole("heading", { name: "在城市的文化与烟火之间" })).toBeVisible();
+  await ai.getByRole("button", { name: "调整旅行需求", exact: true }).click();
+  await expect(ai.getByLabel("目的地城市")).toHaveValue("AI 测试城市");
   await ai.getByRole("button", { name: "返回当前方案", exact: true }).click();
   await expect(ai.getByRole("heading", { name: "在城市的文化与烟火之间" })).toBeVisible();
   expect(manualCalls).toBe(1);

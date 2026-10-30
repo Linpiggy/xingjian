@@ -61,12 +61,12 @@ test("map comes before daily planning on both screens and native wheel moves the
   await expect
     .poll(() => dates.evaluate((element) => element.getBoundingClientRect().top))
     .toBe(0);
-  await page.getByRole("button", { name: /第 14 天/ }).click();
-  await expect(page.getByRole("button", { name: /第 14 天/ })).toHaveAttribute(
+  await page.getByRole("tab", { name: /第 14 天/ }).click();
+  await expect(page.getByRole("tab", { name: /第 14 天/ })).toHaveAttribute(
     "aria-current",
     "date",
   );
-  await expect(page.getByRole("button", { name: /第 14 天/ })).toBeInViewport();
+  await expect(page.getByRole("tab", { name: /第 14 天/ })).toBeInViewport();
   await expect(day).toContainText("第14天");
   await expect
     .poll(async () => {

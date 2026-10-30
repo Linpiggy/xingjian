@@ -1,5 +1,5 @@
 import { api, json, requireSameOrigin } from "@/server/http";
-import { withProviderBudget } from "@/server/providers/budget";
+import { withMapProxyBudget } from "@/server/providers/budget";
 
 export async function GET(
   request: Request,
@@ -45,7 +45,7 @@ export async function GET(
     upstream.search = requestUrl.search;
     upstream.searchParams.set("key", key);
     upstream.searchParams.set("jscode", security);
-    return withProviderBudget(async () => {
+    return withMapProxyBudget(async () => {
       const response = await fetch(upstream, {
         cache: "no-store",
         redirect: "error",
