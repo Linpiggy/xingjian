@@ -5,7 +5,7 @@ import type { Itinerary, ItineraryOutline } from "@/domain/itinerary";
 import { briefDays, briefBudget } from "@/domain/trip-brief";
 import type { ItineraryChange } from "@/domain/itinerary-editing";
 import type { ItineraryRouteResolution } from "@/domain/itinerary-moves";
-import { budgetEstimateSchema, coordinateSchema, walkingSchema } from "./contracts";
+import { budgetEstimateSchema, coordinateSchema, routeSchema } from "./contracts";
 import { venueRulesSchema } from "./venue-contracts";
 import { socialInspirationSchema } from "./social-inspiration-contracts";
 
@@ -58,7 +58,7 @@ export const itineraryRouteResolutionSchema: z.ZodType<ItineraryRouteResolution>
     toActivityId: activityId,
     origin: coordinateSchema,
     destination: coordinateSchema,
-    route: walkingSchema
+    route: routeSchema
       .strict()
       .extend({ segments: z.array(z.array(coordinateSchema).max(10_000)).max(100) }),
   });

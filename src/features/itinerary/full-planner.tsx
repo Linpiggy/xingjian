@@ -3,9 +3,9 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useMutation } from "@tanstack/react-query";
-import { Button } from "@/components/arc/button/button";
+import { Button, ButtonLink } from "@/components/arc/button/button";
 import { useConfirmDialog } from "@/components/arc/dialog/confirm-dialog";
-import Link from "next/link";
+
 import { useRouter } from "next/navigation";
 import { TripSiteHeader } from "./trip-site-header";
 import { Compass, Check, RotateCcw, ArrowUpRight } from "lucide-react";
@@ -20,6 +20,7 @@ import { ItineraryChangePreview } from "./itinerary-change-preview";
 import { prepareItineraryMove } from "@/domain/itinerary-moves";
 import { ItineraryRouteReview } from "./itinerary-route-review";
 import { ItineraryExpenseComparison } from "./itinerary-expense-view";
+import { ArcIcon } from "@/components/arc/icon/icon";
 
 export function FullPlanner({
   startDate,
@@ -285,7 +286,6 @@ export function FullPlanner({
                       : "这是一份新方案预览，当前方案尚未改变。"}
                   </p>
                   <Button
-                    className="button"
                     onClick={() => {
                       useItineraryStore.getState().cancelReview();
                       setError(null);
@@ -300,7 +300,7 @@ export function FullPlanner({
                   </Button>
                   <Button
                     variant="primary"
-                    className="button primary"
+
                     id="trip-confirm-change"
                     disabled={
                       review.plan.status === "infeasible" ||
@@ -311,7 +311,7 @@ export function FullPlanner({
                     }
                     onClick={confirm}
                   >
-                    <Check size={16} aria-hidden="true" />
+                    <ArcIcon icon={Check} size="md" aria-hidden="true" />
                     {review.change ? "确认此项修改" : "确认使用新方案"}
                   </Button>
                   {review.change && plan && (
@@ -359,7 +359,7 @@ export function FullPlanner({
               )}
             {previous && !review && (
               <Button
-                className="button trip-undo"
+                className="trip-undo"
                 onClick={() => {
                   useItineraryStore.getState().undo();
                   requestAnimationFrame(
@@ -369,7 +369,7 @@ export function FullPlanner({
                   );
                 }}
               >
-                <RotateCcw size={16} aria-hidden="true" />
+                <ArcIcon icon={RotateCcw} size="md" aria-hidden="true" />
                 <span>
                   撤销上次修改
                   <small className="trip-undo-context">
@@ -413,15 +413,15 @@ export function FullPlanner({
             className="trip-empty-itinerary"
             aria-labelledby="empty-itinerary-heading"
           >
-            <Compass size={48} strokeWidth={1.2} aria-hidden="true" />
+            <ArcIcon icon={Compass} size="lg" strokeWidth={1.2} aria-hidden="true" />
             <p>你的旅行提案</p>
             <h1 id="empty-itinerary-heading">还没有当前行程</h1>
             <p>
               从一个目的地开始，安排每天的游览、三餐和地点间步行。已有方案仅在当前页面会话内保留，刷新会清空。
             </p>
-            <Link href="/plan" className="button primary">
-              新建旅行规划 <ArrowUpRight size={16} aria-hidden="true" />
-            </Link>
+            <ButtonLink variant="primary" href="/plan">
+              新建旅行规划 <ArcIcon icon={ArrowUpRight} size="md" aria-hidden="true" />
+            </ButtonLink>
           </section>
         )}
       </Content>

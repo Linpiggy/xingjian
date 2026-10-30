@@ -19,7 +19,7 @@ import {
   type VenueRules,
 } from "@/domain/meal-planning";
 import { draftSchema } from "@/lib/contracts";
-import { useDraftEditor } from "@/features/planner/editor-store";
+import { useDraftEditor } from "@/features/itinerary/legacy/editor-store";
 import { fixtureDraft, places, route } from "../fixtures/draft";
 
 const fresh = () => createEditState(fixtureDraft(), "visit-rules-fixture");

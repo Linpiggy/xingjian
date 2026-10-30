@@ -67,7 +67,12 @@ for (const [days, travelers] of [
     expect(calls).toBe(0);
     await fill(page, days, travelers);
     await expect(page.getByRole("main").getByRole("alert")).toHaveCount(0);
-    await page.getByLabel("出发日期").fill("2026-12-31");
+    // 日期已改为区间控件：验证可打开、可读，并保持表单可提交（不在用例里驱动日历，避免脆弱定位）
+    const rangeTrigger = page.getByRole("button", { name: /出发与返回/ });
+    await expect(rangeTrigger).toHaveAccessibleName(/–/);
+    await rangeTrigger.click();
+    await expect(page.getByRole("dialog")).toBeVisible();
+    await page.keyboard.press("Escape");
     await page.getByRole("button", { name: "偏好与必去", exact: true }).click();
     await page
       .getByRole("button", { name: tripPurposeLabels.nature, exact: true })

@@ -1,5 +1,5 @@
 import { makeDay, makeDraft } from "./draft";
-import type { Coordinate, Draft, Leg, WalkingRoute } from "./models";
+import type { Coordinate, Draft, Leg, Route } from "./models";
 import { emptyBudget, summarizeBudget, type BudgetEstimate } from "./budget";
 import {
   activeMealConnections,
@@ -65,7 +65,7 @@ export type EditProposal = {
   effectiveDraft: Draft;
   meals: MealSetup;
   gaps: RouteGap[];
-  routes: WalkingRoute[] | null;
+  routes: Route[] | null;
   conflicts: string[];
 };
 
@@ -105,7 +105,7 @@ const pairKey = (from: string, to: string) => JSON.stringify([from, to]);
 function buildProposal(
   state: EditState,
   operation: StopChange,
-  resolvedRoutes: WalkingRoute[] | null,
+  resolvedRoutes: Route[] | null,
 ): EditProposal {
   const { draft, locks } = state;
   const origin = locate(draft, operation.placeId);
@@ -285,7 +285,7 @@ export function previewEdit(state: EditState, operation: StopChange): EditPropos
 export function resolveEdit(
   state: EditState,
   proposal: EditProposal,
-  routes: WalkingRoute[],
+  routes: Route[],
 ): EditProposal {
   assertVersion(state, proposal);
   return buildProposal(state, proposal.operation, routes);
@@ -471,7 +471,7 @@ export function previewMeals(
 export function resolveMeals(
   state: EditState,
   proposal: MealProposal,
-  routes: WalkingRoute[],
+  routes: Route[],
 ): MealProposal {
   if (proposal.sessionId !== state.sessionId || proposal.baseVersion !== state.version) {
     throw new Error("行程已变化，请重新预览用餐安排。");

@@ -54,6 +54,11 @@ function assertAiAvailable(): void {
   }
 }
 
+// 修补重试也要计入同一分钟限额，避免静默多计费而不受限
+export function noteModelAttempt(): void {
+  started.push(Date.now());
+}
+
 export async function withAiBudget<T>(operation: () => Promise<T>): Promise<T> {
   assertAiAvailable();
   active = true;

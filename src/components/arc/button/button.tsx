@@ -2,13 +2,71 @@
 
 // Adapted from Arc Library (MIT); see ../LICENSE. Keep layout and labels stable.
 import { forwardRef, useCallback, useRef } from "react";
-import type { ButtonHTMLAttributes, RefObject } from "react";
+import type { AnchorHTMLAttributes, ButtonHTMLAttributes, RefObject } from "react";
+import Link, { type LinkProps } from "next/link";
 import { motion, useReducedMotion } from "motion/react";
 import type { Variants } from "motion/react";
 import { motionTokens } from "../motion-tokens";
 import styles from "./button.module.css";
 
-export type ButtonVariant = "primary" | "secondary" | "ghost" | "danger";
+export type ButtonVariant =
+  "primary" | "secondary" | "ghost" | "danger" | "place" | "marker" | "index" | "icon";
+
+export function buttonClassName({
+  variant = "secondary",
+  size = "md",
+  className,
+}: { variant?: ButtonVariant; size?: "sm" | "md" | "lg"; className?: string } = {}) {
+  return [
+    "arc-component",
+    "arc-button",
+    styles.button,
+    styles[variant],
+    styles[size],
+    className,
+  ]
+    .filter(Boolean)
+    .join(" ");
+}
+
+export const ButtonLink = forwardRef<
+  HTMLAnchorElement,
+  Omit<AnchorHTMLAttributes<HTMLAnchorElement>, "href"> &
+    Pick<LinkProps, "href" | "prefetch" | "replace" | "scroll"> & {
+      variant?: ButtonVariant;
+    }
+>(function ButtonLink({ variant, className, children, ...props }, ref) {
+  return (
+    <Link
+      {...props}
+      ref={ref}
+      className={buttonClassName({ variant, className })}
+      data-arc-button={variant ?? "secondary"}
+    >
+      <span className={styles.labelPhase}>{children}</span>
+    </Link>
+  );
+});
+
+export const DragButton = forwardRef<
+  HTMLButtonElement,
+  ButtonHTMLAttributes<HTMLButtonElement>
+>(function DragButton({ className, children, type = "button", ...props }, ref) {
+  return (
+    <button
+      {...props}
+      ref={ref}
+      type={type}
+      className={buttonClassName({
+        variant: "icon",
+        className: [styles.dragHandle, className].filter(Boolean).join(" "),
+      })}
+      data-arc-button="icon"
+    >
+      <span className={styles.labelPhase}>{children}</span>
+    </button>
+  );
+});
 export interface ButtonProps extends Omit<
   ButtonHTMLAttributes<HTMLButtonElement>,
   "onDrag" | "onDragEnd" | "onDragStart" | "onAnimationStart"
@@ -71,25 +129,16 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
       ref={setRefs}
       type={type}
       tabIndex={props.tabIndex ?? 0}
-      className={[
-        "arc-component",
-        "arc-button",
-        styles.button,
-        styles[variant],
-        styles[size],
-        className
-          ?.split(/\s+/u)
-          .filter((name) => name !== "button" && name !== "primary")
-          .join(" "),
-      ]
-        .filter(Boolean)
-        .join(" ")}
+      className={buttonClassName({ variant, size, className })}
+      data-arc-button={variant}
       disabled={disabled}
       aria-busy={loading || undefined}
       aria-disabled={loading || props["aria-disabled"] || undefined}
       custom={button}
       variants={pressVariants}
-      whileTap={reduced || anchorsLayer || inert ? undefined : "pressed"}
+      whileTap={
+        reduced || anchorsLayer || inert || variant === "marker" ? undefined : "pressed"
+      }
       transition={motionTokens.spring.snappy}
       onClick={inert ? (event) => event.preventDefault() : onClick}
     >

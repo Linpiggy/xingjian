@@ -86,14 +86,15 @@ describe("Amap adapter (mock transport, no paid calls)", () => {
         ],
       },
     });
-    const r = await api.walking([120.1, 30.2], [120.4, 30.5]);
+    const r = await api.route([120.1, 30.2], [120.4, 30.5], "walking");
     expect(r.seconds).toBe(1200);
     expect(r.segments).toHaveLength(2);
   });
   it("missing duration and geometry remain unknown", async () => {
-    const r = await provider({ status: "1", route: { paths: [{}] } }).api.walking(
+    const r = await provider({ status: "1", route: { paths: [{}] } }).api.route(
       [120, 30],
       [120.1, 30.1],
+      "walking",
     );
     expect(r.seconds).toBeNull();
     expect(r.meters).toBeNull();
@@ -101,10 +102,31 @@ describe("Amap adapter (mock transport, no paid calls)", () => {
   });
   it("empty routes return a no-route error", async () => {
     await expect(
-      provider({ status: "1", route: { paths: [] } }).api.walking(
+      provider({ status: "1", route: { paths: [] } }).api.route(
         [120, 30],
         [120.1, 30.1],
+        "walking",
       ),
     ).rejects.toMatchObject({ code: "no_route" });
+  });
+});
+
+describe("driving route queries", () => {
+  it("marks driving results and states the reference caveat", async () => {
+    const r = await provider({
+      status: "1",
+      route: {
+        paths: [
+          {
+            distance: "5200",
+            cost: { duration: "780" },
+            steps: [{ polyline: "120.1,30.2;120.2,30.3" }],
+          },
+        ],
+      },
+    }).api.route([120.1, 30.2], [120.2, 30.3], "driving");
+    expect(r.mode).toBe("driving");
+    expect(r.detail).toContain("未含实时路况");
+    expect(r.meters).toBe(5200);
   });
 });

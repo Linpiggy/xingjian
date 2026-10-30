@@ -14,6 +14,8 @@
 /* Focus strengthens the existing border inward; no extra outside ring. */
 .input {
   width: 100%;
+  min-width: 0;
+  max-width: 100%;
   min-height: var(--control-height);
   padding: 0 var(--space-3);
   border: 1px solid var(--border-strong);
@@ -51,10 +53,19 @@
   }
 }
 .input:focus-visible {
-  border-color: var(--foreground);
+  border-color: var(--control-focus-color, var(--primary));
+  box-shadow: var(--focus-inner);
 }
 .input[aria-invalid="true"] {
+  --control-focus-color: var(--danger);
   border-color: var(--danger);
+}
+.range {
+  width: 100%;
+  min-width: 0;
+  height: var(--control-height);
+  margin: 0;
+  accent-color: var(--primary);
 }
 .input:disabled {
   cursor: not-allowed;
@@ -78,4 +89,48 @@
   .input {
     transition-duration: 0.01ms;
   }
+}
+
+/* 日期 / 时间：原生选择器保留，但把触发区放大到整块右侧，并自绘图标 */
+.control {
+  position: relative;
+  display: block;
+  min-width: 0;
+}
+.hasAffordance {
+  padding-right: 44px;
+}
+.hasAffordance::-webkit-calendar-picker-indicator {
+  position: absolute;
+  inset: 0 0 0 auto;
+  width: 44px;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+.pickerIcon {
+  position: absolute;
+  top: 0;
+  right: 0;
+  display: grid;
+  width: 44px;
+  height: 100%;
+  place-items: center;
+  color: var(--text-muted);
+  pointer-events: none;
+  transition: color var(--duration-fast) var(--ease-standard);
+}
+.control:hover .pickerIcon,
+.control:focus-within .pickerIcon {
+  color: var(--accent-strong);
+}
+.pickerIcon svg {
+  width: 18px;
+  height: 18px;
+}
+.input[type="date"],
+.input[type="time"] {
+  font-variant-numeric: tabular-nums;
 }

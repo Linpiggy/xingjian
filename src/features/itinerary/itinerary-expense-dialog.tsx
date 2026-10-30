@@ -11,6 +11,8 @@ import { emptyItineraryExpenses, expenseIncluded } from "@/domain/itinerary-expe
 import { itineraryExpensesSchema } from "@/lib/itinerary-contracts";
 import { parseYuanFen } from "@/lib/money";
 import { expenseLabels } from "./itinerary-expense-view";
+import { ArcIcon } from "@/components/arc/icon/icon";
+import { Input, Select } from "@/components/arc/input/input";
 
 export function ItineraryExpenseDialog({
   plan,
@@ -102,7 +104,7 @@ export function ItineraryExpenseDialog({
           aria-label="关闭费用估算"
           onClick={() => ref.current?.close()}
         >
-          <X size={18} aria-hidden="true" />
+          <ArcIcon icon={X} size="md" aria-hidden="true" />
         </Button>
       </header>
       <form onSubmit={preview} noValidate onInput={() => setError(null)}>
@@ -120,7 +122,7 @@ export function ItineraryExpenseDialog({
               <label htmlFor={`expense-${category}`}>
                 全程{expenseLabels[category]}费用（元）
               </label>
-              <input
+              <Input
                 id={`expense-${category}`}
                 name={`${category}-amount`}
                 inputMode="decimal"
@@ -134,19 +136,19 @@ export function ItineraryExpenseDialog({
               <label htmlFor={`expense-${category}-basis`}>
                 {expenseLabels[category]}金额口径
               </label>
-              <select
+              <Select
                 id={`expense-${category}-basis`}
                 name={`${category}-basis`}
                 defaultValue={previous.items[category].basis}
               >
                 <option value="per_person">每位同行者，全程</option>
                 <option value="trip">全部同行者合计，全程</option>
-              </select>
+              </Select>
             </fieldset>
           ))}
         </div>
         <label className="trip-expense-ack">
-          <input type="checkbox" name="acknowledgeOver" />
+          <Input type="checkbox" name="acknowledgeOver" />
           我已知晓已填估算可能超过预算目标，仍按此记录；不自动增加预算
         </label>
         {error && (
@@ -155,12 +157,10 @@ export function ItineraryExpenseDialog({
           </p>
         )}
         <footer>
-          <Button type="submit" variant="primary" className="button primary">
+          <Button type="submit" variant="primary">
             预览费用估算
           </Button>
-          <Button className="button" onClick={() => ref.current?.close()}>
-            暂不修改费用
-          </Button>
+          <Button onClick={() => ref.current?.close()}>暂不修改费用</Button>
         </footer>
       </form>
     </Dialog>

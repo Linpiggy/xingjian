@@ -44,7 +44,7 @@ describe("generation failure regressions, offline only", () => {
   it("does not charge the AI attempt budget when candidate discovery fails before the model", async () => {
     vi.resetModules();
     const { createItinerary } = await import("@/server/services/create-itinerary");
-    const provider = { search: vi.fn(async () => []), walking: vi.fn() };
+    const provider = { search: vi.fn(async () => []), route: vi.fn() };
     const model = { model: "fixture-model", compose: vi.fn() };
     for (let index = 0; index < 4; index++) {
       await expect(
@@ -228,7 +228,7 @@ describe("generation failure regressions, offline only", () => {
     ).resolves.toEqual(outline);
     const invalid = vi
       .fn<typeof fetch>()
-      .mockResolvedValue(response("explanation " + JSON.stringify(outline)));
+      .mockImplementation(async () => response("explanation " + JSON.stringify(outline)));
     await expect(
       new OpenAiItineraryModel(config, invalid).compose(
         fixtureBrief(),
@@ -237,7 +237,8 @@ describe("generation failure regressions, offline only", () => {
       ),
     ).rejects.toMatchObject({ code: "ai_invalid_json" });
     expect(transport).toHaveBeenCalledOnce();
-    expect(invalid).toHaveBeenCalledOnce();
+    // prose + JSON 属于正文非法：修补重试一次后仍失败
+    expect(invalid).toHaveBeenCalledTimes(2);
   });
 
   it("preserves bounded upstream cooldown metadata without retrying", async () => {

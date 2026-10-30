@@ -5,7 +5,7 @@ import { searchFixture } from "./fixtures";
 test("map container retains width and height after SDK positioning override", async ({
   page,
 }) => {
-  await page.goto("/manual");
+  await page.goto("/plan");
   await searchFixture(page);
   await page.getByRole("button", { name: "地图选点", exact: true }).click();
   const region = page.getByRole("region", { name: "自定义点选地图" });

@@ -8,7 +8,7 @@ function fixtureProvider() {
     search: vi.fn(async (_city: string, keyword: string) =>
       places.filter((p) => p.name === keyword),
     ),
-    walking: vi.fn(async () => route),
+    route: vi.fn(async () => route),
   };
 }
 describe("draft service", () => {
@@ -16,7 +16,7 @@ describe("draft service", () => {
     const provider = fixtureProvider();
     const draft = await createDraft(input, provider);
     expect(provider.search).toHaveBeenCalledTimes(4);
-    expect(provider.walking).toHaveBeenCalledTimes(2);
+    expect(provider.route).toHaveBeenCalledTimes(2);
     expect(draft.status).toBe("unverified");
     expect(draft.days).toHaveLength(2);
   });
@@ -73,7 +73,7 @@ describe("draft service", () => {
   });
   it("keeps a draft with explicit route failure and unknown later timing", async () => {
     const provider = fixtureProvider();
-    provider.walking.mockRejectedValue(new ProviderError("unavailable", "测试路线失败"));
+    provider.route.mockRejectedValue(new ProviderError("unavailable", "测试路线失败"));
     const draft = await createDraft(input, provider);
     expect(draft.days[0].legs[0].route).toBeNull();
     expect(draft.days[0].items[1].startMinute).toBeNull();

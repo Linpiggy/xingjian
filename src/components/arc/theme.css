@@ -1,4 +1,4 @@
-/* Arc's free component tokens, scoped to adapted components; no foundation reset. */
+/* Arc's free component roles alias the single root scale; no foundation reset. */
 .arc-component {
   --background: var(--surface);
   --foreground: var(--fg);
@@ -7,47 +7,30 @@
   --text-secondary: var(--muted);
   --text-muted: var(--muted);
   --accent: var(--primary);
-  --accent-strong: var(--primary);
+  --accent-strong: var(--primary-strong);
   --accent-subtle: var(--soft);
   --success: var(--primary);
-  --warning: #704522;
-  --danger: #913c2f;
-  --space-1: 4px;
-  --space-2: 8px;
-  --space-3: 12px;
-  --space-4: 16px;
-  --space-5: 20px;
-  --space-6: 24px;
-  --space-8: 32px;
-  --space-12: 48px;
-  --control-height-sm: 44px;
-  --control-height-md: 44px;
-  --control-height-lg: 48px;
-  --radius-control: 8px;
-  --radius-pill: 6px;
-  --text-xs: 12px;
-  --text-sm: 14px;
-  --text-base: 16px;
-  --text-lg: 18px;
-  --leading-body: 1.7;
-  --tracking-body: 0;
-  --duration-instant: 0ms;
-  --duration-fast: 160ms;
-  --duration-standard: 240ms;
-  --ease-standard: cubic-bezier(0.22, 1, 0.36, 1);
-  --shadow-resting: 0 1px 2px #243d2d0a;
-}
-.arc-component:focus-visible,
-.arc-component :focus-visible {
-  outline: 2px solid #26735e;
-  outline-offset: 2px;
-}
-.arc-component [role="tab"]:focus-visible {
-  outline-offset: -2px;
+  --warning: var(--warning-ink);
+  /* 上游组件引用的浮层与弹簧变量：本仓库原先缺这三项，导致菜单背景失效（透明） */
+  --surface-raised: var(--surface);
+  --radius-panel: var(--radius-surface);
+  --duration-spring: 0.32s;
+  --ease-spring: var(--ease-standard);
+  --control-height-sm: var(--control-height);
+  --control-height-md: var(--control-height);
+  --control-height-lg: var(--control-height);
+  --radius-pill: var(--radius-tag);
+  --text-xs: var(--font-note);
+  --text-sm: var(--font-body);
+  --text-base: var(--font-emphasis);
+  --text-lg: var(--font-subheading);
+  font-family: var(--font-family);
+  line-height: var(--leading-body);
+  letter-spacing: var(--tracking-body);
 }
 @media (prefers-reduced-motion: reduce) {
   .arc-component {
-    --duration-fast: 0ms;
-    --duration-standard: 0ms;
+    --duration-fast: var(--duration-instant);
+    --duration-standard: var(--duration-instant);
   }
 }

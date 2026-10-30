@@ -1,7 +1,7 @@
 import { z } from "zod";
 import type { ManualIntercitySegment } from "@/domain/intercity";
 import { intercityTimeZone } from "@/domain/intercity";
-import { coordinateSchema, walkingSchema } from "./contracts";
+import { coordinateSchema, routeSchema } from "./contracts";
 
 const station = z.strictObject({
   id: z.string().regex(/^station:[a-zA-Z0-9-]{1,60}$/),
@@ -49,7 +49,7 @@ const connection = z.strictObject({
   fromId: z.string().min(1).max(100),
   toId: z.string().min(1).max(100),
   seconds: z.number().int().min(0).max(86_400).nullable(),
-  source: walkingSchema.shape.source,
+  source: routeSchema.shape.source,
 });
 
 export const intercitySegmentsSchema = z

@@ -1,7 +1,7 @@
 import type { Coordinate, Draft, Stop } from "./models";
 import type { StopLock } from "./editing";
 import { makeDay, makeDraft } from "./draft";
-import type { WalkingRoute } from "./models";
+import type { Route } from "./models";
 import {
   scheduleMealDay,
   scheduleVisitDay,
@@ -55,7 +55,7 @@ export const deferredVisitRoute = "该景点邻段尚未单独查询。";
 export function mergeMealConnections(
   setup: MealSetup,
   gaps: MealRouteGap[],
-  routes: WalkingRoute[],
+  routes: Route[],
 ): MealSetup {
   if (gaps.length !== routes.length) {
     throw new Error("路线结果与受影响路段不一致，未应用修改。");

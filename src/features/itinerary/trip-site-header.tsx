@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Compass } from "lucide-react";
 import type { MouseEvent } from "react";
+import { ArcIcon } from "@/components/arc/icon/icon";
 
 export function TripSiteHeader({
   beforeNavigate,
@@ -45,7 +46,7 @@ export function TripSiteHeader({
   return (
     <header className="trip-site-header">
       <Link href="/" className="trip-brand" onClick={protectDraft}>
-        <Compass size={24} aria-hidden="true" />
+        <ArcIcon icon={Compass} size="lg" aria-hidden="true" />
         行间
       </Link>
       <span className="trip-header-divider" aria-hidden="true" />

@@ -204,7 +204,8 @@
 .trip-fields label > span > svg {
   color: #5a7461;
 }
-.trip-fields :is(input, select, textarea):not(.arc-control) {
+/* 只作用于旧版“label 直接包住原生控件”的写法，避免泄漏到组件内部输入框 */
+.trip-fields > label > :is(input, select, textarea):not(.arc-control) {
   width: 100%;
   min-width: 0;
   min-height: var(--control-height);
@@ -214,10 +215,21 @@
   color: var(--fg);
   background: var(--surface);
 }
-.trip-fields textarea:not(.arc-control) {
+.trip-fields > label > textarea:not(.arc-control) {
   min-height: 112px;
   resize: vertical;
   line-height: 1.7;
+}
+.brief-range {
+  display: grid;
+  min-width: 0;
+  gap: 8px;
+  align-content: start;
+}
+.brief-range-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: #35463a;
 }
 .trip-fields small {
   font-size: 12px;
@@ -476,6 +488,33 @@
   font-weight: 600;
   letter-spacing: 0.08em;
   margin-bottom: 12px;
+}
+.trip-cover-photo {
+  position: relative;
+  width: 100%;
+  height: clamp(180px, 26vw, 280px);
+  margin-bottom: 20px;
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--trip-soft);
+}
+.trip-cover-photo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  display: block;
+}
+/* 图片只做氛围，不压标题可读性 */
+.trip-cover-photo::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    180deg,
+    rgba(247, 245, 239, 0) 55%,
+    rgba(247, 245, 239, 0.72) 100%
+  );
 }
 .trip-cover-meta {
   display: flex;

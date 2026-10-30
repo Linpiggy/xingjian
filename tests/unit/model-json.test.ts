@@ -14,7 +14,9 @@ describe("model JSON failure boundaries", () => {
     "distinguishes invalid upstream envelope without leaking raw data: %s",
     async (body) => {
       const warning = vi.spyOn(console, "warn").mockImplementation(() => undefined);
-      const transport = vi.fn<typeof fetch>().mockResolvedValue(new Response(body));
+      const transport = vi
+        .fn<typeof fetch>()
+        .mockImplementation(async () => new Response(body));
       await expect(
         new OpenAiItineraryModel(config, transport).compose(
           fixtureBrief(),
@@ -23,10 +25,7 @@ describe("model JSON failure boundaries", () => {
         ),
       ).rejects.toMatchObject({ code: "ai_upstream_invalid_json" });
       expect(transport).toHaveBeenCalledOnce();
-      expect(warning).toHaveBeenCalledWith(
-        "[itinerary-json-rejected]",
-        expect.objectContaining({ layer: "upstream" }),
-      );
+      expect(String(warning.mock.calls[0]?.[0])).toContain('"layer":"upstream"');
       expect(JSON.stringify(warning.mock.calls)).not.toContain("private");
     },
   );
@@ -53,7 +52,11 @@ describe("model JSON failure boundaries", () => {
         },
       ],
     });
-    const transport = vi.fn<typeof fetch>().mockResolvedValue(response);
+    const transport = vi
+      .fn<typeof fetch>()
+      .mockImplementation(
+        async () => new Response(await response.clone().text(), response),
+      );
     await expect(
       new OpenAiItineraryModel(config, transport).compose(
         fixtureBrief(),
@@ -64,12 +67,12 @@ describe("model JSON failure boundaries", () => {
       code: "ai_invalid_json",
       message: expect.stringContaining("字符串转义错误"),
     });
-    expect(warning).toHaveBeenCalledWith(
-      "[itinerary-json-rejected]",
-      expect.objectContaining({ layer: "content", category: "control_character" }),
+    expect(String(warning.mock.calls[0]?.[0])).toContain(
+      '"category":"control_character"',
     );
     expect(JSON.stringify(warning.mock.calls)).not.toContain("private");
-    expect(transport).toHaveBeenCalledOnce();
+    // 修补重试：转义错误会再请求一次（同一份坏响应），仍应失败且不泄露内容
+    expect(transport).toHaveBeenCalledTimes(2);
   });
   it("never includes engine snippets or unknown error strings in diagnostic metadata", () => {
     const summary = jsonFailureSummary(

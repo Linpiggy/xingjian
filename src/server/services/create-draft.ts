@@ -78,7 +78,7 @@ export async function createDraft(
         legs.push({
           fromId: from.id,
           toId: to.id,
-          route: await provider.walking(from.location, to.location),
+          route: await provider.route(from.location, to.location, "walking"),
           error: null,
         });
       } catch (error) {

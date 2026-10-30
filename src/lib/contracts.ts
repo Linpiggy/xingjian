@@ -40,11 +40,12 @@ export const placeSchema = z.object({
   openingHours: z.string().nullable(),
   source: sourceSchema,
 });
-export const walkingSchema = z.object({
-  mode: z.literal("walking"),
+export const routeSchema = z.object({
+  mode: z.enum(["walking", "driving", "transit"]),
   meters: z.number().nonnegative().nullable(),
   seconds: z.number().nonnegative().nullable(),
   segments: z.array(z.array(coordinateSchema)),
+  detail: z.string().max(120).nullable(),
   source: sourceSchema,
 });
 export const tripInputSchema = z
@@ -110,7 +111,7 @@ export const searchInputSchema = z.object({
 const legSchema = z.object({
   fromId: z.string(),
   toId: z.string(),
-  route: walkingSchema.nullable(),
+  route: routeSchema.nullable(),
   error: z.string().nullable(),
 });
 const daySchema = z.object({

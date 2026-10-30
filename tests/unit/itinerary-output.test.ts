@@ -67,12 +67,17 @@ describe("bounded compact model protocol", () => {
       expect(() => parseItineraryOutput(JSON.stringify(wire), candidates)).toThrow();
     }
   });
-  it("cannot accept prose fragments, invalid commas or a truncated object", () => {
+  it("cannot accept prose fragments or a truncated object", () => {
     const wire = compact();
     const text = JSON.stringify(wire);
-    for (const value of [text.slice(0, -1), `${text.slice(0, -1)},}`, `解释：${text}`]) {
+    for (const value of [text.slice(0, -1), `解释：${text}`]) {
       expect(() => parseItineraryOutput(value, candidates)).toThrow();
     }
+  });
+  it("tolerates one trailing comma before the closing brace", () => {
+    const text = JSON.stringify(compact());
+    const repaired = `${text.slice(0, -1)},}`;
+    expect(() => parseItineraryOutput(repaired, candidates)).not.toThrow();
   });
   it("drops unknown keys instead of discarding a recognisable plan", () => {
     const wire = compact();
@@ -191,5 +196,29 @@ describe("local reconciliation of valid duplicate visit choices", () => {
         .flatMap((day) => day.visits)
         .some((choice) => choice.placeId === privatePoint.place.id),
     ).toBe(false);
+  });
+});
+
+describe("deterministic structural repairs", () => {
+  it("accepts a meal wrapped in one stray object and still validates the schema", () => {
+    const text = JSON.stringify(compact());
+    const wrapped = text
+      .replace(/,"lunch":/u, ',{"lunch":')
+      .replace(/(,"dinner":)/u, "}$1");
+    expect(wrapped).not.toBe(text);
+    expect(() => parseItineraryOutput(wrapped, candidates)).not.toThrow();
+  });
+  it("accepts the real failure shape: one stray open brace before lunch", () => {
+    const text = JSON.stringify(compact());
+    // 真实样本：...,{"lunch":{...},"dinner":{...}} —— 只多了一个开括号，收括号由外层复用
+    const broken = text.replace(/,"lunch":/u, ',{"lunch":');
+    expect(broken).not.toBe(text);
+    expect(() => parseItineraryOutput(broken, candidates)).not.toThrow();
+  });
+  it("keeps rejecting unrelated structural damage", () => {
+    const text = JSON.stringify(compact());
+    expect(() =>
+      parseItineraryOutput(text.replace(/,"visits":/u, ',{"visits":'), candidates),
+    ).toThrow();
   });
 });

@@ -5,6 +5,7 @@ import {
   ArrowUpRight,
   Clock3,
   Footprints,
+  Car,
   Map,
   MapPin,
   Utensils,
@@ -16,7 +17,7 @@ import {
   GripVertical,
 } from "lucide-react";
 import type { Itinerary } from "@/domain/itinerary";
-import { Button } from "@/components/arc/button/button";
+import { Button, DragButton } from "@/components/arc/button/button";
 import { Badge } from "@/components/arc/badge/badge";
 import { Disclosure } from "@/components/arc/disclosure/disclosure";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/arc/tabs/tabs";
@@ -32,13 +33,15 @@ import { RouteMap } from "@/features/map/route-map";
 import { useWideScreen } from "@/features/map/use-wide-screen";
 import { PlaceDetailsDialog } from "./place-details-dialog";
 import type { ItineraryChange } from "@/domain/itinerary-editing";
-import { WeatherPanel } from "@/features/planner/weather-panel";
+import { WeatherPanel } from "./weather-panel";
 import { ItineraryExpenseSummary } from "./itinerary-expense-view";
 import { ItineraryExpenseDialog } from "./itinerary-expense-dialog";
 import { DayOverview } from "./day-overview";
+import { destinationCover } from "./destination-cover";
 import { PlacePhoto } from "./place-photo";
 import "./map-workspace.css";
 import "./itinerary-usability.css";
+import { ArcIcon } from "@/components/arc/icon/icon";
 
 const money = (fen: number) =>
   new Intl.NumberFormat("zh-CN", { style: "currency", currency: "CNY" }).format(
@@ -52,7 +55,13 @@ const labels = {
   tickets: "门票",
 };
 const purposes = { visit: "游览", breakfast: "早餐", lunch: "午餐", dinner: "晚餐" };
-const colors = ["#203e35", "#4c7566", "#819c8c", "#b2bfa8", "#d9dfd2"];
+const colors = [
+  "var(--budget-1)",
+  "var(--budget-2)",
+  "var(--budget-3)",
+  "var(--budget-4)",
+  "var(--budget-5)",
+];
 export function ItineraryBook({
   plan,
   mapKey,
@@ -141,6 +150,7 @@ export function ItineraryBook({
   const day = plan.days[currentDay];
   const schedule = day.schedule;
   const total = briefBudget(plan.brief).totalFen;
+  const coverSrc = destinationCover(plan.brief.destinationCity);
   const socialReferences =
     plan.brief.socialInspiration ??
     (plan.socialSource?.status === "available"
@@ -191,7 +201,6 @@ export function ItineraryBook({
               <span>{selectedItem?.activity.place.name ?? day.date}</span>
             </div>
             <Button
-              className="button"
               onClick={() => {
                 dayHeading.current?.scrollIntoView({
                   block: "start",
@@ -202,7 +211,7 @@ export function ItineraryBook({
                   ?.focus({ preventScroll: true });
               }}
             >
-              查看当天安排 <ChevronRight size={15} aria-hidden="true" />
+              查看当天安排 <ArcIcon icon={ChevronRight} size="sm" aria-hidden="true" />
             </Button>
           </div>
           <RouteMap
@@ -216,7 +225,7 @@ export function ItineraryBook({
         </section>
       ) : (
         <div className="map-workspace-empty">
-          <Map size={32} aria-hidden="true" />
+          <ArcIcon icon={Map} size="lg" aria-hidden="true" />
           <h2>这一天没有可定位的活动</h2>
           <p>保留抵达与休息安排；可切换其他日期，不会补造地点或路线。</p>
         </div>
@@ -292,6 +301,12 @@ export function ItineraryBook({
       onValueChange={(value) => chooseDay(Number(value))}
     >
       <section className="trip-cover" aria-label="完整旅行方案总览">
+        {coverSrc && (
+          <div className="trip-cover-photo" aria-hidden="true">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={coverSrc} alt="" />
+          </div>
+        )}
         <div className="trip-cover-meta">
           <span>{tripPurposeLabels[plan.brief.mainPurpose]}</span>
           <Badge variant={plan.status === "infeasible" ? "danger" : "warning"}>
@@ -304,15 +319,15 @@ export function ItineraryBook({
         <div className="trip-cover-bottom">
           <div className="trip-cover-facts">
             <span>
-              <MapPin size={16} aria-hidden="true" />
+              <ArcIcon icon={MapPin} size="md" aria-hidden="true" />
               {plan.brief.destinationCity}
             </span>
             <span>
-              <CalendarDays size={16} aria-hidden="true" />
+              <ArcIcon icon={CalendarDays} size="md" aria-hidden="true" />
               {plan.brief.startDate} · {plan.brief.dayCount} 天
             </span>
             <span>
-              <Users size={16} aria-hidden="true" />
+              <ArcIcon icon={Users} size="md" aria-hidden="true" />
               {plan.brief.travelers} 人
             </span>
             <span>全体预算目标 {money(total)}</span>
@@ -320,8 +335,8 @@ export function ItineraryBook({
           <Disclosure className="trip-cover-intro" title="查看规划思路">
             <p>{plan.summary}</p>
           </Disclosure>
-          <Button className="button" onClick={onEdit}>
-            调整旅行需求 <ArrowUpRight size={15} aria-hidden="true" />
+          <Button onClick={onEdit}>
+            调整旅行需求 <ArcIcon icon={ArrowUpRight} size="sm" aria-hidden="true" />
           </Button>
         </div>
       </section>
@@ -378,7 +393,6 @@ export function ItineraryBook({
               </div>
               <div className="trip-day-actions">
                 <Button
-                  className="button"
                   onClick={() =>
                     mapAnchor.current?.scrollIntoView({
                       block: "start",
@@ -386,15 +400,14 @@ export function ItineraryBook({
                     })
                   }
                 >
-                  <Map size={16} aria-hidden="true" />
+                  <ArcIcon icon={Map} size="md" aria-hidden="true" />
                   查看地图
                 </Button>
                 <Button
-                  className="button"
                   disabled={currentDay === plan.days.length - 1}
                   onClick={() => chooseDay(currentDay + 1)}
                 >
-                  下一天 <ChevronRight size={15} aria-hidden="true" />
+                  下一天 <ArcIcon icon={ChevronRight} size="sm" aria-hidden="true" />
                 </Button>
               </div>
             </div>
@@ -434,11 +447,18 @@ export function ItineraryBook({
                     style={{ animationDelay: `${index * 35}ms` }}
                   >
                     {leg && (
-                      <p className="trip-transfer">
-                        <Footprints size={14} aria-hidden="true" />
+                      <p
+                        className="trip-transfer"
+                        data-mode={leg.route?.mode ?? "unknown"}
+                      >
+                        <ArcIcon
+                          icon={leg.route?.mode === "driving" ? Car : Footprints}
+                          size="sm"
+                          aria-hidden="true"
+                        />
                         {leg.route?.seconds == null
-                          ? "步行耗时待核实，后续时间未知"
-                          : `步行约 ${Math.ceil(leg.route.seconds / 60)} 分钟${leg.route.meters == null ? "" : ` · ${(leg.route.meters / 1000).toFixed(1)} km`}`}
+                          ? "交通耗时待核实，后续时间未知"
+                          : `${leg.route.mode === "driving" ? "打车／驾车约" : "步行约"} ${Math.ceil(leg.route.seconds / 60)} 分钟${leg.route.meters == null ? "" : ` · ${(leg.route.meters / 1000).toFixed(1)} km`}`}
                         <span>另留 10 分钟缓冲</span>
                       </p>
                     )}
@@ -457,7 +477,7 @@ export function ItineraryBook({
                       onDrop={(event) => drop(event, index)}
                     >
                       {wide && onActivityChange && item.activity.kind === "visit" && (
-                        <button
+                        <DragButton
                           type="button"
                           className="trip-drag-handle"
                           aria-label={`调整${item.activity.place.name}的位置`}
@@ -495,8 +515,8 @@ export function ItineraryBook({
                             setDropTarget(null);
                           }}
                         >
-                          <GripVertical size={18} aria-hidden="true" />
-                        </button>
+                          <ArcIcon icon={GripVertical} size="md" aria-hidden="true" />
+                        </DragButton>
                       )}
                       <div className="trip-activity-top">
                         <time>{formatMinute(item.startMinute)}</time>
@@ -512,20 +532,21 @@ export function ItineraryBook({
                         </span>
                         {item.activity.positionLocked && (
                           <span className="trip-position-lock">
-                            <Lock size={12} aria-hidden="true" />
+                            <ArcIcon icon={Lock} size="sm" aria-hidden="true" />
                             位置已锁
                           </span>
                         )}
                         {item.activity.fixedStartMinute !== null && (
                           <span className="trip-time-lock">
-                            <Lock size={12} aria-hidden="true" />
+                            <ArcIcon icon={Lock} size="sm" aria-hidden="true" />
                             时间锁 {formatMinute(item.activity.fixedStartMinute)}
                           </span>
                         )}
                       </div>
                       <div className="trip-activity-body">
                         <div className="trip-place-heading">
-                          <button
+                          <Button
+                            variant="place"
                             type="button"
                             className="trip-place-select"
                             aria-pressed={selected === item.activity.id}
@@ -533,13 +554,13 @@ export function ItineraryBook({
                           >
                             <span>
                               {item.activity.kind === "visit" ? (
-                                <MapPin size={17} aria-hidden="true" />
+                                <ArcIcon icon={MapPin} size="md" aria-hidden="true" />
                               ) : (
-                                <Utensils size={17} aria-hidden="true" />
+                                <ArcIcon icon={Utensils} size="md" aria-hidden="true" />
                               )}
                               {item.activity.place.name}
                             </span>
-                          </button>
+                          </Button>
                           <Button
                             variant="ghost"
                             id={`edit-activity-${item.activity.id}`}
@@ -669,7 +690,7 @@ export function ItineraryBook({
               onToggle={(event) => setWeatherOpen(event.currentTarget.open)}
             >
               <summary>
-                <CloudSun size={17} aria-hidden="true" />
+                <ArcIcon icon={CloudSun} size="md" aria-hidden="true" />
                 当天天气与出行提示
               </summary>
               {weatherOpen &&
@@ -789,7 +810,7 @@ export function ItineraryBook({
         />
       )}
       <p className="trip-page-footnote">
-        <Clock3 size={14} aria-hidden="true" />
+        <ArcIcon icon={Clock3} size="sm" aria-hidden="true" />
         行程暂存于当前页面，刷新会清空。时间为估算，开放、预约、天气和实际费用请在出行前再次确认。
       </p>
     </Tabs>

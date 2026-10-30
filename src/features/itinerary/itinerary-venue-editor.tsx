@@ -5,8 +5,9 @@ import { z } from "zod";
 import type { ScheduledActivity } from "@/domain/meal-planning";
 import type { ItineraryChange } from "@/domain/itinerary-editing";
 import { reservationKey } from "@/domain/meal-reservations";
-import { initialVenueFields, buildVenueRules } from "@/features/planner/venue-form";
-import { VenueRulesFields } from "@/features/planner/venue-rules-fields";
+import { initialVenueFields, buildVenueRules } from "./venue-form";
+import { VenueRulesFields } from "./venue-rules-fields";
+import { Button } from "@/components/arc/button/button";
 
 export function ItineraryVenueEditor({
   date,
@@ -71,9 +72,7 @@ export function ItineraryVenueEditor({
             setError(null);
           }}
         />
-        <button type="submit" className="button">
-          预览营业与预约
-        </button>
+        <Button type="submit">预览营业与预约</Button>
         {error && (
           <p role="alert" className="trip-error" aria-label="营业预约填写错误">
             {error}

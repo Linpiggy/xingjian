@@ -35,3 +35,7 @@ test-results/
 # OS files
 .DS_Store
 Thumbs.db
+
+# local design iteration shots
+shots/
+shots.config.ts

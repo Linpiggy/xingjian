@@ -44,17 +44,18 @@ body .trip-app .trip-primary-nav a[aria-current="page"] {
   background: var(--trip-soft);
   color: var(--trip-accent);
 }
-body .trip-app :focus-visible {
+body .trip-app :focus-visible:not([role="spinbutton"]) {
   outline: 2px solid #26735e;
   outline-offset: 2px;
 }
+/* 只给旧式裸控件画内描边；Arc 组件（如 number-field 的 spinbutton）自带焦点样式，不能被这里再套一层方框 */
 body
   .trip-app
   :is(
-    input:not([type="checkbox"], [type="radio"], [type="range"]),
+    input:not([type="checkbox"], [type="radio"], [type="range"], [role="spinbutton"]),
     select,
     textarea
-  ):focus {
+  ):not(.arc-control):focus {
   outline: none;
   border-color: var(--control-focus-color, var(--primary));
   box-shadow: inset 0 0 0 1px var(--control-focus-color, var(--primary));

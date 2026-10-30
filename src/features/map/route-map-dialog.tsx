@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { X } from "lucide-react";
 import { Button } from "@/components/arc/button/button";
 import { Dialog } from "@/components/arc/dialog/dialog";
+import { ArcIcon } from "@/components/arc/icon/icon";
 
 export function RouteMapDialog({
   date,
@@ -33,7 +34,7 @@ export function RouteMapDialog({
           )}
         </div>
         <Button aria-label="收起放大地图" onClick={onClose}>
-          <X size={20} aria-hidden="true" />
+          <ArcIcon icon={X} size="md" aria-hidden="true" />
         </Button>
       </header>
       {children}

@@ -7,18 +7,23 @@ import type {
   SelectHTMLAttributes,
   TextareaHTMLAttributes,
 } from "react";
+import { CalendarDays, Clock } from "lucide-react";
+import { ArcIcon } from "../icon/icon";
 import styles from "./input.module.css";
 
 export interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   label?: string;
   description?: string;
   error?: string;
+  /** 日期／时间输入右侧的原生选择器热区图标 */
+  affordance?: "date" | "time";
 }
 export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
   {
     label,
     description,
     error,
+    affordance,
     className,
     id,
     "aria-describedby": describedBy,
@@ -31,7 +36,8 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
   const inputId = id ?? generated;
   const messageId = `${inputId}-message`;
   const message = error || description;
-  const control = (
+  const PickerIcon = affordance === "time" ? Clock : CalendarDays;
+  const field = (
     <input
       {...props}
       ref={ref}
@@ -40,7 +46,12 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
         "arc-component",
         "arc-control",
         "arc-input",
-        styles.input,
+        props.type === "checkbox" || props.type === "radio"
+          ? styles.checkbox
+          : props.type === "range"
+            ? styles.range
+            : styles.input,
+        affordance ? styles.hasAffordance : undefined,
         label ? undefined : className,
       ]
         .filter(Boolean)
@@ -50,6 +61,16 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
         [describedBy, message ? messageId : null].filter(Boolean).join(" ") || undefined
       }
     />
+  );
+  const control = affordance ? (
+    <span className={styles.control}>
+      {field}
+      <span className={styles.pickerIcon} aria-hidden="true">
+        <ArcIcon icon={PickerIcon} size="md" />
+      </span>
+    </span>
+  ) : (
+    field
   );
   if (!label) {
     return control;

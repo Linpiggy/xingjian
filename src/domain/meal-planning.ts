@@ -1,4 +1,4 @@
-import type { Place, WalkingRoute } from "./models";
+import type { Place, Route } from "./models";
 import { atShanghaiMinute } from "./intercity";
 
 // Day-relative minutes. End is exclusive; an activity may finish exactly at closing.
@@ -31,7 +31,7 @@ export type DayActivity = {
 export type ActivityLeg = {
   fromActivityId: string;
   toActivityId: string;
-  route: WalkingRoute | null;
+  route: Route | null;
 };
 export type MealDayInput = {
   date: string;

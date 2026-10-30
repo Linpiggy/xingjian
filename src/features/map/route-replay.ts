@@ -10,6 +10,8 @@ export type ReplayPart = {
   gapBefore: boolean;
   from: string;
   to: string;
+  legDistance: number;
+  suggested: "walk" | "transit";
 };
 export type ReplayTrack = {
   parts: ReplayPart[];
@@ -85,6 +87,9 @@ export function routeReplay(day: Day): ReplayTrack {
         gapBefore: false,
         from: day.items[index].place.name,
         to: day.items[index + 1].place.name,
+        legDistance: day.legs[index]?.route?.meters ?? 0,
+        // 跟随实际查询到的交通方式：驾车/打车查出来的段用车辆图标
+        suggested: day.legs[index]?.route?.mode === "driving" ? "transit" : "walk",
       });
     }
     if (parts.length === before) {

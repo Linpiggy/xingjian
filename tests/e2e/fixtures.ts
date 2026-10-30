@@ -2,10 +2,9 @@ import { expect, type Page } from "@playwright/test";
 import { places } from "../fixtures/draft";
 
 export async function openPlanningTools(page: Page) {
-  await expect(
-    page.getByRole("tablist", { name: "规划方式", exact: true }),
-  ).toBeVisible();
-  await expect(page.getByRole("tab", { name: /手动选点/ })).toHaveCount(1);
+  // 单一工作台：手动选点模式已移除，这里只确认规划表单已就绪
+  await expect(page.getByRole("heading", { name: "规划旅行" })).toBeVisible();
+  await expect(page.locator(".trip-brief-form")).toHaveCount(1);
 }
 export async function searchFixture(page: Page) {
   await page.route("**/api/places?*", (route) => route.fulfill({ json: { places } }));

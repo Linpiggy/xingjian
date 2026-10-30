@@ -3,6 +3,7 @@ import type { Coordinate, Day } from "@/domain/models";
 import { stopIdentity } from "@/domain/meals";
 import { routeProjection } from "./route-replay";
 import { routeMapPaths } from "./route-presentation";
+import { Button } from "@/components/arc/button/button";
 
 export function RouteDiagram({
   day,
@@ -55,7 +56,7 @@ export function RouteDiagram({
               key={index}
               points={segment.path.map((point) => project(point).join(",")).join(" ")}
               fill="none"
-              stroke="#33734f"
+              stroke="var(--map-route)"
               strokeWidth={selectedId && segment.activityIds.includes(selectedId) ? 6 : 4}
               strokeOpacity={
                 !selectedId || segment.activityIds.includes(selectedId) ? 1 : 0.25
@@ -68,7 +69,8 @@ export function RouteDiagram({
       {day.items.map((item, index) => {
         const [x, y] = project(item.place.location);
         return (
-          <button
+          <Button
+            variant="marker"
             key={stopIdentity(item)}
             type="button"
             tabIndex={-1}
@@ -84,7 +86,7 @@ export function RouteDiagram({
             onClick={() => onSelect(stopIdentity(item))}
           >
             {index + 1}
-          </button>
+          </Button>
         );
       })}
       {position && (

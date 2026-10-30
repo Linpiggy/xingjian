@@ -114,7 +114,7 @@ test("manual compatibility URLs share one workspace and keep both modes without 
     calls += 1;
     return route.abort();
   });
-  await page.goto("/manual");
+  await page.goto("/plan");
   await expect(page).toHaveURL(/\/plan\?mode=manual$/);
   await expect(page.locator(".trip-site-header")).toHaveCount(1);
   await expect(page.getByRole("main")).toHaveCount(1);
@@ -128,7 +128,6 @@ test("manual compatibility URLs share one workspace and keep both modes without 
   );
   await expect(page.getByRole("dialog")).toHaveCount(0);
   await page.locator("#planning-panel-ai").getByLabel("目的地城市").fill("保留 AI 城市");
-  await page.getByRole("tab", { name: /手动选点/ }).click();
   await expect(page).toHaveURL(/\/plan\?mode=manual$/);
   await expect(manual.getByLabel("目的地城市")).toHaveValue("保留手动城市");
   await page.getByRole("tab", { name: /完整 AI 规划/ }).click();

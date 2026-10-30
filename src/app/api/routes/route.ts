@@ -7,9 +7,10 @@ export async function POST(request: Request): Promise<Response> {
     requireSameOrigin(request);
     const input = routeInputSchema.parse(await readBody(request));
     return json({
-      route: await configuredAmap().walking(
+      route: await configuredAmap().route(
         input.origin,
         input.destination,
+        "walking",
         request.signal,
       ),
     });

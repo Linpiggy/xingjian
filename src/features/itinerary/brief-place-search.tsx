@@ -4,6 +4,9 @@ import { useMutation } from "@tanstack/react-query";
 import { Search, Plus } from "lucide-react";
 import { placesResponseSchema } from "@/lib/contracts";
 import { requestJson } from "@/lib/client-api";
+import { ArcIcon } from "@/components/arc/icon/icon";
+import { Input } from "@/components/arc/input/input";
+import { Button } from "@/components/arc/button/button";
 
 export function BriefPlaceSearch({
   city,
@@ -34,13 +37,13 @@ export function BriefPlaceSearch({
   return (
     <details className="brief-place-search">
       <summary>
-        <Search size={15} aria-hidden="true" />
+        <ArcIcon icon={Search} size="sm" aria-hidden="true" />
         搜索并补充必去地点
       </summary>
       <div className="brief-place-search-row">
         <label>
           搜索必去地点
-          <input
+          <Input
             value={keyword}
             maxLength={80}
             disabled={pending}
@@ -56,9 +59,9 @@ export function BriefPlaceSearch({
             }}
           />
         </label>
-        <button
+        <Button
           type="button"
-          className="button"
+
           disabled={pending || search.isPending}
           onClick={() => {
             if (!city.trim() || !keyword.trim()) {
@@ -69,9 +72,9 @@ export function BriefPlaceSearch({
             search.mutate({ city: city.trim(), keyword: keyword.trim() });
           }}
         >
-          <Search size={16} aria-hidden="true" />
+          <ArcIcon icon={Search} size="md" aria-hidden="true" />
           {search.isPending ? "搜索中…" : "查找地点"}
-        </button>
+        </Button>
       </div>
       {(error || search.error) && (
         <p className="trip-error" role="alert">
@@ -90,16 +93,16 @@ export function BriefPlaceSearch({
                 <strong>{place.name}</strong>
                 <p>{place.address ?? "地址待核实"}</p>
               </div>
-              <button
+              <Button
                 type="button"
-                className="button"
+
                 aria-label={`将${place.name}加入必去`}
                 disabled={pending || added || names.length >= 30}
                 onClick={() => onAdd(place.name)}
               >
-                <Plus size={15} aria-hidden="true" />
+                <ArcIcon icon={Plus} size="sm" aria-hidden="true" />
                 {added ? "已加入" : "加入必去"}
-              </button>
+              </Button>
             </li>
           );
         })}

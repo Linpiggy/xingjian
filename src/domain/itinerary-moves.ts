@@ -1,5 +1,5 @@
 import type { Itinerary } from "./itinerary";
-import type { Coordinate, WalkingRoute } from "./models";
+import type { Coordinate, Route } from "./models";
 import type { DayActivity } from "./meal-planning";
 import { briefDays } from "./trip-brief";
 
@@ -15,7 +15,7 @@ export type ItineraryRouteGap = {
   origin: Coordinate;
   destination: Coordinate;
 };
-export type ItineraryRouteResolution = ItineraryRouteGap & { route: WalkingRoute };
+export type ItineraryRouteResolution = ItineraryRouteGap & { route: Route };
 export const itineraryEdgeKey = (gap: ItineraryRouteGap): string =>
   JSON.stringify([gap.fromActivityId, gap.toActivityId, gap.origin, gap.destination]);
 function edge(from: DayActivity, to: DayActivity): ItineraryRouteGap {
@@ -94,7 +94,7 @@ export function prepareItineraryMove(
       target.recommendations.push(explanation);
     }
   }
-  const original = new Map<string, WalkingRoute | null>();
+  const original = new Map<string, Route | null>();
   for (const day of input.days) {
     for (const [index, leg] of (day.schedule?.legs ?? []).entries()) {
       original.set(
@@ -126,7 +126,7 @@ export function prepareItineraryMove(
     });
     notice(day, "活动已按你指定的顺序调整；原主题与推荐理由不代表本次路线已优化。");
   }
-  const supplied = new Map<string, WalkingRoute>();
+  const supplied = new Map<string, Route>();
   for (const result of resolutions) {
     const key = itineraryEdgeKey(result);
     if (!gaps.some((gap) => itineraryEdgeKey(gap) === key) || supplied.has(key)) {

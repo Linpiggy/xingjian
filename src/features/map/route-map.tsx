@@ -18,8 +18,20 @@ import { useRouteReplay } from "./use-route-replay";
 import { RouteReplayControls } from "./route-replay-controls";
 import { RouteDiagram } from "./route-diagram";
 import { RouteMapDialog } from "./route-map-dialog";
-import { Button } from "@/components/arc/button/button";
+import { Button, buttonClassName } from "@/components/arc/button/button";
 import "./route-map.css";
+import { ArcIcon } from "@/components/arc/icon/icon";
+
+/** 地图光标：步行用行走小人，长距离步行建议改乘时用车辆图标；都是装饰性 SVG，不冒充真实公交数据 */
+function cursorMarkup(kind: "walk" | "transit"): string {
+  const walk =
+    '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="13" cy="4" r="2"></circle><path d="M11 9l-2 5 3 2 1 5"></path><path d="M9 14l-3 2"></path><path d="M12 21l-1-5-3-2"></path><path d="M13 9l3 2 2-1"></path></svg>';
+  const car =
+    '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 17h14"></path><path d="M6 17l-1-4 2-5h10l2 5-1 4"></path><circle cx="8" cy="17" r="1.6"></circle><circle cx="16" cy="17" r="1.6"></circle></svg>';
+  return `<span class="route-sdk-cursor" data-kind="${kind}" aria-hidden="true">${
+    kind === "transit" ? car : walk
+  }</span>`;
+}
 
 const failureMessages: Record<MapFailure, string> = {
   sdk_failed: "地图加载失败，请检查网络后重试。",
@@ -131,7 +143,11 @@ export function RouteMap({
       const element = document.createElement("button");
       element.type = "button";
       element.tabIndex = -1;
-      element.className = "map-marker route-marker";
+      element.className = buttonClassName({
+        variant: "marker",
+        className: "map-marker route-marker",
+      });
+      element.dataset.arcButton = "marker";
       element.dataset.purpose = item.purpose ?? "visit";
       element.textContent = String(index + 1);
       element.title = item.place.name;
@@ -156,7 +172,7 @@ export function RouteMap({
     }
     const marker = new sdk.Marker({
       position: day.items[0]?.place.location,
-      content: '<span class="route-sdk-cursor" aria-hidden="true"></span>',
+      content: cursorMarkup("walk"),
       anchor: "center",
       zIndex: 200,
     });
@@ -198,11 +214,13 @@ export function RouteMap({
     const marker = cursorMarker.current;
     if (marker && replay.cursor) {
       marker.setPosition(replay.cursor);
+      const part = track.parts[replay.sample.index];
+      marker.setContent(cursorMarkup(part?.suggested ?? "walk"));
       marker.show();
     } else {
       marker?.hide();
     }
-  }, [runtime, replay.cursor]);
+  }, [runtime, replay.cursor, replay.sample.index, track.parts]);
   useEffect(() => pause(), [selectedId, pause]);
   const mappedLegs = day.legs.filter((leg) =>
     leg.route?.segments.some((path) => path.length >= 2),
@@ -231,33 +249,33 @@ export function RouteMap({
         />
         {runtime && !failed && (
           <div className="route-map-camera">
-            <button
+            <Button
               type="button"
-              className="button"
+
               aria-label="查看全日路线"
               onClick={() =>
                 runtime.map.setFitView(undefined, replay.reduced, [48, 48, 48, 48])
               }
             >
-              <Scan size={16} aria-hidden="true" />
+              <ArcIcon icon={Scan} size="md" aria-hidden="true" />
               全日视野
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
-              className="button"
+
               aria-label="放大一级"
               onClick={() => runtime.map.zoomIn()}
             >
-              <Plus size={16} aria-hidden="true" />
-            </button>
-            <button
+              <ArcIcon icon={Plus} size="md" aria-hidden="true" />
+            </Button>
+            <Button
               type="button"
-              className="button"
+
               aria-label="缩小一级"
               onClick={() => runtime.map.zoomOut()}
             >
-              <Minus size={16} aria-hidden="true" />
-            </button>
+              <ArcIcon icon={Minus} size="md" aria-hidden="true" />
+            </Button>
           </div>
         )}
       </div>
@@ -271,7 +289,8 @@ export function RouteMap({
       <ol>
         {day.items.map((item, index) => (
           <li key={stopIdentity(item)}>
-            <button
+            <Button
+              variant="index"
               type="button"
               data-purpose={item.purpose ?? "visit"}
               aria-label={`在路线中查看第 ${index + 1} 站：${item.place.name}`}
@@ -280,7 +299,7 @@ export function RouteMap({
             >
               <strong>{index + 1}</strong>
               <span>{item.place.name}</span>
-            </button>
+            </Button>
           </li>
         ))}
       </ol>
@@ -288,7 +307,7 @@ export function RouteMap({
   );
   const status = !configured ? (
     <div className="route-map-status">
-      <MapPin size={18} aria-hidden="true" />
+      <ArcIcon icon={MapPin} size="md" aria-hidden="true" />
       <div>
         <h3>地图暂不可用</h3>
         <p>先查看地点与已有轨迹的几何预览；无底图，不用于导航。</p>
@@ -300,18 +319,18 @@ export function RouteMap({
         <h3>地图加载失败</h3>
         <p>{failureMessages[failed]}行程与几何预览仍保留。</p>
       </div>
-      <button
+      <Button
         type="button"
-        className="button"
+
         onClick={() => {
           setFailed(null);
           setRuntime(null);
           setAttempt((value) => value + 1);
         }}
       >
-        <RotateCw size={16} aria-hidden="true" />
+        <ArcIcon icon={RotateCw} size="md" aria-hidden="true" />
         重试地图
-      </button>
+      </Button>
     </div>
   ) : !runtime ? (
     <p className="route-map-status" role="status">
@@ -328,7 +347,6 @@ export function RouteMap({
         </span>
         <div className="route-map-toolbar-actions">
           <Button
-            className="button"
             aria-haspopup="dialog"
             disabled={!track.parts.length}
             onClick={() => {
@@ -338,15 +356,11 @@ export function RouteMap({
               }
             }}
           >
-            <Play size={16} aria-hidden="true" />
+            <ArcIcon icon={Play} size="md" aria-hidden="true" />
             {replay.reduced ? "逐段看路线" : "演示路线"}
           </Button>
-          <Button
-            className="button"
-            aria-haspopup="dialog"
-            onClick={() => setExpanded(true)}
-          >
-            <Maximize2 size={16} aria-hidden="true" />
+          <Button aria-haspopup="dialog" onClick={() => setExpanded(true)}>
+            <ArcIcon icon={Maximize2} size="md" aria-hidden="true" />
             放大地图
           </Button>
         </div>

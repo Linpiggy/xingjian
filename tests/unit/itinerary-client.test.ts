@@ -85,7 +85,11 @@ describe("complete itinerary model boundary", () => {
       [completion(config.key), "ai_invalid_response"],
       [new Response("x".repeat(128001)), "ai_invalid_response"],
     ] as const) {
-      const transport = vi.fn<typeof fetch>().mockResolvedValue(response);
+      const transport = vi
+        .fn<typeof fetch>()
+        .mockImplementation(
+          async () => new Response(await response.clone().text(), response),
+        );
       await expect(
         new OpenAiItineraryModel(config, transport).compose(
           fixtureBrief(),

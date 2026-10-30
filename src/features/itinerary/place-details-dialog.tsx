@@ -4,7 +4,8 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import { X } from "lucide-react";
 import { Dialog } from "@/components/arc/dialog/dialog";
 import { Button } from "@/components/arc/button/button";
-import { Input } from "@/components/arc/input/input";
+import { Select } from "@/components/arc/input/input";
+import { NumberField } from "@/components/arc/number-field/number-field";
 import type { ScheduledActivity } from "@/domain/meal-planning";
 import { formatMinute } from "@/domain/draft";
 import type { ItineraryChange } from "@/domain/itinerary-editing";
@@ -14,6 +15,7 @@ import { ItineraryPlaceGuide } from "./itinerary-place-guide";
 import { PhotoImportDialog } from "./photo-import-dialog";
 import { PlacePhoto } from "./place-photo";
 import { placePhotoKey, usePhotoStore } from "./photo-store";
+import { ArcIcon } from "@/components/arc/icon/icon";
 
 export function PlaceDetailsDialog({
   item,
@@ -144,7 +146,7 @@ export function PlaceDetailsDialog({
           aria-label="关闭地点资料"
           onClick={() => ref.current?.close()}
         >
-          <X size={18} aria-hidden="true" />
+          <ArcIcon icon={X} size="md" aria-hidden="true" />
         </Button>
       </header>
       <div className="trip-detail-content">
@@ -154,17 +156,17 @@ export function PlaceDetailsDialog({
           name={item.activity.place.name}
         />
         <div className="trip-photo-actions">
-          <button type="button" className="button" onClick={() => setPhotoOpen(true)}>
+          <Button type="button" onClick={() => setPhotoOpen(true)}>
             {photo ? "更换参考图片" : "添加平台参考图片"}
-          </button>
+          </Button>
           {photo && (
-            <button
+            <Button
               type="button"
-              className="button"
+
               onClick={() => usePhotoStore.getState().remove(photoKey)}
             >
               移除参考图片
-            </button>
+            </Button>
           )}
         </div>
         {photoOpen && (
@@ -188,22 +190,22 @@ export function PlaceDetailsDialog({
           <section className="trip-activity-edit" aria-label="调整此活动">
             <h3>调整此活动</h3>
             <form onSubmit={duration} noValidate>
-              <Input
+              <NumberField
                 label="建议停留（分钟）"
-                type="number"
+                field="stayMinutes"
                 name="stayMinutes"
+                fullWidth
                 min={15}
                 max={240}
+                step={15}
                 defaultValue={item.activity.stayMinutes}
-                onInput={() => setError(null)}
+                onValueChange={() => setError(null)}
               />
-              <Button type="submit" className="button">
-                预览停留调整
-              </Button>
+              <Button type="submit">预览停留调整</Button>
             </form>
-            <button
+            <Button
               type="button"
-              className="button"
+
               disabled={
                 item.startMinute === null && item.activity.fixedStartMinute === null
               }
@@ -218,10 +220,10 @@ export function PlaceDetailsDialog({
               {item.activity.fixedStartMinute === null
                 ? "预览锁定开始时间"
                 : "预览解除时间锁"}
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
-              className="button"
+
               onClick={() =>
                 propose({
                   kind: "position_lock",
@@ -231,7 +233,7 @@ export function PlaceDetailsDialog({
               }
             >
               {item.activity.positionLocked ? "预览解除位置锁" : "预览锁定位置"}
-            </button>
+            </Button>
             <p>位置锁保留此地点、日期与次序，不固定开始时间。</p>
             <p>
               {item.activity.fixedStartMinute !== null
@@ -261,7 +263,7 @@ export function PlaceDetailsDialog({
                 >
                   <label>
                     移动到日期
-                    <select
+                    <Select
                       value={moveDay}
                       onChange={(event) => {
                         const index = Number(event.target.value);
@@ -294,11 +296,11 @@ export function PlaceDetailsDialog({
                               : ""}
                         </option>
                       ))}
-                    </select>
+                    </Select>
                   </label>
                   <label>
                     插入位置
-                    <select
+                    <Select
                       value={moveIndex}
                       onChange={(event) => {
                         setMoveIndex(Number(event.target.value));
@@ -312,15 +314,15 @@ export function PlaceDetailsDialog({
                             : `在「${positions[index - 1].name}」之后`}
                         </option>
                       ))}
-                    </select>
+                    </Select>
                   </label>
-                  <button
+                  <Button
                     type="submit"
-                    className="button"
+
                     disabled={item.activity.positionLocked}
                   >
                     预览新位置
-                  </button>
+                  </Button>
                 </form>
                 <p>
                   保持指定顺序，仅在预览中补查实际变化的路线。
@@ -410,9 +412,7 @@ export function PlaceDetailsDialog({
           活动安排与菜品是 AI
           建议。时间由建议停留、实际相邻步行与独立缓冲推算；开放、预约和饮食安全仍须向场所核实。
         </p>
-        <Button className="button" onClick={() => ref.current?.close()}>
-          返回当天行程
-        </Button>
+        <Button onClick={() => ref.current?.close()}>返回当天行程</Button>
       </div>
     </Dialog>
   );

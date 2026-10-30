@@ -10,6 +10,8 @@ import {
 import { TripSiteHeader } from "@/features/itinerary/trip-site-header";
 import "@/features/itinerary/itinerary.css";
 import "./travel-home.css";
+import { ArcIcon } from "@/components/arc/icon/icon";
+import { ButtonLink } from "@/components/arc/button/button";
 
 export const metadata = { title: "行间 | 从一次期待开始" };
 
@@ -21,7 +23,7 @@ export default function ExplorePage() {
         <section className="travel-home-hero" aria-labelledby="travel-home-heading">
           <div className="travel-home-copy">
             <p className="travel-home-label">
-              <Compass size={18} aria-hidden="true" />
+              <ArcIcon icon={Compass} size="md" aria-hidden="true" />
               把日子，留给喜欢的地方
             </p>
             <h1 id="travel-home-heading">
@@ -34,12 +36,12 @@ export default function ExplorePage() {
               在同一个工作台，把每天的吃玩、步行与停留，慢慢调成喜欢的样子。
             </p>
             <div className="travel-home-actions">
-              <Link href="/plan" className="travel-home-start">
-                开始规划 <ArrowRight size={19} aria-hidden="true" />
-              </Link>
-              <Link href="/itinerary">
-                继续当前行程 <ArrowRight size={16} aria-hidden="true" />
-              </Link>
+              <ButtonLink href="/plan" variant="primary">
+                开始规划 <ArcIcon icon={ArrowRight} size="md" aria-hidden="true" />
+              </ButtonLink>
+              <ButtonLink href="/itinerary" variant="ghost">
+                继续当前行程 <ArcIcon icon={ArrowRight} size="md" aria-hidden="true" />
+              </ButtonLink>
             </div>
             <p className="travel-home-scope">一座城市 · 1—14 天 · 1—20 人</p>
           </div>
@@ -60,15 +62,15 @@ export default function ExplorePage() {
                 </strong>
                 <div className="travel-paper-timeline">
                   <div>
-                    <Coffee size={19} />
+                    <ArcIcon icon={Coffee} size="md" />
                     <span>先吃一顿喜欢的早餐</span>
                   </div>
                   <div>
-                    <MapPin size={19} />
+                    <ArcIcon icon={MapPin} size="md" />
                     <span>走进感兴趣的地方</span>
                   </div>
                   <div>
-                    <Utensils size={19} />
+                    <ArcIcon icon={Utensils} size="md" />
                     <span>在下一站，尝一口当地</span>
                   </div>
                 </div>
@@ -77,7 +79,7 @@ export default function ExplorePage() {
                 </span>
               </div>
               <div className="travel-paper-note">
-                <SlidersHorizontal size={20} />
+                <ArcIcon icon={SlidersHorizontal} size="md" />
                 <span>
                   不必一次定稿
                   <strong>先预览，再决定。</strong>
@@ -91,17 +93,17 @@ export default function ExplorePage() {
           <Link href="/plan">
             <span>从一个想法开始</span>
             <strong>让 AI 安排完整一天</strong>
-            <ArrowRight size={20} aria-hidden="true" />
+            <ArcIcon icon={ArrowRight} size="md" aria-hidden="true" />
           </Link>
           <Link href="/itinerary">
             <span>已经有了方案</span>
             <strong>回到你的旅行提案</strong>
-            <ArrowRight size={20} aria-hidden="true" />
+            <ArcIcon icon={ArrowRight} size="md" aria-hidden="true" />
           </Link>
-          <Link href="/plan?mode=manual">
-            <span>想亲自选择地点</span>
-            <strong>在工作台里手动选点</strong>
-            <ArrowRight size={20} aria-hidden="true" />
+          <Link href="/plan">
+            <span>已经想好必去</span>
+            <strong>在需求里补充必去地点</strong>
+            <ArcIcon icon={ArrowRight} size="md" aria-hidden="true" />
           </Link>
         </section>
         <p className="travel-home-footnote">

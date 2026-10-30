@@ -4,6 +4,7 @@ import type { ItineraryStage, ItineraryWork } from "@/domain/itinerary";
 import { Button } from "@/components/arc/button/button";
 import { Progress } from "@/components/arc/progress/progress";
 import "./planning-progress.css";
+import { ArcIcon } from "@/components/arc/icon/icon";
 
 export type GenerationProgress = {
   stage: ItineraryStage;
@@ -60,9 +61,9 @@ export function PlanningProgress({
             aria-current={index === active ? "step" : undefined}
           >
             {index < active ? (
-              <Check size={19} aria-hidden="true" />
+              <ArcIcon icon={Check} size="md" aria-hidden="true" />
             ) : (
-              <Icon size={19} aria-hidden="true" />
+              <ArcIcon icon={Icon} size="md" aria-hidden="true" />
             )}
             <span>{label}</span>
           </li>
@@ -84,9 +85,7 @@ export function PlanningProgress({
           路线核对 {work.completed}/{work.total} 天
         </span>
       )}
-      <Button className="button" onClick={onCancel}>
-        取消生成
-      </Button>
+      <Button onClick={onCancel}>取消生成</Button>
     </section>
   );
 }

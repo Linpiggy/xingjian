@@ -70,14 +70,24 @@
   stroke: #fffef9;
   stroke-width: 4;
 }
+/* 演示光标：步行/建议改乘两类图标，圆形底保持一致的可读性 */
 .route-sdk-cursor {
-  display: block;
-  width: 22px;
-  height: 22px;
-  border: 4px solid #fffef9;
+  display: grid;
+  width: 26px;
+  height: 26px;
+  place-items: center;
+  border: 2px solid #fffef9;
   border-radius: 50%;
-  background: #ac612c;
+  background: #2a5d43;
+  color: #fffef9;
   box-shadow: 0 1px 8px #533c2740;
+}
+.route-sdk-cursor[data-kind="transit"] {
+  background: #ac612c;
+}
+.route-sdk-cursor svg {
+  width: 15px;
+  height: 15px;
 }
 .route-map-camera {
   position: absolute;
@@ -117,26 +127,24 @@
   flex-shrink: 0;
   margin-top: 12px;
 }
+/* 站点卡片按可用宽度自动换行：宽屏一行多张，窄屏两列再退成一列，不再横向挤成单行 */
 .route-map-stop-index ol {
   display: grid;
-  grid-auto-flow: column;
-  grid-auto-columns: minmax(176px, 1fr);
+  grid-template-columns: repeat(auto-fill, minmax(168px, 1fr));
   align-items: stretch;
   gap: 8px;
   margin: 0;
   padding: 4px;
-  overflow-x: auto;
-  overscroll-behavior-inline: contain;
-  scrollbar-width: thin;
+  overflow: visible;
   list-style: none;
 }
 .route-map-stop-index li {
   min-width: 0;
   margin: 0;
 }
+/* Arc Button 会把内容包进一层 labelPhase，因此按钮内部改为 flex，并给名称节点留出可换行宽度 */
 .route-map-stop-index button {
-  display: grid;
-  grid-template-columns: 24px minmax(0, 1fr);
+  display: flex;
   align-items: center;
   gap: 8px;
   width: 100%;
@@ -153,7 +161,16 @@
   overflow-wrap: anywhere;
 }
 .route-map-stop-index button > span {
+  display: flex;
+  flex: 1;
   min-width: 0;
+  align-items: center;
+  gap: 8px;
+  line-height: 1.6;
+}
+.route-map-stop-index button > span > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
   line-height: 1.6;
 }
 .route-map-stop-index button[aria-pressed="true"] {

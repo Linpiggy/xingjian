@@ -128,8 +128,9 @@ test("public place search is part of full planning, stays explicit and appends t
     return route.abort();
   });
   await page.goto("/plan");
-  await expect(page.getByRole("tab", { name: /手动选点/ })).toHaveCount(0);
-  await expect(page.getByText("手动草稿工具", { exact: true })).toBeVisible();
+  // 手动选点模式已移除：工作台只保留完整 AI 规划
+  await expect(page.getByText("手动草稿工具", { exact: true })).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "规划旅行" })).toBeVisible();
   await page.getByLabel("目的地城市").fill("测试城市");
   await page.getByRole("button", { name: "偏好与必去", exact: true }).click();
   await page.getByText("搜索并补充必去地点", { exact: true }).click();

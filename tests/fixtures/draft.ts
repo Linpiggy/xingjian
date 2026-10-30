@@ -1,11 +1,5 @@
 // Authored fixtures only. Never used as a production fallback.
-import type {
-  Draft,
-  Place,
-  Source,
-  TripInput,
-  WalkingRoute,
-} from "../../src/domain/models";
+import type { Draft, Place, Source, TripInput, Route } from "../../src/domain/models";
 import { addDays, groupPlaces, makeDay, makeDraft } from "../../src/domain/draft";
 
 export const source: Source = {
@@ -33,8 +27,9 @@ export const places: Place[] = input.keywords.map((name, i) => ({
   openingHours: null,
   source,
 }));
-export const route: WalkingRoute = {
+export const route: Route = {
   mode: "walking",
+  detail: null,
   meters: 1200,
   seconds: 1200,
   segments: [

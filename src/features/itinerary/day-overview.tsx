@@ -2,6 +2,7 @@ import { Coffee, Footprints, MapPin, Utensils, Landmark } from "lucide-react";
 import type { Itinerary } from "@/domain/itinerary";
 import { formatMinute } from "@/domain/draft";
 import { Disclosure } from "@/components/arc/disclosure/disclosure";
+import { ArcIcon } from "@/components/arc/icon/icon";
 
 const visuals = { visit: Landmark, breakfast: Coffee, lunch: Utensils, dinner: Utensils };
 const labels = { visit: "游览", breakfast: "早餐", lunch: "午餐", dinner: "晚餐" };
@@ -18,15 +19,15 @@ export function DayOverview({ day }: { day: Itinerary["days"][number] }) {
     <section className="trip-day-overview" aria-label="当日行程速览">
       <div className="trip-day-metrics">
         <span>
-          <MapPin size={17} aria-hidden="true" />
+          <ArcIcon icon={MapPin} size="md" aria-hidden="true" />
           <strong>{attractions.length}</strong> 处游览
         </span>
         <span>
-          <Utensils size={17} aria-hidden="true" />
+          <ArcIcon icon={Utensils} size="md" aria-hidden="true" />
           <strong>{schedule.items.length - attractions.length}</strong> 次用餐
         </span>
         <span>
-          <Footprints size={17} aria-hidden="true" />
+          <ArcIcon icon={Footprints} size="md" aria-hidden="true" />
           {measured.length ? `已知步行 ${(meters / 1000).toFixed(1)} km` : "步行距离未知"}
           {unknown > 0 && <small>{unknown} 段待核实</small>}
         </span>
@@ -53,7 +54,7 @@ export function DayOverview({ day }: { day: Itinerary["days"][number] }) {
             return (
               <li key={item.activity.id}>
                 <div title={item.activity.place.name}>
-                  <Icon size={23} strokeWidth={1.6} aria-hidden="true" />
+                  <ArcIcon icon={Icon} size="lg" strokeWidth={1.6} aria-hidden="true" />
                   <strong>{labels[item.activity.kind]}</strong>
                   <time>{formatMinute(item.startMinute)}</time>
                 </div>

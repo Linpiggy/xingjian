@@ -91,6 +91,7 @@ export async function api(operation: () => Promise<Response>): Promise<Response>
           ? 503
           : [
                 "rate_limited",
+                "amap_rate_limited",
                 "ai_rate_limited",
                 "ai_local_rate_limited",
                 "ai_cooldown",

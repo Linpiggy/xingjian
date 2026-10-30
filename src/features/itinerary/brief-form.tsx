@@ -29,13 +29,28 @@ import { SocialInspirationInput } from "./social-inspiration-input";
 import { PlanningProgress, type GenerationProgress } from "./planning-progress";
 import { BriefPlaceSearch } from "./brief-place-search";
 import { Button } from "@/components/arc/button/button";
-import { Input } from "@/components/arc/input/input";
+import { Input, Select, Textarea } from "@/components/arc/input/input";
+import { NumberField } from "@/components/arc/number-field/number-field";
+import { TimePicker } from "@/components/arc/time-picker/time-picker";
+import { DateRangePicker } from "@/components/arc/date-range-picker/date-range-picker";
 import {
   Segmented,
   SegmentedList,
   SegmentedTrigger,
   SegmentedContent,
 } from "@/components/arc/segmented/segmented";
+import { ArcIcon } from "@/components/arc/icon/icon";
+
+const parseDay = (iso: string) => {
+  const [year, month, day] = iso.split("-").map(Number);
+  return new Date(year ?? 1970, (month ?? 1) - 1, day ?? 1);
+};
+const isoDay = (date: Date) =>
+  `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+const addDays = (date: Date, amount: number) =>
+  new Date(date.getFullYear(), date.getMonth(), date.getDate() + amount);
+const daySpan = (start: Date, end: Date) =>
+  Math.max(1, Math.round((end.getTime() - start.getTime()) / 86_400_000) + 1);
 
 const purposeVisuals = {
   local_life: { icon: Store, description: "街巷、市场与当地日常" },
@@ -99,6 +114,11 @@ export function BriefForm({
     SocialInspiration | undefined
   >(initial?.socialInspiration);
   const [sourceBusy, setSourceBusy] = useState(false);
+  const [tripDates, setTripDates] = useState(() => {
+    const start = parseDay(initial?.startDate ?? startDate);
+    const days = initial?.dayCount ?? 3;
+    return { start, end: addDays(start, days - 1), days };
+  });
   const [summary, setSummary] = useState({
     city: initial?.destinationCity ?? "",
     date: initial?.startDate ?? startDate,
@@ -205,7 +225,12 @@ export function BriefForm({
             : "请完整填写有效的天数、人数和时间。"
           : (issue?.message ?? "请检查旅行需求。"),
       );
-      const target = event.currentTarget.elements.namedItem(names[field] ?? "city");
+      const key = names[field] ?? "city";
+      const visible = event.currentTarget.querySelector<HTMLElement>(
+        `[data-field="${key}"] input:not([type="hidden"]), [data-field="${key}"] button`,
+      );
+      const named = event.currentTarget.elements.namedItem(key);
+      const target = visible ?? (named instanceof HTMLElement ? named : null);
       if (target instanceof HTMLElement) {
         const details = target.closest("details");
         if (details) {
@@ -261,7 +286,7 @@ export function BriefForm({
                 aria-controls="brief-basics"
                 disabled={pending}
               >
-                <CalendarDays size={16} aria-hidden="true" />
+                <ArcIcon icon={CalendarDays} size="md" aria-hidden="true" />
                 行程概况
               </SegmentedTrigger>
               <SegmentedTrigger
@@ -270,7 +295,7 @@ export function BriefForm({
                 aria-controls="brief-preferences"
                 disabled={pending}
               >
-                <Compass size={16} aria-hidden="true" />
+                <ArcIcon icon={Compass} size="md" aria-hidden="true" />
                 偏好与必去
               </SegmentedTrigger>
             </SegmentedList>
@@ -293,25 +318,49 @@ export function BriefForm({
                     defaultValue={initial?.destinationCity ?? ""}
                     maxLength={40}
                   />
-                  <Input
-                    label="出发日期"
-                    name="date"
-                    type="date"
-                    defaultValue={initial?.startDate ?? startDate}
-                  />
-                  <Input
+                  <div className="brief-range" data-field="date">
+                    <span className="brief-range-label">出发与返回</span>
+                    <DateRangePicker
+                      label="出发与返回"
+                      boundary={() => form.current}
+                      value={{ start: tripDates.start, end: tripDates.end }}
+                      onChange={(range) => {
+                        const days = daySpan(range.start, range.end);
+                        setTripDates({ start: range.start, end: range.end, days });
+                        setSummary((previous) => ({
+                          ...previous,
+                          date: isoDay(range.start),
+                          days: String(days),
+                        }));
+                        setValidation(null);
+                      }}
+                    />
+                    <input type="hidden" name="date" value={isoDay(tripDates.start)} />
+                  </div>
+                  <NumberField
                     label="旅行天数"
+                    field="days"
                     name="days"
-                    type="number"
+                    fullWidth
                     min={1}
                     max={14}
-                    defaultValue={initial?.dayCount ?? 3}
+                    value={tripDates.days}
+                    onValueChange={(days) => {
+                      setTripDates((previous) => ({
+                        ...previous,
+                        days,
+                        end: addDays(previous.start, days - 1),
+                      }));
+                      setSummary((previous) => ({ ...previous, days: String(days) }));
+                      setValidation(null);
+                    }}
                     description="1—14 天，同一城市"
                   />
-                  <Input
+                  <NumberField
                     label="同行人数"
+                    field="travelers"
                     name="travelers"
-                    type="number"
+                    fullWidth
                     min={1}
                     max={20}
                     defaultValue={initial?.travelers ?? 2}
@@ -328,19 +377,19 @@ export function BriefForm({
                   />
                   <label>
                     <span id="brief-budget-basis-label">预算口径</span>
-                    <select
+                    <Select
                       aria-labelledby="brief-budget-basis-label"
                       name="basis"
                       defaultValue={initial?.budget.basis ?? "per_person"}
                     >
                       <option value="per_person">每人全程</option>
                       <option value="total">所有人合计</option>
-                    </select>
+                    </Select>
                   </label>
                 </div>
                 <div className="trip-checks">
                   <label>
-                    <input
+                    <Input
                       name="lodging"
                       type="checkbox"
                       defaultChecked={initial?.budget.includeLodging ?? true}
@@ -348,7 +397,7 @@ export function BriefForm({
                     预算包含住宿
                   </label>
                   <label>
-                    <input
+                    <Input
                       name="intercity"
                       type="checkbox"
                       defaultChecked={initial?.budget.includeIntercity ?? false}
@@ -360,45 +409,39 @@ export function BriefForm({
                   <summary>抵达／离开时间与每天可用时段</summary>
                   <p>时间按上海时区安排；首末日只使用你实际可用的时间。</p>
                   <div className="trip-fields">
-                    <label>
-                      <span>首日可用开始</span>
-                      <input
-                        name="first"
-                        type="time"
-                        defaultValue={time(
-                          initial?.availability.firstDayStartMinute ?? 540,
-                        )}
-                      />
-                    </label>
-                    <label>
-                      <span>末日最晚结束</span>
-                      <input
-                        name="last"
-                        type="time"
-                        defaultValue={time(
-                          initial?.availability.lastDayEndMinute ?? 1260,
-                        )}
-                      />
-                    </label>
-                    <label>
-                      <span>每天开始游玩</span>
-                      <input
-                        name="dailyStart"
-                        type="time"
-                        defaultValue={time(initial?.availability.dailyStartMinute ?? 540)}
-                      />
-                    </label>
-                    <label>
-                      <span>每天结束游玩</span>
-                      <input
-                        name="dailyEnd"
-                        type="time"
-                        defaultValue={time(initial?.availability.dailyEndMinute ?? 1260)}
-                      />
-                    </label>
+                    <TimePicker
+                      label="首日可用开始"
+                      field="first"
+                      name="first"
+                      minuteStep={15}
+                      defaultValue={time(
+                        initial?.availability.firstDayStartMinute ?? 540,
+                      )}
+                    />
+                    <TimePicker
+                      label="末日最晚结束"
+                      field="last"
+                      name="last"
+                      minuteStep={15}
+                      defaultValue={time(initial?.availability.lastDayEndMinute ?? 1260)}
+                    />
+                    <TimePicker
+                      label="每天开始游玩"
+                      field="dailyStart"
+                      name="dailyStart"
+                      minuteStep={15}
+                      defaultValue={time(initial?.availability.dailyStartMinute ?? 540)}
+                    />
+                    <TimePicker
+                      label="每天结束游玩"
+                      field="dailyEnd"
+                      name="dailyEnd"
+                      minuteStep={15}
+                      defaultValue={time(initial?.availability.dailyEndMinute ?? 1260)}
+                    />
                     <label>
                       <span>出发城市（选填）</span>
-                      <input
+                      <Input
                         name="origin"
                         defaultValue={initial?.originCity ?? ""}
                         maxLength={40}
@@ -406,11 +449,11 @@ export function BriefForm({
                     </label>
                     <label>
                       <span>旅行节奏</span>
-                      <select name="pace" defaultValue={initial?.pace ?? "balanced"}>
+                      <Select name="pace" defaultValue={initial?.pace ?? "balanced"}>
                         <option value="relaxed">轻松一点</option>
                         <option value="balanced">松紧适中</option>
                         <option value="packed">充实紧凑</option>
-                      </select>
+                      </Select>
                     </label>
                   </div>
                 </details>
@@ -428,7 +471,8 @@ export function BriefForm({
                 <legend>这趟旅行，最看重什么？</legend>
                 <div className="trip-purpose-grid" role="group" aria-label="主要旅行目的">
                   {tripPurposes.map((value) => (
-                    <button
+                    <Button
+                      variant="secondary"
                       type="button"
                       key={value}
                       aria-pressed={purpose === value}
@@ -440,20 +484,28 @@ export function BriefForm({
                     >
                       {(() => {
                         const Icon = purposeVisuals[value].icon;
-                        return <Icon size={19} strokeWidth={1.6} aria-hidden="true" />;
+                        return (
+                          <ArcIcon
+                            icon={Icon}
+                            size="md"
+                            strokeWidth={1.6}
+                            aria-hidden="true"
+                          />
+                        );
                       })()}
                       <span>
                         {tripPurposeLabels[value]}
                         <small>{purposeVisuals[value].description}</small>
                       </span>
                       {purpose === value && (
-                        <Check
-                          size={15}
+                        <ArcIcon
+                          icon={Check}
+                          size="sm"
                           className="trip-purpose-check"
                           aria-hidden="true"
                         />
                       )}
-                    </button>
+                    </Button>
                   ))}
                 </div>
                 <details className="trip-disclosure">
@@ -463,7 +515,7 @@ export function BriefForm({
                       .filter((value) => value !== purpose)
                       .map((value) => (
                         <label key={value}>
-                          <input
+                          <Input
                             type="checkbox"
                             checked={secondary.includes(value)}
                             onChange={(event) =>
@@ -487,7 +539,7 @@ export function BriefForm({
                 <div className="trip-fields">
                   <label>
                     <span>必去公共地点</span>
-                    <textarea
+                    <Textarea
                       name="mustVisit"
                       placeholder="每行一个明确地点名称；没有也可留空"
                       value={mustVisitText}
@@ -496,7 +548,7 @@ export function BriefForm({
                   </label>
                   <label>
                     <span>必吃菜品</span>
-                    <textarea
+                    <Textarea
                       name="dishes"
                       placeholder="每行一个菜品；供应情况仍需向商家核实"
                       defaultValue={initial?.mustEat
@@ -511,7 +563,7 @@ export function BriefForm({
                   <div className="trip-fields">
                     <label>
                       <span>必吃餐厅</span>
-                      <textarea
+                      <Textarea
                         name="restaurants"
                         defaultValue={initial?.mustEat
                           .filter((item) => item.kind === "restaurant")
@@ -522,7 +574,7 @@ export function BriefForm({
                     </label>
                     <label>
                       <span>忌口</span>
-                      <textarea
+                      <Textarea
                         name="avoid"
                         defaultValue={initial?.dietary.avoid.join("\n")}
                         placeholder="每行一项"
@@ -530,7 +582,7 @@ export function BriefForm({
                     </label>
                     <label>
                       <span>过敏原记录</span>
-                      <textarea
+                      <Textarea
                         name="allergies"
                         defaultValue={initial?.dietary.allergies.join("\n")}
                         placeholder="不能凭 AI 判断过敏安全，仍须与商家确认"
@@ -582,7 +634,7 @@ export function BriefForm({
                 </p>
               </details>
               <label className="trip-consent">
-                <input name="consent" type="checkbox" disabled={pending} />
+                <Input name="consent" type="checkbox" disabled={pending} />
                 我确认本次生成会使用模型与地图查询配额
               </label>
               {(validation || error) && (
@@ -623,7 +675,8 @@ export function BriefForm({
                   className="trip-generate"
                   disabled={cooldown > 0 || sourceBusy}
                 >
-                  生成我的完整方案 <ArrowRight size={18} aria-hidden="true" />
+                  生成我的完整方案{" "}
+                  <ArcIcon icon={ArrowRight} size="md" aria-hidden="true" />
                 </Button>
               )}
             </div>
@@ -631,14 +684,14 @@ export function BriefForm({
           <aside className="trip-entry-aside" aria-label="本次旅行摘要">
             <div className="trip-summary-heading">
               <span>此行概览</span>
-              <Compass size={21} strokeWidth={1.4} aria-hidden="true" />
+              <ArcIcon icon={Compass} size="md" strokeWidth={1.4} aria-hidden="true" />
             </div>
             <div className="trip-intent-visual" aria-hidden="true">
-              <PurposeIcon size={48} strokeWidth={1.3} />
+              <ArcIcon icon={PurposeIcon} size="lg" strokeWidth={1.3} />
               <div>
-                <CalendarDays size={21} />
-                <MapPin size={21} />
-                <Utensils size={21} />
+                <ArcIcon icon={CalendarDays} size="md" />
+                <ArcIcon icon={MapPin} size="md" />
+                <ArcIcon icon={Utensils} size="md" />
               </div>
             </div>
             <h2>{summary.city.trim() || "目的地待定"}</h2>
@@ -680,17 +733,13 @@ export function BriefForm({
               </div>
             </dl>
             <div className="trip-summary-inclusion">
-              <Check size={15} aria-hidden="true" />
+              <ArcIcon icon={Check} size="sm" aria-hidden="true" />
               <p>每日活动、三餐建议与相邻步行路线，按你的可用时间安排。</p>
             </div>
             <p className="trip-aside-note">
               营业、预约、天气与真实价格仍须核实。费用为目标参考，不是报价或达标承诺。
             </p>
-            {onBackToPlan && (
-              <Button className="button" onClick={onBackToPlan}>
-                返回当前方案
-              </Button>
-            )}
+            {onBackToPlan && <Button onClick={onBackToPlan}>返回当前方案</Button>}
           </aside>
         </div>
       </form>

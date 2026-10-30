@@ -123,12 +123,12 @@ test("paper home has native skip-to-action focus, working AI and manual entries 
   await page
     .getByRole("region", { name: "选择规划方式" })
     .getByRole("link", {
-      name: "想亲自选择地点 在工作台里手动选点",
+      name: "已经想好必去 在需求里补充必去地点",
       exact: true,
     })
     .focus();
   await page.keyboard.press("Enter");
-  await expect(page).toHaveURL(/\/plan\?mode=manual$/);
+  await expect(page).toHaveURL(/\/plan$/);
   expect(calls).toBe(0);
 });
 

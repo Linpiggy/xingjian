@@ -29,7 +29,7 @@ function dependencies() {
         )
         .map((candidate) => structuredClone(candidate.place)),
     ),
-    walking: vi.fn(async () => structuredClone(route)),
+    route: vi.fn(async () => structuredClone(route)),
   };
   const model: ItineraryModel = {
     model: "fixture-model",
@@ -125,7 +125,7 @@ describe("complete itinerary orchestration, offline only", () => {
       ).toHaveLength(1);
     }
     expect(model.compose).toHaveBeenCalledOnce();
-    expect(provider.walking).toHaveBeenCalledTimes(8);
+    expect(provider.route).toHaveBeenCalledTimes(8);
     expect(plan.constraints).toEqual([]);
     expect(plan.notices.join(" ")).toContain("未核实的旅行经验");
     expect(plan.brief.socialInspiration).toEqual(brief.socialInspiration);
@@ -194,7 +194,7 @@ describe("complete itinerary orchestration, offline only", () => {
         ),
       ).rejects.toThrow();
       expect(provider.search).not.toHaveBeenCalled();
-      expect(provider.walking).not.toHaveBeenCalled();
+      expect(provider.route).not.toHaveBeenCalled();
       expect(model.compose).not.toHaveBeenCalled();
     }
   });
@@ -211,7 +211,7 @@ describe("complete itinerary orchestration, offline only", () => {
       (await service())(brief, provider, model, controller.signal),
     ).rejects.toThrow();
     expect(model.compose).not.toHaveBeenCalled();
-    expect(provider.walking).not.toHaveBeenCalled();
+    expect(provider.route).not.toHaveBeenCalled();
   });
   it("generates without must lists, includes three meals and queries only true directed neighbours", async () => {
     const { provider, model } = dependencies();
@@ -232,11 +232,12 @@ describe("complete itinerary orchestration, offline only", () => {
       expect(day.schedule?.items[0].startMinute).toBe(540);
       expect(day.schedule?.items[1].startMinute).toBe(615);
     }
-    expect(provider.walking).toHaveBeenCalledTimes(8);
-    expect(provider.walking).toHaveBeenNthCalledWith(
+    expect(provider.route).toHaveBeenCalledTimes(8);
+    expect(provider.route).toHaveBeenNthCalledWith(
       1,
       [120.11, 30.2],
       [120.1, 30.2],
+      "walking",
       expect.any(AbortSignal),
     );
     expect(model.compose).toHaveBeenCalledOnce();
@@ -263,7 +264,7 @@ describe("complete itinerary orchestration, offline only", () => {
       )(brief, provider, model, new AbortController().signal);
       expect(plan.days).toHaveLength(days);
       expect(plan.days.at(-1)?.date).toBe(days === 14 ? "2027-01-13" : "2026-12-31");
-      expect(provider.walking).toHaveBeenCalledTimes(days * 4);
+      expect(provider.route).toHaveBeenCalledTimes(days * 4);
       expect(plan.allocation.reduce((sum, value) => sum + value.targetFen, 0)).toBe(
         brief.budget.amountFen * travelers,
       );
@@ -282,7 +283,7 @@ describe("complete itinerary orchestration, offline only", () => {
     expect(plan.days[0].notices.join("")).toContain("详细体验建议缺失");
     expect(plan.days[0].recommendations.every((item) => !item.guide)).toBe(true);
     expect(model.compose).toHaveBeenCalledOnce();
-    expect(provider.walking).toHaveBeenCalledTimes(8);
+    expect(provider.route).toHaveBeenCalledTimes(8);
   });
   it("preserves a no-activity arrival date without fabricating meals or activity times", async () => {
     const { provider, model } = dependencies();
@@ -294,7 +295,7 @@ describe("complete itinerary orchestration, offline only", () => {
     expect(plan.days[0].schedule).toBeNull();
     expect(plan.days[0].notices.join("")).toContain("没有可游玩时段");
     expect(plan.days[1].schedule?.items).toHaveLength(5);
-    expect(provider.walking).toHaveBeenCalledTimes(4);
+    expect(provider.route).toHaveBeenCalledTimes(4);
   });
   it("limits meals to actual availability and does not invent breakfast after a late start", async () => {
     const { provider, model } = dependencies();
@@ -339,38 +340,38 @@ describe("complete itinerary orchestration, offline only", () => {
   });
   it("retries one transient walking failure and keeps the returned geometry", async () => {
     const { provider, model } = dependencies();
-    vi.mocked(provider.walking)
+    vi.mocked(provider.route)
       .mockRejectedValueOnce(await providerFailure("rate_limited"))
       .mockResolvedValue(structuredClone(route));
     const plan = await (
       await service()
     )(fixtureBrief(), provider, model, new AbortController().signal);
-    expect(provider.walking).toHaveBeenCalledTimes(9);
+    expect(provider.route).toHaveBeenCalledTimes(9);
     expect(plan.days[0].schedule?.legs[0].route?.segments).toEqual(route.segments);
     expect(plan.days[0].notices.join("")).not.toContain("未核实");
   });
   it("keeps the leg unknown when the retried walking query also fails", async () => {
     const { provider, model } = dependencies();
-    vi.mocked(provider.walking).mockRejectedValue(await providerFailure("upstream_http"));
+    vi.mocked(provider.route).mockRejectedValue(await providerFailure("upstream_http"));
     const plan = await (
       await service()
     )(fixtureBrief(), provider, model, new AbortController().signal);
-    expect(provider.walking).toHaveBeenCalledTimes(16);
+    expect(provider.route).toHaveBeenCalledTimes(16);
     expect(plan.days[0].schedule?.legs.every((leg) => leg.route === null)).toBe(true);
     expect(plan.days[0].notices.join("")).toContain("未核实");
   });
   it("does not retry a definitive no-route answer", async () => {
     const { provider, model } = dependencies();
-    vi.mocked(provider.walking).mockRejectedValue(await providerFailure("no_route"));
+    vi.mocked(provider.route).mockRejectedValue(await providerFailure("no_route"));
     await (
       await service()
     )(fixtureBrief(), provider, model, new AbortController().signal);
-    expect(provider.walking).toHaveBeenCalledTimes(8);
+    expect(provider.route).toHaveBeenCalledTimes(8);
   });
 
   it("keeps unknown route timing null, queries no synthetic straight-line replacement", async () => {
     const { provider, model } = dependencies();
-    vi.mocked(provider.walking).mockRejectedValue(new Error("fixture failure"));
+    vi.mocked(provider.route).mockRejectedValue(new Error("fixture failure"));
     const plan = await (
       await service()
     )(fixtureBrief(), provider, model, new AbortController().signal);
@@ -381,7 +382,7 @@ describe("complete itinerary orchestration, offline only", () => {
         .every((item) => item.startMinute === null && item.endMinute === null),
     ).toBe(true);
     expect(plan.days[0].schedule?.legs.every((leg) => leg.route === null)).toBe(true);
-    expect(provider.walking).toHaveBeenCalledTimes(8);
+    expect(provider.route).toHaveBeenCalledTimes(8);
   });
   it("reports omitted hard requirements instead of declaring completion", async () => {
     const { provider, model } = dependencies();
@@ -465,7 +466,7 @@ describe("complete itinerary orchestration, offline only", () => {
       await expect(
         (await service())(fixtureBrief(), provider, model, new AbortController().signal),
       ).rejects.toMatchObject({ code: "ai_invalid_response" });
-      expect(provider.walking).not.toHaveBeenCalled();
+      expect(provider.route).not.toHaveBeenCalled();
     }
   });
   it("does not feed private user points into AI candidates", async () => {
@@ -529,7 +530,7 @@ describe("complete itinerary orchestration, offline only", () => {
       Array.from({ length: 400 }, () => [120.1, 30.2] as [number, number]),
       Array.from({ length: 200 }, () => [120.11, 30.21] as [number, number]),
     ];
-    vi.mocked(provider.walking).mockResolvedValue(long);
+    vi.mocked(provider.route).mockResolvedValue(long);
     const plan = await (
       await service()
     )(fixtureBrief(), provider, model, new AbortController().signal);

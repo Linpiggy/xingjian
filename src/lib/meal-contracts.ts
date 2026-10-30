@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type { MealDayInput } from "@/domain/meal-planning";
-import { placeSchema, walkingSchema } from "./contracts";
+import { placeSchema, routeSchema } from "./contracts";
 
 import {
   minuteWindowSchema,
@@ -19,10 +19,10 @@ const place = placeSchema.strict().extend({
   id: z.string().min(1).max(100),
   source: sourceSchema,
 });
-const walking = walkingSchema.strict().extend({
+const walking = routeSchema.strict().extend({
   seconds: z.number().min(0).max(86_400).nullable(),
   segments: z
-    .array(z.array(walkingSchema.shape.segments.element.element).max(10_000))
+    .array(z.array(routeSchema.shape.segments.element.element).max(10_000))
     .max(100),
   source: sourceSchema,
 });

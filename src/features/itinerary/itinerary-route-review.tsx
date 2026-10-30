@@ -10,9 +10,10 @@ import {
   type ItineraryMove,
   type ItineraryRouteResolution,
 } from "@/domain/itinerary-moves";
-import { walkingSchema } from "@/lib/contracts";
+import { routeSchema } from "@/lib/contracts";
 import { requestJson } from "@/lib/client-api";
 import { useItineraryStore } from "./itinerary-store";
+import { Button } from "@/components/arc/button/button";
 
 export function ItineraryRouteReview({
   before,
@@ -75,7 +76,7 @@ export function ItineraryRouteReview({
           }
           const result = await requestJson(
             "/api/routes",
-            z.strictObject({ route: walkingSchema }),
+            z.strictObject({ route: routeSchema }),
             {
               method: "POST",
               headers: { "Content-Type": "application/json" },
@@ -131,9 +132,9 @@ export function ItineraryRouteReview({
       )}
       <div>
         {prepared.missing.length > 0 && (
-          <button
+          <Button
             type="button"
-            className="button"
+
             disabled={mutation.isPending || conflicted}
             onClick={() => mutation.mutate()}
           >
@@ -142,16 +143,16 @@ export function ItineraryRouteReview({
               : routes.length > 0
                 ? "补查剩余路线"
                 : "查询受影响路线"}
-          </button>
+          </Button>
         )}
         {mutation.isPending && (
-          <button
+          <Button
             type="button"
-            className="button"
+
             onClick={() => controller.current?.abort()}
           >
             取消路线查询
-          </button>
+          </Button>
         )}
         <span role="status">
           已查询 {prepared.gaps.length - prepared.missing.length}／{prepared.gaps.length}{" "}

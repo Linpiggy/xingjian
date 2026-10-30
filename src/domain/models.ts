@@ -20,11 +20,18 @@ export type Place = {
   openingHours: string | null;
   source: Source;
 };
-export type WalkingRoute = {
-  mode: "walking";
+export type RouteMode = "walking" | "driving" | "transit";
+
+/**
+ * 一段接续路线。mode 是已查询到的交通方式，不是模型猜测；
+ * detail 只写供应商返回的可核对信息（如“打车参考”），没有就为 null。
+ */
+export type Route = {
+  mode: RouteMode;
   meters: number | null;
   seconds: number | null;
   segments: Coordinate[][];
+  detail: string | null;
   source: Source;
 };
 export type TripInput = {
@@ -41,7 +48,7 @@ export type TripInput = {
 export type Leg = {
   fromId: string;
   toId: string;
-  route: WalkingRoute | null;
+  route: Route | null;
   error: string | null;
 };
 export type Stop = {
@@ -65,5 +72,5 @@ export interface PlaceProvider {
   search(city: string, keyword: string): Promise<Place[]>;
 }
 export interface RouteProvider {
-  walking(origin: Coordinate, destination: Coordinate): Promise<WalkingRoute>;
+  route(origin: Coordinate, destination: Coordinate, mode: RouteMode): Promise<Route>;
 }

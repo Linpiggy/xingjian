@@ -1,4 +1,4 @@
-import type { Coordinate, Place, WalkingRoute } from "@/domain/models";
+import type { Coordinate, Place, Route, RouteMode } from "@/domain/models";
 import type { DayActivity, ActivityLeg } from "@/domain/meal-planning";
 import { scheduleAvailableDay } from "@/domain/meal-planning";
 import { uniqueItineraryVisits } from "@/domain/itinerary-selection";
@@ -24,7 +24,7 @@ import {
 } from "@/lib/itinerary-contracts";
 import type { SocialReferenceProvider } from "@/server/providers/social-catalog";
 import { tripBriefSchema } from "@/lib/trip-brief-contracts";
-import { placeSchema, walkingSchema } from "@/lib/contracts";
+import { placeSchema, routeSchema } from "@/lib/contracts";
 import type { ItineraryModel } from "@/server/ai/itinerary-model";
 import { withAiBudget, withItineraryBudget } from "@/server/ai/budget";
 import { providerWaitMs } from "@/server/providers/budget";
@@ -32,11 +32,12 @@ import { ProviderError } from "@/server/providers/errors";
 
 export interface ItineraryProvider {
   search(city: string, keyword: string, signal?: AbortSignal): Promise<Place[]>;
-  walking(
+  route(
     origin: Coordinate,
     destination: Coordinate,
+    mode: RouteMode,
     signal?: AbortSignal,
-  ): Promise<WalkingRoute>;
+  ): Promise<Route>;
 }
 const queries: Record<TripPurpose, string[]> = {
   local_life: ["历史街区", "传统市场"],
@@ -83,19 +84,55 @@ function retryableRouteFailure(error: unknown): boolean {
     ["rate_limited", "upstream_http", "unavailable"].includes(error.code)
   );
 }
+/** 直线距离粗筛，只用来决定查哪种交通方式，不当作实际路程 */
+export function straightLineMeters(origin: Coordinate, destination: Coordinate): number {
+  const radians = Math.PI / 180;
+  const latitude = (destination[1] - origin[1]) * radians;
+  const longitude = (destination[0] - origin[0]) * radians;
+  const value =
+    Math.sin(latitude / 2) ** 2 +
+    Math.cos(origin[1] * radians) *
+      Math.cos(destination[1] * radians) *
+      Math.sin(longitude / 2) ** 2;
+  return 6_371_000 * 2 * Math.asin(Math.sqrt(Math.min(1, value)));
+}
+
+/** 步行 1.2 km 以内；超过就查打车／驾车参考，避免把长距离硬排成步行 */
+export const WALK_LIMIT_METERS = 1_500;
+
+export function suggestedRouteMode(
+  origin: Coordinate,
+  destination: Coordinate,
+): RouteMode {
+  return straightLineMeters(origin, destination) <= WALK_LIMIT_METERS
+    ? "walking"
+    : "driving";
+}
+
 async function fetchWalking(
   provider: ItineraryProvider,
   origin: Coordinate,
   destination: Coordinate,
   signal: AbortSignal,
   progress: (message: string, stage?: ItineraryStage) => void,
-): Promise<WalkingRoute | null> {
+): Promise<Route | null> {
+  const mode = suggestedRouteMode(origin, destination);
   for (let attempt = 0; attempt < 2; attempt += 1) {
     await turn(signal, progress, "routes");
     try {
-      return walkingSchema.parse(await provider.walking(origin, destination, signal));
+      return routeSchema.parse(await provider.route(origin, destination, mode, signal));
     } catch (error) {
       signal.throwIfAborted();
+      const fallback = mode === "driving" && attempt === 1;
+      if (fallback) {
+        try {
+          return routeSchema.parse(
+            await provider.route(origin, destination, "walking", signal),
+          );
+        } catch {
+          return null;
+        }
+      }
       if (attempt === 1 || !retryableRouteFailure(error)) {
         return null;
       }
@@ -408,6 +445,7 @@ export async function createItinerary(
         );
       }
       const legs: ActivityLeg[] = [];
+      let drivingLegs = 0;
       for (let i = 1; i < activities.length; i++) {
         const fetched = await fetchWalking(
           provider,
@@ -417,7 +455,7 @@ export async function createItinerary(
           progress,
         );
         // A route recorded from the user's own input is not a verified supplier answer.
-        let route: WalkingRoute | null = fetched?.source.kind === "user" ? null : fetched;
+        let route: Route | null = fetched?.source.kind === "user" ? null : fetched;
         if (route) {
           let points = 0;
           const segments = route.segments.filter((segment) => {
@@ -430,12 +468,15 @@ export async function createItinerary(
           route = { ...route, segments };
         } else {
           notices.push(
-            "一段实际步行路线未核实，相关后续时刻保持未知；不会以直线距离补交通时间。",
+            "一段实际交通路线未核实，相关后续时刻保持未知；不会以直线距离补交通时间。",
           );
         }
-        if (route?.seconds != null && route.seconds > 2400) {
+        if (route?.mode === "driving") {
+          drivingLegs += 1;
+        }
+        if (route?.mode === "walking" && route.seconds != null && route.seconds > 2400) {
           notices.push(
-            "含超过 40 分钟的步行路段，需比较公共交通或调整地点；当前不冒称已获得公交方案。",
+            "含超过 40 分钟的步行路段，建议改乘公共交通或调整地点；当前只查了步行方案。",
           );
         }
         legs.push({
@@ -443,6 +484,11 @@ export async function createItinerary(
           toActivityId: activities[i].id,
           route,
         });
+      }
+      if (drivingLegs >= 3) {
+        notices.push(
+          `当天有 ${drivingLegs} 段需要打车或驾车，地点分布较散；可考虑合并同片区站点，或减少跨区安排。`,
+        );
       }
       const schedule = scheduleAvailableDay({
         date: availability.date,
@@ -545,7 +591,7 @@ export async function createItinerary(
       notices: [
         ...selection.notices,
         `按“${tripPurposeLabels[brief.mainPurpose]}”优先组织；选择与菜品描述为 AI 建议，非商家事实。`,
-        "目前各段采用实际步行查询；公共交通方案、开放、预约、实际价格与天气仍待核实，不保证可直接执行。",
+        "接续段按距离分别查询了实际步行或打车／驾车方案；公交线路、开放、预约、实际价格与天气仍待核实，不保证可直接执行。",
         "费用图表示预算目标的分配建议，不是实际报价或预算达标证明；早餐、午晚餐按真实可用时段纳入。",
         "10 分钟为独立规划缓冲，不是排队、候车或路段耗时；未发送精确住宿字段和自定义地图点，请勿在偏好中填写票据或联系方式。",
         "方案暂存在本页，刷新会丢失。",

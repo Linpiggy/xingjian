@@ -5,6 +5,9 @@ import { Dialog } from "@/components/arc/dialog/dialog";
 import type { Coordinate, PlaceCandidate } from "@/domain/models";
 import { coordinateSchema } from "@/lib/contracts";
 import { initializeMap, type MapFailure } from "./initialize-map";
+import { Button } from "@/components/arc/button/button";
+import { ArcIcon } from "@/components/arc/icon/icon";
+import { Input } from "@/components/arc/input/input";
 
 export function PointPicker({
   center,
@@ -118,14 +121,15 @@ export function PointPicker({
     >
       <div className="dialog-heading">
         <h2 id="point-title">地图添加地点</h2>
-        <button
+        <Button
+          variant="icon"
           type="button"
           className="icon-button"
           aria-label="关闭地图选点"
           onClick={close}
         >
-          <X size={20} />
-        </button>
+          <ArcIcon icon={X} size="md" />
+        </Button>
       </div>
       <p className="muted">
         点击地图选择位置，再填写名称。自定义地点的位置与入口请自行确认。
@@ -145,9 +149,9 @@ export function PointPicker({
                 ? "底图加载超时，请稍后重试。"
                 : "请检查网络后重试，也可关闭地图并搜索添加地点。"}
             </p>
-            <button
+            <Button
               type="button"
-              className="button"
+
               onClick={() => {
                 setFailure(null);
                 setRuntime(null);
@@ -155,7 +159,7 @@ export function PointPicker({
               }}
             >
               重试地图
-            </button>
+            </Button>
           </div>
         ) : !runtime ? (
           <div className="map-state" role="status">
@@ -165,7 +169,7 @@ export function PointPicker({
       </div>
       <div className="field">
         <label htmlFor="custom-point-name">自定义地点名称</label>
-        <input
+        <Input
           id="custom-point-name"
           value={name}
           onChange={(event) => setName(event.target.value)}
@@ -179,14 +183,15 @@ export function PointPicker({
       </div>
       <div className="form-actions">
         <small>仅代表用户选点，城市、入口、开放与价格未核实。</small>
-        <button
+        <Button
+          variant="primary"
           type="button"
-          className="button primary"
+
           disabled={!point || !name.trim()}
           onClick={confirm}
         >
           添加到清单
-        </button>
+        </Button>
       </div>
     </Dialog>
   );
