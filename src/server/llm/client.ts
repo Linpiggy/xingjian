@@ -69,6 +69,8 @@ export async function streamCompletion(
     signal: AbortSignal;
     onText: (delta: string) => void;
     maxTokens?: number;
+    /** 不使用工具时可要求模型只输出 JSON 对象 */
+    jsonOutput?: boolean;
   },
 ): Promise<CompletionResult> {
   let response: Response;
@@ -89,8 +91,13 @@ export async function streamCompletion(
         max_tokens: options.maxTokens ?? 8000,
         ...(config.isDeepSeek ? { thinking: { type: "disabled" } } : {}),
         messages: options.messages,
-        tools: options.tools.map((tool) => ({ type: "function", function: tool })),
-        tool_choice: "auto",
+        ...(options.tools.length
+          ? {
+              tools: options.tools.map((tool) => ({ type: "function", function: tool })),
+              tool_choice: "auto",
+            }
+          : {}),
+        ...(options.jsonOutput ? { response_format: { type: "json_object" } } : {}),
       }),
     });
   } catch (error) {

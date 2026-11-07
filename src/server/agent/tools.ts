@@ -5,15 +5,18 @@
  */
 import { z } from "zod";
 import { clusterByArea, distanceMeters, orderByShortestPath } from "@/lib/geo";
+import { requiredMeals } from "@/lib/schedule";
 import type { Place } from "@/lib/schema";
 import { addDays } from "@/lib/time";
 import { hasCityKnowledge, retrieve } from "@/server/rag/retriever";
 import type { ToolSpec } from "@/server/llm/client";
-import { assembleTrip, buildDay } from "./enrich";
+import { assembleTrip, buildDay, dayToDraft } from "./enrich";
 import { cleanText, cleanList } from "./guard";
 import type { AgentSession, DayDraft } from "./session";
 
 const MAX_SIGHTS: Record<string, number> = { relaxed: 3, balanced: 4, packed: 6 };
+/** 同一天最多提交次数，超过后要求模型接受结果继续，避免死循环 */
+const MAX_DAY_ATTEMPTS = 3;
 
 function compactPlace(place: Place, origin?: Place) {
   return {
@@ -78,6 +81,18 @@ const saveDayArgs = z.object({
   stops: z.array(stopArgs).min(2).max(10),
 });
 
+const setHotelArgs = z.object({
+  placeId: z.string().describe("通过 search_places / search_nearby 搜到的酒店 ID"),
+  reason: z.string().max(120).describe("为什么住这里：离哪些景点近、交通如何"),
+  pricePerNightCny: z
+    .number()
+    .min(0)
+    .max(20000)
+    .nullable()
+    .default(null)
+    .describe("每间每晚参考价"),
+});
+
 const finalizeArgs = z.object({
   title: z.string().max(30),
   subtitle: z.string().max(60),
@@ -98,7 +113,7 @@ const finalizeArgs = z.object({
     .max(20000)
     .nullable()
     .default(null)
-    .describe("每间每晚住宿参考价"),
+    .describe("可选：覆盖 set_hotel 给出的每间每晚参考价"),
   hotelNote: z.string().max(80).default("").describe("住宿区域建议"),
   changeSummary: z
     .string()
@@ -254,6 +269,33 @@ export const tools = {
       );
     },
   }),
+  set_hotel: define({
+    schema: setHotelArgs,
+    description:
+      "多日行程必须先确定住宿：选择位于行程重心、交通方便的酒店（用户已指定酒店时用它）。之后每天会自动计算从酒店出发与返回的交通。",
+    label: (args, session) =>
+      `确定住宿：${session.places.get(args.placeId)?.name ?? "酒店"}`,
+    run: async (args, session) => {
+      const place = session.places.get(args.placeId);
+      if (!place) {
+        return fail(`未知地点 ID ${args.placeId}，请先搜索酒店`);
+      }
+      if (place.category !== "hotel" && place.category !== "other") {
+        return fail(`${place.name} 不是住宿类地点，请搜索“酒店”`);
+      }
+      const changed = session.hotel?.place.id !== place.id;
+      session.hotel = {
+        place,
+        reason: cleanText(args.reason),
+        pricePerNightCny: args.pricePerNightCny,
+        userProvided: Boolean(session.request.hotelName),
+      };
+      if (changed) {
+        session.staleDays = new Set(session.days.keys());
+      }
+      return ok({ hotel: place.name }, `住在${place.name}`);
+    },
+  }),
   arrange_places: define({
     schema: arrangeArgs,
     description:
@@ -293,7 +335,18 @@ export const tools = {
       if (args.day > days) {
         return fail(`行程只有 ${days} 天，day 超出范围`);
       }
+      if (session.needsHotel() && !session.hotel) {
+        return fail("多日行程请先搜索酒店并调用 set_hotel 确定住宿，再提交每天安排");
+      }
       const errors: string[] = [];
+      const submitted = new Set(args.stops.map((stop) => stop.placeId));
+      for (const locked of session.lockedPlaceIds(args.day)) {
+        if (!submitted.has(locked)) {
+          errors.push(
+            `${session.places.get(locked)?.name ?? locked} 已被用户锁定，必须保留在这一天`,
+          );
+        }
+      }
       for (const stop of args.stops) {
         if (!session.places.has(stop.placeId)) {
           errors.push(`地点 ID ${stop.placeId} 不是检索结果中的真实地点`);
@@ -307,8 +360,17 @@ export const tools = {
         errors.push(`当前节奏每天最多 ${MAX_SIGHTS[pace]} 个景点，请删减`);
       }
       const meals = new Set(args.stops.map((stop) => stop.mealType).filter(Boolean));
-      if (!meals.has("lunch") || !meals.has("dinner")) {
-        errors.push("每天需要包含午餐（lunch）和晚餐（dinner）两个 meal 站点");
+      const required = requiredMeals(
+        args.day,
+        days,
+        session.request.arrivalTime,
+        session.request.departureTime,
+      );
+      const missing = required.filter((meal) => !meals.has(meal));
+      if (missing.length) {
+        errors.push(
+          `这一天需要包含 ${missing.map((meal) => (meal === "lunch" ? "午餐（lunch）" : "晚餐（dinner）")).join("和")} 的 meal 站点`,
+        );
       }
       const usedElsewhere = [...session.days.values()]
         .filter((day) => day.day !== args.day)
@@ -331,6 +393,7 @@ export const tools = {
         summary: cleanText(args.summary),
         stops: args.stops.map((stop) => ({
           ...stop,
+          locked: session.lockedPlaceIds(args.day).includes(stop.placeId),
           mealType: stop.kind === "meal" ? (stop.mealType ?? "snack") : null,
           title: cleanText(stop.title),
           description: cleanText(stop.description),
@@ -339,8 +402,16 @@ export const tools = {
           dishes: cleanList(stop.dishes),
         })),
       };
+      const attempts = (session.saveAttempts.get(args.day) ?? 0) + 1;
+      if (attempts > MAX_DAY_ATTEMPTS + 1) {
+        return fail(
+          `第 ${args.day} 天已提交过多次，请保留现有安排，继续其他天或调用 finalize_trip`,
+        );
+      }
+      session.saveAttempts.set(args.day, attempts);
       const day = await buildDay(session, draft);
       session.days.set(day.day, day);
+      session.staleDays.delete(day.day);
       session.emit({ type: "day", day });
       const conflicts = [
         ...day.warnings,
@@ -356,6 +427,14 @@ export const tools = {
           ),
           legs: day.legs.map((leg) => `${leg.mode} ${leg.minutes ?? "?"}分钟`),
           conflicts,
+          ...(conflicts.length
+            ? {
+                note:
+                  attempts >= MAX_DAY_ATTEMPTS
+                    ? "这一天已调整多次，请接受当前安排并继续下一步，剩余冲突会提示给用户。"
+                    : "冲突能通过调整顺序、删减或替换解决时再重提；若无法解决（如赶车时间），接受即可，不要反复提交。",
+              }
+            : {}),
           remainingDays: Array.from({ length: days }, (_, i) => i + 1).filter(
             (d) => !session.days.has(d),
           ),
@@ -380,6 +459,16 @@ export const tools = {
         return fail(`还有第 ${missing.join("、")} 天未提交 save_day_plan`);
       }
       const previous = session.previous;
+      // 住宿变更后，未重新提交的天需要按新酒店重算往返交通
+      for (const dayNumber of session.staleDays) {
+        const existing = session.days.get(dayNumber);
+        if (existing) {
+          const rebuilt = await buildDay(session, dayToDraft(existing));
+          session.days.set(dayNumber, rebuilt);
+          session.emit({ type: "day", day: rebuilt });
+        }
+      }
+      session.staleDays.clear();
       const trip = assembleTrip(session, {
         title: cleanText(args.title) || previous?.title || `${session.request.city}之旅`,
         subtitle: cleanText(args.subtitle) || previous?.subtitle || "",

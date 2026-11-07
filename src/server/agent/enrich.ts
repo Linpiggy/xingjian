@@ -97,6 +97,12 @@ export async function buildDay(session: AgentSession, draft: DayDraft): Promise<
   for (let i = 1; i < places.length; i += 1) {
     legs.push(await computeLeg(session, places[i - 1], places[i]));
   }
+  const { days: totalDays, arrivalTime, departureTime } = session.request;
+  const hotel = session.needsHotel() ? session.hotel?.place : null;
+  const isLast = draft.day === totalDays;
+  const startLeg = hotel ? await computeLeg(session, hotel, places[0]) : null;
+  const endLeg =
+    hotel && !isLast ? await computeLeg(session, places[places.length - 1], hotel) : null;
   const { slots, warnings } = scheduleDay(
     session.request.pace,
     draft.stops.map((stop, i) => ({
@@ -106,6 +112,11 @@ export async function buildDay(session: AgentSession, draft: DayDraft): Promise<
       durationMin: stop.durationMin,
     })),
     legs,
+    {
+      startLeg,
+      arrival: draft.day === 1 ? arrivalTime : null,
+      departure: isLast ? departureTime : null,
+    },
   );
   const date = addDays(session.request.startDate, draft.day - 1);
   const weather = session.weather?.find((item) => item.date === date) ?? null;
@@ -125,6 +136,8 @@ export async function buildDay(session: AgentSession, draft: DayDraft): Promise<
     dishes: stop.dishes,
     citations: stop.citations.filter((id) => session.knowledge.has(id)),
     warnings: slots[i].warnings,
+    locked: stop.locked ?? false,
+    userEdited: stop.userEdited ?? false,
   }));
   if (weather && /雨|雪|雷/.test(weather.dayWeather)) {
     warnings.unshift(`当天预报${weather.dayWeather}，户外项目请备好雨具或准备室内备选`);
@@ -136,8 +149,35 @@ export async function buildDay(session: AgentSession, draft: DayDraft): Promise<
     summary: draft.summary,
     stops,
     legs,
+    startLeg,
+    endLeg,
     weather,
     warnings,
+  };
+}
+
+/** 已排好的一天转回草稿，用于手动编辑或住宿变更后重新排程 */
+export function dayToDraft(day: Day): DayDraft {
+  return {
+    day: day.day,
+    theme: day.theme,
+    summary: day.summary,
+    stops: day.stops.map((stop) => ({
+      placeId: stop.place.id,
+      kind: stop.kind,
+      mealType: stop.mealType,
+      durationMin: stop.durationMin,
+      title: stop.title,
+      description: stop.description,
+      highlights: stop.highlights,
+      tips: stop.tips,
+      ticketCny: stop.ticketCny,
+      mealCny: stop.mealCny,
+      dishes: stop.dishes,
+      citations: stop.citations,
+      locked: stop.locked,
+      userEdited: stop.userEdited,
+    })),
   };
 }
 
@@ -155,7 +195,11 @@ export function computeBudget(
   const stops = days.flatMap((day) => day.stops);
   const sights = stops.filter((stop) => stop.kind === "sight");
   const meals = stops.filter((stop) => stop.kind === "meal");
-  const legs = days.flatMap((day) => day.legs);
+  const legs = days.flatMap((day) => [
+    ...day.legs,
+    ...(day.startLeg ? [day.startLeg] : []),
+    ...(day.endLeg ? [day.endLeg] : []),
+  ]);
   const unknownItems: string[] = [];
   const unknownTickets = sights.filter((stop) => stop.ticketCny === null);
   if (unknownTickets.length) {
@@ -230,8 +274,8 @@ export function assembleTrip(
     budget: computeBudget(
       days,
       session.request.travelers,
-      args.hotelPerNightCny,
-      args.hotelNote,
+      args.hotelPerNightCny ?? session.hotel?.pricePerNightCny ?? null,
+      session.hotel ? session.hotel.place.name : args.hotelNote,
     ),
     citations: [...cited].flatMap((id) => {
       const chunk = session.knowledge.get(id);
@@ -248,5 +292,43 @@ export function assembleTrip(
     }),
     changeSummary: args.changeSummary,
     generatedAt: new Date().toISOString(),
+    hotel: session.hotel,
+    candidates: collectCandidates(session, days),
   };
+}
+
+/** 未被采用的景点与餐厅留作手动替换候选，各取最多 40 个 */
+function collectCandidates(session: AgentSession, days: Day[]): Place[] {
+  const used = new Set(days.flatMap((day) => day.stops.map((stop) => stop.place.id)));
+  if (session.hotel) {
+    used.add(session.hotel.place.id);
+  }
+  const rest = [...session.places.values()].filter((place) => !used.has(place.id));
+  const food = rest.filter((place) => place.category === "food").slice(-40);
+  const other = rest
+    .filter((place) => place.category !== "food" && place.category !== "hotel")
+    .slice(-40);
+  return [...other, ...food];
+}
+
+/** 手动编辑后重算预算：住宿按原口径保留，其余按当前行程汇总 */
+export function recomputeBudget(trip: Trip, travelers: number): Budget {
+  const next = computeBudget(
+    trip.days,
+    travelers,
+    trip.hotel?.pricePerNightCny ?? null,
+    trip.hotel?.place.name ?? "",
+  );
+  if (!trip.hotel) {
+    const unknownItems = next.unknownItems.filter((item) => item !== "住宿费用未估算");
+    const hotel = trip.budget.hotel;
+    return {
+      ...next,
+      hotel,
+      hotelNote: trip.budget.hotelNote,
+      unknownItems: hotel === null ? [...unknownItems, "住宿费用未估算"] : unknownItems,
+      total: next.total - (next.hotel ?? 0) + (hotel ?? 0),
+    };
+  }
+  return next;
 }

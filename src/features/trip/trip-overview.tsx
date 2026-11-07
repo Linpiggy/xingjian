@@ -1,6 +1,6 @@
 "use client";
 
-import { CloudRain, CloudSun, Snowflake, Sun } from "lucide-react";
+import { BedDouble, CloudRain, CloudSun, Snowflake, Sun } from "lucide-react";
 import { money } from "@/lib/format";
 import type { Trip, TripRequest, Weather } from "@/lib/schema";
 import { formatDateLabel } from "@/lib/time";
@@ -143,6 +143,38 @@ export function TripOverview({ trip, request }: { trip: Trip; request: TripReque
           </p>
         </div>
       </div>
+      {trip.hotel ? (
+        <div className="mt-8 flex gap-4 rounded-xl border border-line bg-card p-4 sm:p-5">
+          {trip.hotel.place.photos[0] ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={trip.hotel.place.photos[0]}
+              alt={trip.hotel.place.name}
+              referrerPolicy="no-referrer"
+              loading="lazy"
+              className="hidden size-24 shrink-0 rounded-lg object-cover sm:block"
+            />
+          ) : null}
+          <div className="min-w-0">
+            <p className="flex items-center gap-1.5 text-xs text-ink-faint">
+              <BedDouble size={14} className="text-sky" aria-hidden />
+              {trip.hotel.userProvided ? "你预订的住处" : "AI 推荐住处"}
+              {trip.hotel.pricePerNightCny !== null
+                ? ` · 参考价约 ${money(trip.hotel.pricePerNightCny)}/间/晚`
+                : ""}
+            </p>
+            <h2 className="mt-1 font-display text-xl text-ink">
+              {trip.hotel.place.name}
+            </h2>
+            {trip.hotel.place.address ? (
+              <p className="text-sm text-ink-faint">{trip.hotel.place.address}</p>
+            ) : null}
+            <p className="mt-2 text-sm leading-relaxed text-ink-soft">
+              {trip.hotel.reason}
+            </p>
+          </div>
+        </div>
+      ) : null}
     </section>
   );
 }

@@ -15,6 +15,7 @@ const place = (id: string, name: string, lng: number, lat: number): Place => ({
   photos: [],
   citycode: "0571",
   adcode: "330106",
+  category: "sight",
 });
 
 const lake = place("T1", "测试湖畔", 120.15, 30.25);
@@ -37,6 +38,8 @@ export function fixtureDay(day: number, museumTitle = "测试博物馆"): Day {
       wind: "东风 1-3级",
     },
     warnings: [],
+    startLeg: null,
+    endLeg: null,
     stops: [
       {
         kind: "sight",
@@ -54,6 +57,8 @@ export function fixtureDay(day: number, museumTitle = "测试博物馆"): Day {
         dishes: [],
         citations: ["hz-overview"],
         warnings: [],
+        locked: false,
+        userEdited: false,
       },
       {
         kind: "meal",
@@ -71,6 +76,8 @@ export function fixtureDay(day: number, museumTitle = "测试博物馆"): Day {
         dishes: ["片儿川"],
         citations: [],
         warnings: [],
+        locked: false,
+        userEdited: false,
       },
       {
         kind: "sight",
@@ -88,6 +95,8 @@ export function fixtureDay(day: number, museumTitle = "测试博物馆"): Day {
         dishes: [],
         citations: [],
         warnings: ["闭园前仅剩 30 分钟，游览可能不完整"],
+        locked: false,
+        userEdited: false,
       },
       {
         kind: "meal",
@@ -105,6 +114,8 @@ export function fixtureDay(day: number, museumTitle = "测试博物馆"): Day {
         dishes: ["东坡肉"],
         citations: [],
         warnings: [],
+        locked: false,
+        userEdited: false,
       },
     ],
     legs: [
@@ -173,6 +184,8 @@ export function fixtureTrip(
     ],
     changeSummary,
     generatedAt: "2026-11-07T12:00:00.000Z",
+    hotel: null,
+    candidates: [{ ...restaurant, id: "T5", name: "测试备选餐厅", category: "food" }],
   };
 }
 

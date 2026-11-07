@@ -91,6 +91,7 @@ export function tripToMarkdown(trip: Trip, request: TripRequest): string {
     "",
     trip.overview,
     "",
+    ...(trip.hotel ? [`住宿：${trip.hotel.place.name}——${trip.hotel.reason}`, ""] : []),
   ];
   for (const day of trip.days) {
     lines.push(`## 第 ${day.day} 天 · ${formatDateLabel(day.date)} · ${day.theme}`, "");

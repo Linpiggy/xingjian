@@ -32,5 +32,6 @@
 ## 执行与验收
 
 - 改动后运行相关检查：`npm run check`（含 secrets / format / lint / typecheck / test），UI 或流程变化再跑 `npm run e2e`；只汇报实际执行结果。
-- 真实模型 / 高德调用会消耗额度，验证时控制次数。
+- 真实模型 / 高德调用会消耗额度，验证时控制次数；`npm run evaluate` 一次约数百次高德调用，需要时才运行。
+- 修改 `tripSchema` 等持久化结构时，新字段给默认值并在 `src/store/trips.ts` 的 `migrate` 中处理旧数据。
 - 每轮测试后本地提交 Git；不推送、不改全局配置、不重写历史。

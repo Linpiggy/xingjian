@@ -5,14 +5,14 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { Coordinate, Day, Place } from "@/lib/schema";
+import type { Coordinate, Day, Hotel, Place } from "@/lib/schema";
 
 interface MapPoint {
   id: string;
   name: string;
   location: Coordinate;
   label: string;
-  tone: "sight" | "meal" | "candidate";
+  tone: "sight" | "meal" | "candidate" | "hotel";
 }
 
 interface MapLine {
@@ -41,7 +41,12 @@ interface AMapSdk {
   Scale: new () => unknown;
 }
 
-const COLORS = { sight: "#1f5a47", meal: "#b0512a", candidate: "#8d8274" };
+const COLORS: Record<MapPoint["tone"], string> = {
+  hotel: "#2d5b78",
+  sight: "#1f5a47",
+  meal: "#b0512a",
+  candidate: "#8d8274",
+};
 const LINE_COLORS = { walking: "#1f5a47", transit: "#2d5b78", taxi: "#9a6512" };
 
 let sdkPromise: Promise<AMapSdk> | null = null;
@@ -76,6 +81,7 @@ function markerHtml(point: MapPoint, active: boolean): string {
 export function buildMapData(
   days: Day[],
   candidates: Place[],
+  hotel: Hotel | null = null,
 ): { points: MapPoint[]; lines: MapLine[] } {
   const points: MapPoint[] = [];
   const lines: MapLine[] = [];
@@ -89,7 +95,11 @@ export function buildMapData(
         tone: stop.kind === "meal" ? "meal" : "sight",
       });
     });
-    for (const leg of day.legs) {
+    for (const leg of [
+      ...day.legs,
+      ...(day.startLeg ? [day.startLeg] : []),
+      ...(day.endLeg ? [day.endLeg] : []),
+    ]) {
       if (leg.path.length >= 2) {
         lines.push({ path: leg.path, mode: leg.mode });
       }
@@ -107,18 +117,29 @@ export function buildMapData(
       });
     }
   }
+  if (hotel && days.some((day) => day.startLeg || day.endLeg)) {
+    points.push({
+      id: "hotel",
+      name: hotel.place.name,
+      location: hotel.place.location,
+      label: "宿",
+      tone: "hotel",
+    });
+  }
   return { points, lines };
 }
 
 export function TripMap({
   days,
   candidates = [],
+  hotel = null,
   activeId,
   onSelect,
   className = "",
 }: {
   days: Day[];
   candidates?: Place[];
+  hotel?: Hotel | null;
   activeId?: string | null;
   onSelect?: (id: string) => void;
   className?: string;
@@ -127,7 +148,10 @@ export function TripMap({
   const container = useRef<HTMLDivElement>(null);
   const [map, setMap] = useState<{ instance: AMapMap; sdk: AMapSdk } | null>(null);
   const [failed, setFailed] = useState(!key);
-  const data = useMemo(() => buildMapData(days, candidates), [days, candidates]);
+  const data = useMemo(
+    () => buildMapData(days, candidates, hotel),
+    [days, candidates, hotel],
+  );
   const select = useRef(onSelect);
   useEffect(() => {
     select.current = onSelect;
@@ -215,7 +239,7 @@ export function TripMap({
         zIndex: point.tone === "candidate" ? 20 : point.id === activeId ? 40 : 30,
         anchor: "center",
       });
-      if (point.tone !== "candidate") {
+      if (point.tone !== "candidate" && point.tone !== "hotel") {
         marker.on("click", () => select.current?.(point.id));
       }
       overlays.push(marker);

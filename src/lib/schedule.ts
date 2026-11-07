@@ -35,13 +35,35 @@ export const TRANSFER_BUFFER_MIN = 10;
 /** 交通耗时未知时的保守估算 */
 export const UNKNOWN_LEG_MIN = 30;
 
+/** 抵达后出站、去酒店放行李的预留时间 */
+export const ARRIVAL_SETTLE_MIN = 60;
+/** 离开前回酒店取行李并赶往车站/机场的预留时间 */
+export const DEPARTURE_RESERVE_MIN = 120;
+
+export interface DayConstraints {
+  /** 从酒店到第一站的交通 */
+  startLeg?: Pick<Leg, "minutes"> | null;
+  /** 当天最早可开始时间（第一天抵达时间） */
+  arrival?: string | null;
+  /** 当天必须离开的时间（最后一天返程时间） */
+  departure?: string | null;
+}
+
 export function scheduleDay(
   pace: Pace,
   stops: ScheduleInput[],
   legs: Pick<Leg, "minutes">[],
+  constraints: DayConstraints = {},
 ): { slots: ScheduledSlot[]; warnings: string[] } {
   const dayWarnings: string[] = [];
   let cursor = toMinutes(DAY_START[pace]) ?? 540;
+  const arrival = constraints.arrival ? toMinutes(constraints.arrival) : null;
+  if (arrival !== null) {
+    cursor = Math.max(cursor, arrival + ARRIVAL_SETTLE_MIN);
+  }
+  if (constraints.startLeg) {
+    cursor += (constraints.startLeg.minutes ?? UNKNOWN_LEG_MIN) + TRANSFER_BUFFER_MIN;
+  }
   const slots: ScheduledSlot[] = [];
 
   stops.forEach((stop, index) => {
@@ -88,6 +110,12 @@ export function scheduleDay(
     cursor = end;
   });
 
+  const departure = constraints.departure ? toMinutes(constraints.departure) : null;
+  if (departure !== null && cursor > departure - DEPARTURE_RESERVE_MIN) {
+    dayWarnings.push(
+      `最后一站 ${toClock(cursor)} 结束，距离 ${constraints.departure} 返程不足 ${DEPARTURE_RESERVE_MIN / 60} 小时，可能赶不上车`,
+    );
+  }
   if (cursor > 22 * 60) {
     dayWarnings.push(`当天行程预计 ${toClock(cursor)} 才结束，节奏偏紧，建议删减一项`);
   }
@@ -98,4 +126,31 @@ export function scheduleDay(
     );
   }
   return { slots, warnings: dayWarnings };
+}
+
+/**
+ * 每天必须安排的正餐：第一天到得晚就不要求午餐，最后一天走得早就不要求晚餐。
+ * 校验器与提示词共用这条规则，避免模型陷入“必须吃晚饭却要赶车”的矛盾。
+ */
+export function requiredMeals(
+  day: number,
+  totalDays: number,
+  arrival: string | null,
+  departure: string | null,
+): ("lunch" | "dinner")[] {
+  const meals: ("lunch" | "dinner")[] = ["lunch", "dinner"];
+  const arrive = day === 1 && arrival ? toMinutes(arrival) : null;
+  const leave = day === totalDays && departure ? toMinutes(departure) : null;
+  return meals.filter((meal) => {
+    const window = MEAL_WINDOWS[meal];
+    const from = toMinutes(window.from) ?? 0;
+    const to = toMinutes(window.to) ?? 0;
+    if (arrive !== null && arrive + ARRIVAL_SETTLE_MIN > to) {
+      return false;
+    }
+    if (leave !== null && leave - DEPARTURE_RESERVE_MIN < from + 45) {
+      return false;
+    }
+    return true;
+  });
 }

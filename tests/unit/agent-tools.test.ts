@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { AgentEvent, Place, TripRequest } from "@/lib/schema";
+import type { AgentEvent, Place, Trip, TripRequest } from "@/lib/schema";
 import { computeBudget } from "@/server/agent/enrich";
 import { AgentSession } from "@/server/agent/session";
 import { tools, toolSpecs } from "@/server/agent/tools";
@@ -18,6 +18,9 @@ const request: TripRequest = {
   foodPreference: "",
   notes: "",
   accessibility: false,
+  arrivalTime: null,
+  departureTime: null,
+  hotelName: "",
 };
 
 function place(id: string, lng: number, extra: Partial<Place> = {}): Place {
@@ -33,6 +36,7 @@ function place(id: string, lng: number, extra: Partial<Place> = {}): Place {
     photos: [],
     citycode: "0571",
     adcode: "330106",
+    category: "sight",
     ...extra,
   };
 }
@@ -62,18 +66,41 @@ const fakeAmap = {
   }),
 } as unknown as AmapClient;
 
-function session() {
+function session(withHotel = true, previous: Trip | null = null) {
   const events: AgentEvent[] = [];
-  const s = new AgentSession(request, fakeAmap, (event) => events.push(event));
+  const s = new AgentSession(request, fakeAmap, (event) => events.push(event), previous);
   s.register([
+    place("h1", 120.16, { category: "hotel", name: "测试酒店" }),
     place("s1", 120.15),
     place("s2", 120.155),
     place("r1", 120.152, { avgCost: 80 }),
     place("r2", 120.2, { avgCost: 120 }),
     place("s3", 120.3),
+    place("s4", 120.31),
   ]);
+  if (withHotel) {
+    s.hotel = {
+      place: s.places.get("h1")!,
+      reason: "",
+      pricePerNightCny: 300,
+      userProvided: false,
+    };
+  }
   return { s, events };
 }
+
+const validDay = (day = 1, sights: [string, string] = ["s1", "s2"]) =>
+  tools.save_day_plan.schema.parse({
+    day,
+    theme: "湖边",
+    summary: "",
+    stops: [
+      stop(sights[0], "sight"),
+      stop("r1", "meal", "lunch"),
+      stop(sights[1], "sight"),
+      stop("r2", "meal", "dinner"),
+    ],
+  });
 
 const stop = (
   placeId: string,
@@ -161,6 +188,55 @@ describe("agent tools", () => {
     expect(events.some((event) => event.type === "day")).toBe(true);
   });
 
+  it("requires a hotel before planning multi-day trips", async () => {
+    const { s } = session(false);
+    const outcome = await tools.save_day_plan.run(validDay(), s);
+    expect(outcome.content).toContain("set_hotel");
+  });
+
+  it("adds hotel legs except after the last day", async () => {
+    const { s } = session();
+    await tools.save_day_plan.run(validDay(1), s);
+    await tools.save_day_plan.run(validDay(2, ["s3", "s4"]), s);
+    expect(s.days.get(1)!.startLeg).not.toBeNull();
+    expect(s.days.get(1)!.endLeg).not.toBeNull();
+    expect(s.days.get(2)!.endLeg).toBeNull();
+  });
+
+  it("keeps stops the user locked when revising", async () => {
+    const { s } = session();
+    await tools.save_day_plan.run(validDay(1), s);
+    await tools.save_day_plan.run(validDay(2, ["s3", "s4"]), s);
+    const locked = s.days.get(1)!;
+    const previous = {
+      days: [
+        {
+          ...locked,
+          stops: locked.stops.map((item, i) => ({ ...item, locked: i === 0 })),
+        },
+      ],
+      citations: [],
+      candidates: [],
+      hotel: s.hotel,
+    } as unknown as Trip;
+    const revise = session(true, previous).s;
+    const outcome = await tools.save_day_plan.run(
+      tools.save_day_plan.schema.parse({
+        day: 1,
+        theme: "改",
+        summary: "",
+        stops: [
+          stop("s2", "sight"),
+          stop("r1", "meal", "lunch"),
+          stop("r2", "meal", "dinner"),
+        ],
+      }),
+      revise,
+    );
+    expect(outcome.ok).toBe(false);
+    expect(outcome.content).toContain("锁定");
+  });
+
   it("refuses to finalize before every day is planned", async () => {
     const { s } = session();
     const outcome = await tools.finalize_trip.run(
@@ -189,6 +265,8 @@ describe("budget", () => {
       legs: [],
       weather: null,
       warnings: [],
+      startLeg: null,
+      endLeg: null,
     };
     const budget = computeBudget(
       [day, { ...day, day: 2 }, { ...day, day: 3 }],

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { SiteHeader } from "@/components/site-header";
 import { PlannerForm } from "@/features/planner/planner-form";
 import { RecentTrips } from "@/features/trip/recent-trips";
+import { SampleTrips } from "@/features/trip/sample-trips";
 import { DESTINATIONS } from "@/lib/destinations";
 
 const STEPS = [
@@ -64,6 +65,12 @@ export default async function HomePage({
                   className="inline-flex h-12 items-center rounded-lg bg-ink px-6 font-medium text-paper transition-colors hover:bg-pine-deep"
                 >
                   开始规划
+                </a>
+                <a
+                  href="#samples"
+                  className="inline-flex h-12 items-center rounded-lg border border-line bg-card px-5 text-ink transition-colors hover:border-ink-faint"
+                >
+                  看看示例手册
                 </a>
                 <a
                   href="#how"
@@ -153,6 +160,18 @@ export default async function HomePage({
               ))}
             </ol>
           </div>
+        </section>
+
+        <section
+          id="samples"
+          className="mx-auto max-w-7xl scroll-mt-6 px-5 pt-20 sm:px-8"
+        >
+          <h2 className="font-display text-3xl text-ink">先翻翻成品</h2>
+          <p className="mb-8 mt-3 max-w-2xl text-ink-soft">
+            这两份手册由行间 Agent
+            实际生成，翻开后可以锁定、换顺序、替换地点，也可以直接对 AI 说想怎么改。
+          </p>
+          <SampleTrips />
         </section>
 
         <section className="mx-auto max-w-7xl px-5 py-20 sm:px-8">

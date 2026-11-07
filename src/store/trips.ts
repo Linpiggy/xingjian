@@ -6,7 +6,15 @@
 
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
-import type { AgentEvent, Day, Place, Trip, TripRequest } from "@/lib/schema";
+import {
+  tripRequestSchema,
+  tripSchema,
+  type AgentEvent,
+  type Day,
+  type Place,
+  type Trip,
+  type TripRequest,
+} from "@/lib/schema";
 
 export type TraceItem =
   | { kind: "status"; text: string }
@@ -35,6 +43,8 @@ export interface TripRecord {
   run: RunState;
   error: string | null;
   versions: { trip: Trip; label: string; at: string }[];
+  /** 首页导入的示例手册 */
+  sample?: boolean;
 }
 
 interface TripStore {
@@ -47,6 +57,10 @@ interface TripStore {
   failRun: (id: string, message: string) => void;
   cancelRun: (id: string) => void;
   undo: (id: string) => void;
+  /** 手动编辑后的新版本（旧版本进入历史，可撤销） */
+  commitEdit: (id: string, trip: Trip) => void;
+  toggleLock: (id: string, day: number, index: number) => void;
+  importSample: (request: TripRequest, trip: Trip) => string;
 }
 
 const MAX_RECORDS = 12;
@@ -54,6 +68,28 @@ const MAX_VERSIONS = 6;
 
 function newId(): string {
   return Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
+}
+
+function pushVersion(record: TripRecord): TripRecord["versions"] {
+  return record.trip
+    ? [
+        {
+          trip: record.trip,
+          label: record.trip.changeSummary ?? "初始版本",
+          at: new Date().toISOString(),
+        },
+        ...record.versions,
+      ].slice(0, MAX_VERSIONS)
+    : record.versions;
+}
+
+function insert(state: TripStore, record: TripRecord): Partial<TripStore> {
+  const order = [record.id, ...state.order].slice(0, MAX_RECORDS);
+  const records: Record<string, TripRecord> = {};
+  for (const key of order) {
+    records[key] = key === record.id ? record : state.records[key];
+  }
+  return { order, records };
 }
 
 function update(
@@ -87,13 +123,8 @@ export const useTrips = create<TripStore>()(
       order: [],
       create: (request) => {
         const id = newId();
-        set((state) => {
-          const order = [id, ...state.order].slice(0, MAX_RECORDS);
-          const records: Record<string, TripRecord> = {};
-          for (const key of order) {
-            records[key] = state.records[key];
-          }
-          records[id] = {
+        set((state) =>
+          insert(state, {
             id,
             createdAt: new Date().toISOString(),
             request,
@@ -104,11 +135,55 @@ export const useTrips = create<TripStore>()(
             run: "idle",
             error: null,
             versions: [],
-          };
-          return { order, records };
-        });
+          }),
+        );
         return id;
       },
+      importSample: (request, trip) => {
+        const id = newId();
+        set((state) =>
+          insert(state, {
+            id,
+            createdAt: new Date().toISOString(),
+            request,
+            trip,
+            liveDays: [],
+            livePlaces: [],
+            trace: [],
+            run: "idle",
+            error: null,
+            versions: [],
+            sample: true,
+          }),
+        );
+        return id;
+      },
+      commitEdit: (id, trip) =>
+        set((state) =>
+          update(state, id, (record) => ({ trip, versions: pushVersion(record) })),
+        ),
+      toggleLock: (id, day, index) =>
+        set((state) =>
+          update(state, id, (record) =>
+            record.trip
+              ? {
+                  trip: {
+                    ...record.trip,
+                    days: record.trip.days.map((item) =>
+                      item.day === day
+                        ? {
+                            ...item,
+                            stops: item.stops.map((stop, i) =>
+                              i === index ? { ...stop, locked: !stop.locked } : stop,
+                            ),
+                          }
+                        : item,
+                    ),
+                  },
+                }
+              : {},
+          ),
+        ),
       remove: (id) =>
         set((state) => {
           const records = { ...state.records };
@@ -177,16 +252,7 @@ export const useTrips = create<TripStore>()(
                 };
               }
               case "trip": {
-                const versions = record.trip
-                  ? [
-                      {
-                        trip: record.trip,
-                        label: record.trip.changeSummary ?? "初始版本",
-                        at: new Date().toISOString(),
-                      },
-                      ...record.versions,
-                    ].slice(0, MAX_VERSIONS)
-                  : record.versions;
+                const versions = pushVersion(record);
                 return {
                   trip: event.trip,
                   versions,
@@ -233,7 +299,32 @@ export const useTrips = create<TripStore>()(
     }),
     {
       name: "xingjian-trips",
-      version: 1,
+      version: 2,
+      // v1 → v2：补齐抵达/返程、住宿、候选、锁定等新字段
+      migrate: (persisted) => {
+        const state = persisted as {
+          order: string[];
+          records: Record<string, TripRecord>;
+        };
+        const records: Record<string, TripRecord> = {};
+        for (const [key, record] of Object.entries(state.records ?? {})) {
+          const request = tripRequestSchema.safeParse(record.request);
+          if (!request.success) {
+            continue;
+          }
+          const trip = record.trip ? tripSchema.safeParse(record.trip) : null;
+          records[key] = {
+            ...record,
+            request: request.data,
+            trip: trip?.success ? trip.data : null,
+            versions: (record.versions ?? []).flatMap((version) => {
+              const parsed = tripSchema.safeParse(version.trip);
+              return parsed.success ? [{ ...version, trip: parsed.data }] : [];
+            }),
+          };
+        }
+        return { order: (state.order ?? []).filter((key) => key in records), records };
+      },
       storage: createJSONStorage(() => localStorage),
       // 运行中的临时状态不持久化：刷新后视为中断
       partialize: (state) => ({

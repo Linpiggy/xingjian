@@ -2,16 +2,27 @@
 
 import {
   AlertTriangle,
+  ArrowDown,
+  ArrowUp,
+  BedDouble,
   Bus,
   CarTaxiFront,
   Clock,
   Footprints,
   Lightbulb,
+  Loader2,
+  Lock,
+  LockOpen,
+  Minus,
+  Plus,
+  Repeat,
   Square,
   Star,
   Ticket,
+  Trash2,
   Volume2,
 } from "lucide-react";
+import type { ReactNode } from "react";
 import { useSpeaker, useSpeechSupport } from "@/features/voice/speech";
 import {
   dayNarration,
@@ -21,12 +32,13 @@ import {
   money,
   stopLabel,
 } from "@/lib/format";
-import type { Citation, Day, Leg, Stop } from "@/lib/schema";
+import type { Citation, Day, Hotel, Leg, Stop } from "@/lib/schema";
+import type { DayEditor } from "./use-trip-editor";
 import { formatDateLabel } from "@/lib/time";
 
 const LEG_ICON = { walking: Footprints, transit: Bus, taxi: CarTaxiFront };
 
-function LegRow({ leg }: { leg: Leg }) {
+function LegRow({ leg, label }: { leg: Leg; label?: string }) {
   const Icon = LEG_ICON[leg.mode];
   return (
     <li className="grid grid-cols-[56px_1fr] gap-3 sm:grid-cols-[72px_1fr] sm:gap-5">
@@ -39,6 +51,7 @@ function LegRow({ leg }: { leg: Leg }) {
         </span>
         <div className="min-w-0">
           <p className="text-ink-soft">
+            {label ? <span className="text-ink-faint">{label} · </span> : null}
             <span className="font-medium text-ink">{LEG_LABEL[leg.mode]}</span>
             <span className="tabular"> · {duration(leg.minutes)}</span>
             {leg.meters ? (
@@ -60,6 +73,138 @@ function LegRow({ leg }: { leg: Leg }) {
   );
 }
 
+function HotelRow({ hotel, text }: { hotel: Hotel; text: string }) {
+  return (
+    <li className="grid grid-cols-[56px_1fr] gap-3 sm:grid-cols-[72px_1fr] sm:gap-5">
+      <div className="relative flex justify-center">
+        <span className="absolute inset-y-0 w-px bg-line" aria-hidden />
+        <span className="relative z-10 mt-2 grid size-7 place-items-center rounded-full bg-sky text-white ring-4 ring-paper">
+          <BedDouble size={14} aria-hidden />
+        </span>
+      </div>
+      <p className="py-2.5 text-sm text-ink-soft">
+        {text}
+        <span className="font-medium text-ink">{hotel.place.name}</span>
+      </p>
+    </li>
+  );
+}
+
+function ToolButton({
+  label,
+  onClick,
+  disabled,
+  pressed,
+  children,
+}: {
+  label: string;
+  onClick: () => void;
+  disabled?: boolean;
+  pressed?: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      title={label}
+      aria-pressed={pressed}
+      disabled={disabled}
+      onClick={(event) => {
+        event.stopPropagation();
+        onClick();
+      }}
+      className={`grid size-8 place-items-center rounded-md transition-colors disabled:opacity-30 ${
+        pressed
+          ? "bg-pine-soft text-pine-deep"
+          : "text-ink-soft hover:bg-paper-deep hover:text-ink"
+      }`}
+    >
+      {children}
+    </button>
+  );
+}
+
+function StopToolbar({
+  stop,
+  day,
+  index,
+  count,
+  editor,
+  onSwap,
+}: {
+  stop: Stop;
+  day: number;
+  index: number;
+  count: number;
+  editor: DayEditor;
+  onSwap: (day: number, index: number) => void;
+}) {
+  const busy = editor.busyDay !== null;
+  const locked = stop.locked;
+  return (
+    <div
+      className="no-print flex flex-wrap items-center gap-0.5 border-t border-line-soft bg-paper/60 px-2 py-1"
+      onClick={(event) => event.stopPropagation()}
+    >
+      <ToolButton
+        label={locked ? "解除锁定" : "锁定（AI 调整时保留）"}
+        pressed={locked}
+        onClick={() => editor.lock(day, index)}
+      >
+        {locked ? <Lock size={15} /> : <LockOpen size={15} />}
+      </ToolButton>
+      <span className="mx-1 h-4 w-px bg-line" aria-hidden />
+      <ToolButton
+        label="上移"
+        disabled={busy || index === 0}
+        onClick={() => editor.move(day, index, -1)}
+      >
+        <ArrowUp size={15} />
+      </ToolButton>
+      <ToolButton
+        label="下移"
+        disabled={busy || index === count - 1}
+        onClick={() => editor.move(day, index, 1)}
+      >
+        <ArrowDown size={15} />
+      </ToolButton>
+      <ToolButton
+        label="缩短 30 分钟"
+        disabled={busy || stop.durationMin <= 15}
+        onClick={() => editor.resize(day, index, -30)}
+      >
+        <Minus size={15} />
+      </ToolButton>
+      <ToolButton
+        label="延长 30 分钟"
+        disabled={busy || stop.durationMin >= 480}
+        onClick={() => editor.resize(day, index, 30)}
+      >
+        <Plus size={15} />
+      </ToolButton>
+      <span className="mx-1 h-4 w-px bg-line" aria-hidden />
+      <button
+        type="button"
+        disabled={busy || locked}
+        onClick={() => onSwap(day, index)}
+        className="flex h-8 items-center gap-1 rounded-md px-2 text-xs text-ink-soft transition-colors hover:bg-paper-deep hover:text-ink disabled:opacity-30"
+      >
+        <Repeat size={14} aria-hidden />
+        <span className="sr-only sm:not-sr-only">换一个</span>
+      </button>
+      <ToolButton
+        label="删除这一站"
+        disabled={busy || locked || count <= 1}
+        onClick={() => editor.remove(day, index)}
+      >
+        <Trash2 size={15} />
+      </ToolButton>
+      {locked ? <span className="ml-auto pr-2 text-[11px] text-pine">已锁定</span> : null}
+    </div>
+  );
+}
+
 function StopCard({
   stop,
   id,
@@ -67,6 +212,7 @@ function StopCard({
   index,
   citations,
   onFocus,
+  toolbar,
 }: {
   stop: Stop;
   id: string;
@@ -74,6 +220,7 @@ function StopCard({
   index: number;
   citations: Map<string, Citation>;
   onFocus: (id: string) => void;
+  toolbar?: ReactNode;
 }) {
   const meal = stop.kind === "meal";
   const photo = stop.place.photos[0];
@@ -116,6 +263,15 @@ function StopCard({
                 <Clock size={12} aria-hidden />
                 {stop.start}–{stop.end} · {duration(stop.durationMin)}
               </span>
+              {stop.locked ? (
+                <span className="flex items-center gap-0.5 text-pine">
+                  <Lock size={11} aria-hidden />
+                  锁定
+                </span>
+              ) : null}
+              {stop.userEdited ? (
+                <span className="text-ink-faint">· 手动调整</span>
+              ) : null}
             </div>
             <h3 className="mt-2 font-display text-xl leading-snug text-ink">
               {stop.title || stop.place.name}
@@ -223,6 +379,7 @@ function StopCard({
             </div>
           ) : null}
         </div>
+        {toolbar}
       </article>
     </li>
   );
@@ -234,13 +391,20 @@ export function DayChapter({
   activeId,
   onFocus,
   pending = false,
+  hotel = null,
+  editor,
+  onSwap,
 }: {
   day: Day;
   citations: Map<string, Citation>;
   activeId: string | null;
   onFocus: (id: string) => void;
   pending?: boolean;
+  hotel?: Hotel | null;
+  editor?: DayEditor;
+  onSwap?: (day: number, index: number) => void;
 }) {
+  const busy = editor?.busyDay === day.day;
   const { synthesis } = useSpeechSupport();
   const { speaking, speak, stop } = useSpeaker();
   return (
@@ -298,7 +462,23 @@ export function DayChapter({
         </ul>
       ) : null}
 
-      <ol className="mt-4">
+      {busy ? (
+        <p
+          className="no-print mt-4 flex items-center gap-2 text-sm text-pine"
+          role="status"
+        >
+          <Loader2 size={15} className="animate-spin" aria-hidden />
+          正在用真实路线重新计算这一天的时间…
+        </p>
+      ) : null}
+
+      <ol className={`mt-4 transition-opacity ${busy ? "opacity-50" : ""}`}>
+        {hotel && day.startLeg ? (
+          <>
+            <HotelRow hotel={hotel} text="从住处出发：" />
+            <LegRow leg={day.startLeg} label="前往第一站" />
+          </>
+        ) : null}
         {day.stops.map((stop, index) => {
           const id = `${day.day}-${index}`;
           return [
@@ -313,9 +493,27 @@ export function DayChapter({
               active={activeId === id}
               citations={citations}
               onFocus={onFocus}
+              toolbar={
+                editor && onSwap ? (
+                  <StopToolbar
+                    stop={stop}
+                    day={day.day}
+                    index={index}
+                    count={day.stops.length}
+                    editor={editor}
+                    onSwap={onSwap}
+                  />
+                ) : null
+              }
             />,
           ];
         })}
+        {hotel && day.endLeg ? (
+          <>
+            <LegRow leg={day.endLeg} label="返回住处" />
+            <HotelRow hotel={hotel} text="回到住处休息：" />
+          </>
+        ) : null}
       </ol>
     </section>
   );

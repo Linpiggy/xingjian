@@ -12,6 +12,8 @@ import {
   Segmented,
   Stepper,
 } from "@/components/ui";
+import { DatePicker } from "@/components/date-picker";
+import { TimeSelect } from "@/components/time-select";
 import { QUICK_CITIES } from "@/lib/destinations";
 import {
   INTERESTS,
@@ -53,6 +55,9 @@ export function PlannerForm({ initialCity = "" }: { initialCity?: string }) {
     foodPreference: "",
     notes: "",
     accessibility: false,
+    arrivalTime: null,
+    departureTime: null,
+    hotelName: "",
   }));
   const [errors, setErrors] = useState<Partial<Record<keyof TripRequest, string>>>({});
   const [notesBase, setNotesBase] = useState("");
@@ -73,7 +78,10 @@ export function PlannerForm({ initialCity = "" }: { initialCity?: string }) {
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
-    const parsed = tripRequestSchema.safeParse(form);
+    const parsed = tripRequestSchema.safeParse({
+      ...form,
+      hotelName: form.days > 1 ? form.hotelName : "",
+    });
     if (!parsed.success) {
       const next: typeof errors = {};
       for (const issue of parsed.error.issues) {
@@ -127,13 +135,13 @@ export function PlannerForm({ initialCity = "" }: { initialCity?: string }) {
 
       <div className="grid gap-4 sm:grid-cols-3">
         <Field label="出发日期" htmlFor="field-startDate">
-          <input
+          <DatePicker
             id="field-startDate"
-            type="date"
-            className={inputClass}
             value={form.startDate}
             min={todayInShanghai()}
-            onChange={(event) => set("startDate", event.target.value)}
+            max={addDays(todayInShanghai(), 180)}
+            span={form.days}
+            onChange={(value) => set("startDate", value)}
           />
         </Field>
         <Field label="天数">
@@ -154,6 +162,40 @@ export function PlannerForm({ initialCity = "" }: { initialCity?: string }) {
             max={20}
             value={form.travelers}
             onChange={(value) => set("travelers", value)}
+          />
+        </Field>
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-3">
+        <Field label="第一天几点到" hint="选填" htmlFor="field-arrivalTime">
+          <TimeSelect
+            id="field-arrivalTime"
+            value={form.arrivalTime}
+            placeholder="不限，全天可玩"
+            onChange={(value) => set("arrivalTime", value)}
+          />
+        </Field>
+        <Field label="最后一天几点走" hint="选填" htmlFor="field-departureTime">
+          <TimeSelect
+            id="field-departureTime"
+            value={form.departureTime}
+            placeholder="不限，玩到晚上"
+            onChange={(value) => set("departureTime", value)}
+          />
+        </Field>
+        <Field
+          label="已订酒店"
+          hint={form.days > 1 ? "选填" : "单日无需"}
+          htmlFor="field-hotelName"
+        >
+          <input
+            id="field-hotelName"
+            className={inputClass}
+            placeholder={form.days > 1 ? "不填由 AI 推荐住宿" : "当日往返"}
+            disabled={form.days === 1}
+            value={form.days > 1 ? form.hotelName : ""}
+            maxLength={60}
+            onChange={(event) => set("hotelName", event.target.value)}
           />
         </Field>
       </div>

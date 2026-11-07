@@ -30,6 +30,8 @@ export const INTERESTS = [
   "小众秘境",
 ] as const;
 
+export const clockSchema = z.string().regex(/^\d{2}:\d{2}$/, "时间格式无效");
+
 /** 用户在首页提交的规划需求 */
 export const tripRequestSchema = z.object({
   city: z.string().trim().min(1, "请填写目的地").max(20, "目的地过长"),
@@ -44,6 +46,12 @@ export const tripRequestSchema = z.object({
   foodPreference: z.string().trim().max(200),
   notes: z.string().trim().max(500),
   accessibility: z.boolean(),
+  /** 第一天抵达时间（到站/落地），null 表示不限 */
+  arrivalTime: clockSchema.nullable().default(null),
+  /** 最后一天离开时间（发车/起飞），null 表示不限 */
+  departureTime: clockSchema.nullable().default(null),
+  /** 已订酒店名称，留空由 Agent 推荐住宿区域 */
+  hotelName: z.string().trim().max(60).default(""),
 });
 export type TripRequest = z.infer<typeof tripRequestSchema>;
 
@@ -61,6 +69,8 @@ export const placeSchema = z.object({
   photos: z.array(z.string()).max(3),
   citycode: z.string().nullable(),
   adcode: z.string().nullable(),
+  /** 由高德 typecode 归类，用于替换候选与地图样式 */
+  category: z.enum(["sight", "food", "hotel", "other"]).default("other"),
 });
 export type Place = z.infer<typeof placeSchema>;
 
@@ -86,6 +96,10 @@ export const stopSchema = z.object({
   dishes: z.array(z.string()),
   citations: z.array(z.string()),
   warnings: z.array(z.string()),
+  /** 用户锁定：AI 调整时必须保留 */
+  locked: z.boolean().default(false),
+  /** 用户手动替换/修改过 */
+  userEdited: z.boolean().default(false),
 });
 export type Stop = z.infer<typeof stopSchema>;
 
@@ -123,6 +137,9 @@ export const daySchema = z.object({
   stops: z.array(stopSchema),
   /** legs[i] 连接 stops[i] 与 stops[i+1] */
   legs: z.array(legSchema),
+  /** 从酒店到第一站 / 从最后一站回酒店（单日行程或最后一天为 null） */
+  startLeg: legSchema.nullable().default(null),
+  endLeg: legSchema.nullable().default(null),
   weather: weatherSchema.nullable(),
   warnings: z.array(z.string()),
 });
@@ -148,6 +165,16 @@ export const budgetSchema = z.object({
 });
 export type Budget = z.infer<typeof budgetSchema>;
 
+export const hotelSchema = z.object({
+  place: placeSchema,
+  reason: z.string(),
+  /** 每间每晚参考价（AI 估算） */
+  pricePerNightCny: z.number().nullable(),
+  /** 用户自己指定的酒店 */
+  userProvided: z.boolean(),
+});
+export type Hotel = z.infer<typeof hotelSchema>;
+
 export const tripSchema = z.object({
   title: z.string(),
   subtitle: z.string(),
@@ -160,6 +187,9 @@ export const tripSchema = z.object({
   citations: z.array(citationSchema),
   changeSummary: z.string().nullable(),
   generatedAt: z.string(),
+  hotel: hotelSchema.nullable().default(null),
+  /** Agent 检索到但未采用的地点，供手动替换 */
+  candidates: z.array(placeSchema).max(80).default([]),
 });
 export type Trip = z.infer<typeof tripSchema>;
 
@@ -184,3 +214,13 @@ export const agentInputSchema = z.discriminatedUnion("mode", [
   }),
 ]);
 export type AgentInput = z.infer<typeof agentInputSchema>;
+
+/** 手动编辑某一天后的重新排程请求（不调用模型） */
+export const rescheduleInputSchema = z.object({
+  request: tripRequestSchema,
+  trip: tripSchema,
+  day: z.number().int().min(1),
+  stops: z.array(stopSchema).min(1).max(12),
+  label: z.string().trim().min(1).max(80),
+});
+export type RescheduleInput = z.infer<typeof rescheduleInputSchema>;

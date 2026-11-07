@@ -16,7 +16,9 @@ import { useTrips, type TripRecord } from "@/store/trips";
 import { DayChapter } from "./day-chapter";
 import { ReviseDock } from "./revise-dock";
 import { TripCover } from "./trip-cover";
+import { SwapDialog } from "./swap-dialog";
 import { TripOverview } from "./trip-overview";
+import { useTripEditor } from "./use-trip-editor";
 
 export function TripPage({ id }: { id: string }) {
   const hydrated = useHydrated();
@@ -174,6 +176,14 @@ function TripBook({ record }: { record: TripRecord }) {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [activeDay, setActiveDay] = useState(1);
   const [copied, setCopied] = useState(false);
+  const [swapTarget, setSwapTarget] = useState<{ day: number; index: number } | null>(
+    null,
+  );
+  const editor = useTripEditor(record);
+  const swapStop = swapTarget
+    ? (trip.days.find((day) => day.day === swapTarget.day)?.stops[swapTarget.index] ??
+      null)
+    : null;
   const citations = useMemo(
     () => new Map<string, Citation>(trip.citations.map((c) => [c.id, c])),
     [trip],
@@ -206,8 +216,11 @@ function TripBook({ record }: { record: TripRecord }) {
   }, [trip]);
 
   const focusStop = useCallback((id: string) => {
-    setActiveId(id);
     const day = Number(id.split("-")[0]);
+    if (!day) {
+      return;
+    }
+    setActiveId(id);
     setActiveDay(day);
     document
       .getElementById(`stop-${id}`)
@@ -242,6 +255,21 @@ function TripBook({ record }: { record: TripRecord }) {
       </SiteHeader>
 
       <main id="main" className="mx-auto max-w-7xl px-4 pb-48 sm:px-8">
+        {record.sample ? (
+          <p className="no-print mb-4 rounded-lg border border-line bg-card px-4 py-2.5 text-sm text-ink-soft">
+            这是一份示例手册，由行间 Agent 于{" "}
+            {new Date(trip.generatedAt).toLocaleDateString("zh-CN")}{" "}
+            实际生成，日期、天气和营业信息可能已经变化。可以直接在下方对它提出调整，或回到首页规划自己的旅行。
+          </p>
+        ) : null}
+        {editor.error ? (
+          <p
+            role="alert"
+            className="no-print mb-4 rounded-lg border border-danger/30 bg-card px-4 py-2.5 text-sm text-danger"
+          >
+            {editor.error}
+          </p>
+        ) : null}
         <TripCover trip={trip} request={request} />
 
         <nav
@@ -301,6 +329,7 @@ function TripBook({ record }: { record: TripRecord }) {
               </div>
               <TripMap
                 days={mapDays}
+                hotel={trip.hotel}
                 activeId={activeId}
                 onSelect={focusStop}
                 className="h-[320px] lg:h-[calc(100dvh-9rem)]"
@@ -317,8 +346,22 @@ function TripBook({ record }: { record: TripRecord }) {
                 citations={citations}
                 activeId={activeId}
                 onFocus={focusStop}
+                hotel={trip.hotel}
+                editor={editor}
+                onSwap={(day, index) => setSwapTarget({ day, index })}
               />
             ))}
+            <SwapDialog
+              stop={swapStop}
+              candidates={trip.candidates}
+              onClose={() => setSwapTarget(null)}
+              onPick={(place) => {
+                if (swapTarget) {
+                  editor.replace(swapTarget.day, swapTarget.index, place);
+                }
+                setSwapTarget(null);
+              }}
+            />
 
             <section id="tips" className="scroll-mt-24 pt-16">
               <h2 className="border-b border-ink pb-4 font-display text-[28px] text-ink">

@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { scheduleDay, TRANSFER_BUFFER_MIN, UNKNOWN_LEG_MIN } from "@/lib/schedule";
+import {
+  ARRIVAL_SETTLE_MIN,
+  requiredMeals,
+  scheduleDay,
+  TRANSFER_BUFFER_MIN,
+  UNKNOWN_LEG_MIN,
+} from "@/lib/schedule";
 import { addDays, parseOpenWindow, toClock, toMinutes } from "@/lib/time";
 
 const sight = (name: string, durationMin: number, openTime: string | null = null) => ({
@@ -78,5 +84,29 @@ describe("scheduleDay", () => {
     );
     expect(slots[1].start).toBe(toClock(600 + UNKNOWN_LEG_MIN + TRANSFER_BUFFER_MIN));
     expect(warnings.join()).toContain("未取得路线数据");
+  });
+
+  it("starts day one after arrival plus settling time and the hotel leg", () => {
+    const { slots } = scheduleDay("balanced", [sight("A", 60)], [], {
+      arrival: "13:00",
+      startLeg: { minutes: 20 },
+    });
+    expect(slots[0].start).toBe(
+      toClock(13 * 60 + ARRIVAL_SETTLE_MIN + 20 + TRANSFER_BUFFER_MIN),
+    );
+  });
+
+  it("warns when the last day ends too close to departure", () => {
+    const { warnings } = scheduleDay("balanced", [sight("A", 360)], [], {
+      departure: "15:00",
+    });
+    expect(warnings.join()).toContain("返程");
+  });
+
+  it("relaxes required meals around arrival and departure", () => {
+    expect(requiredMeals(1, 2, "10:30", "17:00")).toEqual(["lunch", "dinner"]);
+    expect(requiredMeals(2, 2, "10:30", "17:00")).toEqual(["lunch"]);
+    expect(requiredMeals(1, 2, "15:00", null)).toEqual(["dinner"]);
+    expect(requiredMeals(1, 1, null, null)).toEqual(["lunch", "dinner"]);
   });
 });

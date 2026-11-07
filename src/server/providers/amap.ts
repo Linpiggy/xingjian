@@ -50,6 +50,7 @@ const poiSchema = z.object({
   location: z.string(),
   address: text,
   type: text,
+  typecode: text,
   citycode: text,
   adcode: text,
   business: z
@@ -92,6 +93,21 @@ function securePhoto(url: string): string | null {
   }
 }
 
+/** 高德 typecode 前两位：05 餐饮、10 住宿、11 风景名胜、14 科教文化、08 体育休闲、06 购物 */
+export function categoryOf(typecode: string | null): Place["category"] {
+  const prefix = typecode?.slice(0, 2);
+  if (prefix === "05") {
+    return "food";
+  }
+  if (prefix === "10") {
+    return "hotel";
+  }
+  if (prefix && ["11", "14", "08", "06", "12", "19"].includes(prefix)) {
+    return "sight";
+  }
+  return "other";
+}
+
 function toPlace(raw: z.infer<typeof poiSchema>): Place | null {
   const location = parseLocation(raw.location);
   if (!location) {
@@ -112,6 +128,7 @@ function toPlace(raw: z.infer<typeof poiSchema>): Place | null {
       .slice(0, 3),
     citycode: raw.citycode,
     adcode: raw.adcode,
+    category: categoryOf(raw.typecode?.split("|")[0] ?? null),
   };
 }
 
