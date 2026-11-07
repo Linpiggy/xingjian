@@ -1,0 +1,252 @@
+/**
+ * 确定性增强：把模型给出的“当天地点 + 停留时长”变成可执行行程。
+ * - 相邻地点用高德真实路线计算交通方式、时长和费用
+ * - 排程器根据交通、营业时间、用餐窗口计算时刻
+ * - 汇总预算（只计已知项，未知项单独列出，不当作 0）
+ */
+import { distanceMeters } from "@/lib/geo";
+import { scheduleDay } from "@/lib/schedule";
+import type { Budget, Day, Leg, Place, Stop, Trip } from "@/lib/schema";
+import { addDays } from "@/lib/time";
+import { KNOWLEDGE_SOURCE } from "@/server/rag/corpus";
+import type { AgentSession, DayDraft } from "./session";
+
+const WALK_LIMIT_METERS = 1300;
+
+async function computeLeg(session: AgentSession, from: Place, to: Place): Promise<Leg> {
+  const { travelers, travelerType, accessibility } = session.request;
+  const straight = distanceMeters(from.location, to.location);
+  if (straight < 60) {
+    return {
+      mode: "walking",
+      minutes: 2,
+      meters: Math.round(straight),
+      costCny: 0,
+      summary: "同一区域，步行即达",
+      path: [],
+      alternative: null,
+    };
+  }
+  try {
+    if (straight <= WALK_LIMIT_METERS && !accessibility) {
+      session.amapCalls += 1;
+      const walk = await session.amap.walking(from.location, to.location);
+      return { mode: "walking", ...walk, alternative: null };
+    }
+    const citycode = from.citycode ?? to.citycode;
+    session.amapCalls += 2;
+    const [transit, drive] = await Promise.all([
+      citycode
+        ? session.amap.transit(from.location, to.location, citycode).catch(() => null)
+        : null,
+      session.amap.driving(from.location, to.location).catch(() => null),
+    ]);
+    const cars = Math.ceil(travelers / 4);
+    const taxiPerPerson =
+      drive?.costCny != null ? Math.round((drive.costCny * cars) / travelers) : null;
+    const preferTaxi =
+      accessibility ||
+      travelerType === "elderly" ||
+      !transit ||
+      (drive?.minutes != null &&
+        transit.minutes != null &&
+        transit.minutes > drive.minutes + 25);
+    if (preferTaxi && drive) {
+      return {
+        mode: "taxi",
+        minutes: drive.minutes,
+        meters: drive.meters,
+        costCny: taxiPerPerson,
+        summary: `打车约 ${drive.minutes ?? "?"} 分钟${drive.costCny != null ? `，车费约 ¥${Math.round(drive.costCny)}/车` : ""}`,
+        path: drive.path,
+        alternative: transit
+          ? `公交/地铁约 ${transit.minutes ?? "?"} 分钟：${transit.summary}`
+          : null,
+      };
+    }
+    if (transit) {
+      return {
+        mode: "transit",
+        minutes: transit.minutes,
+        meters: transit.meters,
+        costCny: transit.costCny,
+        summary: transit.summary,
+        path: transit.path,
+        alternative: drive
+          ? `打车约 ${drive.minutes ?? "?"} 分钟${taxiPerPerson != null ? `，人均约 ¥${taxiPerPerson}` : ""}`
+          : null,
+      };
+    }
+  } catch {
+    // 落到下方的“未知”分支，不伪造时长
+  }
+  return {
+    mode: straight <= WALK_LIMIT_METERS ? "walking" : "taxi",
+    minutes: null,
+    meters: Math.round(straight),
+    costCny: null,
+    summary: "路线数据暂不可用，请出发前在地图应用中确认",
+    path: [],
+    alternative: null,
+  };
+}
+
+export async function buildDay(session: AgentSession, draft: DayDraft): Promise<Day> {
+  const places = draft.stops.map((stop) => session.places.get(stop.placeId) as Place);
+  const legs: Leg[] = [];
+  for (let i = 1; i < places.length; i += 1) {
+    legs.push(await computeLeg(session, places[i - 1], places[i]));
+  }
+  const { slots, warnings } = scheduleDay(
+    session.request.pace,
+    draft.stops.map((stop, i) => ({
+      kind: stop.kind,
+      mealType: stop.mealType,
+      place: places[i],
+      durationMin: stop.durationMin,
+    })),
+    legs,
+  );
+  const date = addDays(session.request.startDate, draft.day - 1);
+  const weather = session.weather?.find((item) => item.date === date) ?? null;
+  const stops: Stop[] = draft.stops.map((stop, i) => ({
+    kind: stop.kind,
+    mealType: stop.mealType,
+    place: places[i],
+    start: slots[i].start,
+    end: slots[i].end,
+    durationMin: stop.durationMin,
+    title: stop.title,
+    description: stop.description,
+    highlights: stop.highlights,
+    tips: stop.tips,
+    ticketCny: stop.kind === "sight" ? stop.ticketCny : null,
+    mealCny: stop.kind === "meal" ? (stop.mealCny ?? places[i].avgCost) : null,
+    dishes: stop.dishes,
+    citations: stop.citations.filter((id) => session.knowledge.has(id)),
+    warnings: slots[i].warnings,
+  }));
+  if (weather && /雨|雪|雷/.test(weather.dayWeather)) {
+    warnings.unshift(`当天预报${weather.dayWeather}，户外项目请备好雨具或准备室内备选`);
+  }
+  return {
+    day: draft.day,
+    date,
+    theme: draft.theme,
+    summary: draft.summary,
+    stops,
+    legs,
+    weather,
+    warnings,
+  };
+}
+
+function sumKnown(values: (number | null)[]): number | null {
+  const known = values.filter((value): value is number => value !== null);
+  return known.length ? Math.round(known.reduce((a, b) => a + b, 0)) : null;
+}
+
+export function computeBudget(
+  days: Day[],
+  travelers: number,
+  hotelPerNightCny: number | null,
+  hotelNote: string,
+): Budget {
+  const stops = days.flatMap((day) => day.stops);
+  const sights = stops.filter((stop) => stop.kind === "sight");
+  const meals = stops.filter((stop) => stop.kind === "meal");
+  const legs = days.flatMap((day) => day.legs);
+  const unknownItems: string[] = [];
+  const unknownTickets = sights.filter((stop) => stop.ticketCny === null);
+  if (unknownTickets.length) {
+    unknownItems.push(`${unknownTickets.length} 处景点门票未知`);
+  }
+  const unknownMeals = meals.filter((stop) => stop.mealCny === null);
+  if (unknownMeals.length) {
+    unknownItems.push(`${unknownMeals.length} 顿餐费未知`);
+  }
+  const unknownLegs = legs.filter((leg) => leg.costCny === null);
+  if (unknownLegs.length) {
+    unknownItems.push(`${unknownLegs.length} 段交通费用未知`);
+  }
+  const nights = Math.max(0, days.length - 1);
+  const rooms = Math.ceil(travelers / 2);
+  const hotel =
+    nights === 0
+      ? 0
+      : hotelPerNightCny === null
+        ? null
+        : Math.round((hotelPerNightCny * nights * rooms) / travelers);
+  if (hotel === null) {
+    unknownItems.push("住宿费用未估算");
+  }
+  const tickets = sumKnown(sights.map((stop) => stop.ticketCny));
+  const mealTotal = sumKnown(meals.map((stop) => stop.mealCny));
+  const transport = sumKnown(legs.map((leg) => leg.costCny));
+  return {
+    tickets,
+    meals: mealTotal,
+    transport,
+    hotel,
+    total: (tickets ?? 0) + (mealTotal ?? 0) + (transport ?? 0) + (hotel ?? 0),
+    unknownItems,
+    hotelNote:
+      nights === 0
+        ? "当日往返，不含住宿"
+        : `${nights} 晚 × ${rooms} 间${hotelNote ? `，${hotelNote}` : ""}（AI 参考价，非实时报价）`,
+  };
+}
+
+export function assembleTrip(
+  session: AgentSession,
+  args: {
+    title: string;
+    subtitle: string;
+    overview: string;
+    tips: { text: string; citations: string[] }[];
+    packing: string[];
+    hotelPerNightCny: number | null;
+    hotelNote: string;
+    changeSummary: string | null;
+  },
+): Trip {
+  const days = [...session.days.values()].sort((a, b) => a.day - b.day);
+  const tips = args.tips.map((tip) => ({
+    text: tip.text,
+    citations: tip.citations.filter((id) => session.knowledge.has(id)),
+  }));
+  const cited = new Set([
+    ...tips.flatMap((tip) => tip.citations),
+    ...days.flatMap((day) => day.stops.flatMap((stop) => stop.citations)),
+  ]);
+  return {
+    title: args.title,
+    subtitle: args.subtitle,
+    city: session.request.city,
+    overview: args.overview,
+    days,
+    tips,
+    packing: args.packing,
+    budget: computeBudget(
+      days,
+      session.request.travelers,
+      args.hotelPerNightCny,
+      args.hotelNote,
+    ),
+    citations: [...cited].flatMap((id) => {
+      const chunk = session.knowledge.get(id);
+      return chunk
+        ? [
+            {
+              id,
+              title: chunk.title,
+              source: chunk.source || KNOWLEDGE_SOURCE,
+              excerpt: chunk.content,
+            },
+          ]
+        : [];
+    }),
+    changeSummary: args.changeSummary,
+    generatedAt: new Date().toISOString(),
+  };
+}

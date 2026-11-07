@@ -1,12 +1,16 @@
 import { defineConfig, devices } from "@playwright/test";
 
+/**
+ * 端到端测试：页面中的 /api/agent 由测试用 fixture 拦截，不调用真实模型与地图，
+ * 因此无需任何密钥即可运行。
+ */
 export default defineConfig({
   testDir: "./tests/e2e",
   fullyParallel: false,
   workers: 1,
-  timeout: 30_000,
+  timeout: 60_000,
   retries: 0,
-  reporter: [["list"], ["html", { open: "never" }]],
+  reporter: [["list"]],
   use: {
     baseURL: "http://127.0.0.1:3100",
     trace: "retain-on-failure",
@@ -34,19 +38,11 @@ export default defineConfig({
     timeout: 120_000,
     env: {
       TRAVEL_E2E: "1",
-      DATABASE_URL: "",
-      QWEATHER_API_HOST: "",
-      QWEATHER_API_KEY: "",
-      QWEATHER_JWT: "",
-      QWEATHER_PRIVATE_KEY: "",
       NEXT_PUBLIC_AMAP_JS_KEY: "",
       AMAP_JS_SECURITY_CODE: "",
       AMAP_WEB_SERVICE_KEY: "",
       OPENAI_API_KEY: "",
       DEEPSEEK_API_KEY: "",
-      OPENAI_BASE_URL: "",
-      OPENAI_MODEL: "",
-      SOCIAL_REFERENCE_FILE: "",
       NEXT_TELEMETRY_DISABLED: "1",
     },
   },

@@ -1,84 +1,19 @@
+/**
+ * 高德 Web 服务适配器（服务端专用，Key 不出服务器）。
+ * 只做：地点检索、周边检索、步行/公交/驾车路线、天气预报。
+ * 所有响应都用 Zod 宽松解析，缺失字段归一为 null，而不是猜测值。
+ */
 import { z } from "zod";
-import type {
-  Coordinate,
-  Place,
-  PlaceProvider,
-  Route,
-  RouteMode,
-  RouteProvider,
-  Source,
-} from "@/domain/models";
-import { coordinateSchema } from "@/lib/contracts";
-import { ProviderError } from "./errors";
-import { withProviderBudget } from "./budget";
+import type { Coordinate, Place, Weather } from "@/lib/schema";
+import { AppError } from "@/server/errors";
 
-const envelope = z
-  .object({ status: z.string(), infocode: z.string().optional() })
-  .passthrough();
-const optionalText = z.string().trim().min(1).nullable().catch(null);
-const poi = z.object({
-  id: z.string().min(1),
-  name: z.string().min(1),
-  location: z.string(),
-  address: optionalText,
-  citycode: optionalText,
-  business: z.object({ opentime_week: optionalText }).catch({ opentime_week: null }),
-});
-const searchResponse = z.object({ pois: z.array(poi) });
-const scalar = z.union([z.string(), z.number(), z.null()]).optional();
-const routeResponse = z.object({
-  route: z.object({
-    paths: z.array(
-      z.object({
-        distance: scalar,
-        cost: z.object({ duration: scalar }).optional(),
-        steps: z.array(z.object({ polyline: z.string().optional() })).optional(),
-      }),
-    ),
-  }),
-});
-
-export function parseCoordinate(value: string): Coordinate | null {
-  if (!/^[-+]?\d+(?:\.\d+)?,[-+]?\d+(?:\.\d+)?$/.test(value)) {
-    return null;
-  }
-  const result = coordinateSchema.safeParse(value.split(",").map(Number));
-  return result.success ? result.data : null;
-}
-function nonnegative(value: string | number | null | undefined): number | null {
-  if (value == null || (typeof value === "string" && !value.trim())) {
-    return null;
-  }
-  const result = Number(value);
-  return Number.isFinite(result) && result >= 0 ? result : null;
-}
-function source(): Source {
-  return {
-    kind: "provider",
-    provider: "amap",
-    queriedAt: new Date().toISOString(),
-    coordinateSystem: "GCJ-02",
-  };
-}
-
-/** 高德个人 Key 的并发配额很低（实测 10 并发里一半返回 10021），这里统一串行并留间隔 */
-const MIN_INTERVAL_MS = 420;
-const RATE_INFCODES = new Set(["10004", "10021"]);
-const QUOTA_INFCODES = new Set(["10003", "10044", "10045"]);
-const PERMISSION_INFCODES = new Set([
-  "10001",
-  "10005",
-  "10006",
-  "10007",
-  "10008",
-  "10009",
-  "10012",
-  "10013",
-]);
+const MIN_INTERVAL_MS = 380;
+const RETRY_CODES = new Set(["10004", "10021"]);
 
 let gate: Promise<unknown> = Promise.resolve();
 let lastCallAt = 0;
 
+/** 个人 Key 并发额度很低，所有请求串行并保持最小间隔 */
 function throttle<T>(task: () => Promise<T>): Promise<T> {
   const run = gate.then(async () => {
     const wait = Math.max(0, lastCallAt + MIN_INTERVAL_MS - Date.now());
@@ -92,169 +27,389 @@ function throttle<T>(task: () => Promise<T>): Promise<T> {
   return run;
 }
 
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+const text = z
+  .union([z.string(), z.array(z.unknown())])
+  .optional()
+  .transform((value) =>
+    typeof value === "string" && value.trim() ? value.trim() : null,
+  );
+const numeric = z
+  .union([z.string(), z.number(), z.array(z.unknown())])
+  .optional()
+  .transform((value) => {
+    if (value === undefined || Array.isArray(value) || value === "") {
+      return null;
+    }
+    const result = Number(value);
+    return Number.isFinite(result) ? result : null;
+  });
 
-export class AmapProvider implements PlaceProvider, RouteProvider {
+const poiSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  location: z.string(),
+  address: text,
+  type: text,
+  citycode: text,
+  adcode: text,
+  business: z
+    .object({ rating: numeric, cost: numeric, opentime_week: text, opentime_today: text })
+    .partial()
+    .optional(),
+  photos: z.array(z.object({ url: z.string() }).passthrough()).optional(),
+});
+
+export function parseLocation(value: string): Coordinate | null {
+  const parts = value.split(",").map(Number);
+  if (parts.length !== 2 || parts.some((n) => !Number.isFinite(n))) {
+    return null;
+  }
+  const [lng, lat] = parts;
+  if (lng < 73 || lng > 136 || lat < 3 || lat > 54) {
+    return null;
+  }
+  return [lng, lat];
+}
+
+function parsePolyline(value: string): Coordinate[] {
+  return value
+    .split(";")
+    .map(parseLocation)
+    .filter((point): point is Coordinate => point !== null);
+}
+
+/** 高德图片是 http 链接，同一主机支持 https，统一升级避免混合内容 */
+function securePhoto(url: string): string | null {
+  try {
+    const parsed = new URL(url);
+    if (!/(^|\.)autonavi\.com$|(^|\.)amap\.com$/.test(parsed.hostname)) {
+      return null;
+    }
+    parsed.protocol = "https:";
+    return parsed.toString();
+  } catch {
+    return null;
+  }
+}
+
+function toPlace(raw: z.infer<typeof poiSchema>): Place | null {
+  const location = parseLocation(raw.location);
+  if (!location) {
+    return null;
+  }
+  return {
+    id: raw.id,
+    name: raw.name,
+    address: raw.address,
+    location,
+    type: raw.type?.split(";").slice(-1)[0] ?? null,
+    rating: raw.business?.rating ?? null,
+    avgCost: raw.business?.cost ?? null,
+    openTime: raw.business?.opentime_today ?? raw.business?.opentime_week ?? null,
+    photos: (raw.photos ?? [])
+      .map((photo) => securePhoto(photo.url))
+      .filter((url): url is string => url !== null)
+      .slice(0, 3),
+    citycode: raw.citycode,
+    adcode: raw.adcode,
+  };
+}
+
+export interface RouteResult {
+  minutes: number | null;
+  meters: number | null;
+  costCny: number | null;
+  path: Coordinate[];
+  summary: string;
+}
+
+export class AmapClient {
   constructor(
     private readonly key: string,
     private readonly transport: typeof fetch = fetch,
   ) {}
+
   private async request(
     path: string,
     params: Record<string, string>,
-    signal?: AbortSignal,
-    recovered = false,
+    retried = false,
   ): Promise<unknown> {
-    if (!this.key) {
-      throw new ProviderError("not_configured", "请在本地配置高德 Web 服务 Key。");
-    }
-    return withProviderBudget(() =>
-      throttle(async () => {
-        const url = new URL(path, "https://restapi.amap.com");
-        url.search = new URLSearchParams({ ...params, key: this.key }).toString();
-        try {
-          const response = await this.transport(url, {
-            cache: "no-store",
-            redirect: "error",
-            signal: signal
-              ? AbortSignal.any([signal, AbortSignal.timeout(8000)])
-              : AbortSignal.timeout(8000),
-          });
-          if (!response.ok) {
-            throw new ProviderError(
-              "unavailable",
-              "高德服务暂时不可用。",
-              response.status === 429 ? "rate_limited" : "upstream_http",
-            );
-          }
-          const text = await response.text();
-          if (text.length > 3_000_000) {
-            throw new ProviderError("unavailable", "高德响应超出大小限制。");
-          }
-          const raw: unknown = JSON.parse(text);
-          const result = envelope.safeParse(raw);
-          if (!result.success) {
-            throw new ProviderError("unavailable", "高德响应格式异常。");
-          }
-          if (result.data.status !== "1") {
-            const code = result.data.infocode ?? "unknown";
-            if (PERMISSION_INFCODES.has(code)) {
-              throw new ProviderError(
-                "permission_denied",
-                "高德凭据或接口权限需检查。",
-                code,
-              );
-            }
-            if (QUOTA_INFCODES.has(code)) {
-              throw new ProviderError(
-                "unavailable",
-                "高德今日调用配额已用尽，请明天再试或更换 Key。",
-                "amap_quota_exceeded",
-              );
-            }
-            if (RATE_INFCODES.has(code)) {
-              throw new ProviderError(
-                "unavailable",
-                "高德访问频率受限。",
-                "amap_rate_limited",
-                2,
-              );
-            }
-            throw new ProviderError("unavailable", "高德请求未成功，请稍后重试。", code);
-          }
-          return raw;
-        } catch (error) {
-          if (error instanceof ProviderError) {
-            // 频率受限是并发/节奏问题，退避重试一次即可，不涉及模型计费
-            if (error.code === "amap_rate_limited" && !recovered) {
-              await sleep(800);
-              return this.request(path, params, signal, true);
-            }
-            throw error;
-          }
-          throw new ProviderError(
-            "unavailable",
-            "高德请求超时、网络异常或返回格式错误。",
-          );
-        }
-      }),
-    );
-  }
-  async search(city: string, keyword: string, signal?: AbortSignal): Promise<Place[]> {
-    const raw = await this.request(
-      "/v5/place/text",
-      {
-        keywords: keyword,
-        region: city,
-        city_limit: "true",
-        page_size: "5",
-        show_fields: "business",
-      },
-      signal,
-    );
-    const parsed = searchResponse.safeParse(raw);
-    if (!parsed.success) {
-      throw new ProviderError("unavailable", "高德地点响应格式异常。");
-    }
-    return parsed.data.pois.flatMap((p) => {
-      const location = parseCoordinate(p.location);
-      return location
-        ? [
-            {
-              id: p.id,
-              name: p.name,
-              location,
-              citycode: p.citycode,
-              address: p.address,
-              openingHours: p.business.opentime_week,
-              source: source(),
-            },
-          ]
-        : [];
-    });
-  }
-  async route(
-    origin: Coordinate,
-    destination: Coordinate,
-    mode: RouteMode,
-    signal?: AbortSignal,
-  ): Promise<Route> {
-    // v5 只有步行与驾车两条可直接消费的接口；公交需要城市对，暂不在此处伪造
-    const path = mode === "driving" ? "/v5/direction/driving" : "/v5/direction/walking";
-    const raw = await this.request(
-      path,
-      {
-        origin: origin.join(","),
-        destination: destination.join(","),
-        show_fields: "cost,polyline",
-      },
-      signal,
-    );
-    const parsed = routeResponse.safeParse(raw);
-    if (!parsed.success) {
-      throw new ProviderError("unavailable", "高德路线响应格式异常。");
-    }
-    const leg = parsed.data.route.paths[0];
-    if (!leg) {
-      throw new ProviderError("unavailable", "两地之间未返回可用路线。", "no_route");
-    }
-    const segments = (leg.steps ?? []).flatMap((step) => {
-      if (!step.polyline) {
-        return [];
+    return throttle(async (): Promise<unknown> => {
+      const url = new URL(path, "https://restapi.amap.com");
+      url.search = new URLSearchParams({ ...params, key: this.key }).toString();
+      let response: Response;
+      try {
+        response = await this.transport(url, {
+          cache: "no-store",
+          redirect: "error",
+          signal: AbortSignal.timeout(8000),
+        });
+      } catch {
+        throw new AppError("upstream", "高德服务请求超时或网络异常");
       }
-      const points = step.polyline.split(";").map(parseCoordinate);
-      // Never connect across malformed or missing segments with an invented straight line.
-      return points.length >= 2 && points.every((p) => p !== null)
-        ? [points as Coordinate[]]
-        : [];
+      if (!response.ok) {
+        throw new AppError("upstream", `高德服务暂不可用（HTTP ${response.status}）`);
+      }
+      const body = (await response.json()) as { status?: string; infocode?: string };
+      if (body.status !== "1") {
+        if (!retried && body.infocode && RETRY_CODES.has(body.infocode)) {
+          await new Promise((resolve) => setTimeout(resolve, 900));
+          return null;
+        }
+        throw new AppError("upstream", `高德请求未成功（${body.infocode ?? "unknown"}）`);
+      }
+      return body as unknown;
+    }).then((result): Promise<unknown> | unknown =>
+      result === null ? this.request(path, params, true) : result,
+    );
+  }
+
+  async searchText(city: string, keyword: string, limit = 8): Promise<Place[]> {
+    const raw = await this.request("/v5/place/text", {
+      keywords: keyword,
+      region: city,
+      city_limit: "true",
+      page_size: String(limit),
+      show_fields: "business,photos",
     });
+    return this.parsePois(raw);
+  }
+
+  async searchAround(
+    center: Coordinate,
+    keyword: string,
+    radius: number,
+    types = "",
+    limit = 8,
+  ): Promise<Place[]> {
+    const raw = await this.request("/v5/place/around", {
+      location: center.join(","),
+      keywords: keyword,
+      types,
+      radius: String(radius),
+      sortrule: "weight",
+      page_size: String(limit),
+      show_fields: "business,photos",
+    });
+    return this.parsePois(raw);
+  }
+
+  private parsePois(raw: unknown): Place[] {
+    const parsed = z.object({ pois: z.array(z.unknown()).optional() }).parse(raw);
+    return (parsed.pois ?? []).flatMap((item) => {
+      const poi = poiSchema.safeParse(item);
+      const place = poi.success ? toPlace(poi.data) : null;
+      return place ? [place] : [];
+    });
+  }
+
+  async walking(origin: Coordinate, destination: Coordinate): Promise<RouteResult> {
+    const raw = await this.request("/v5/direction/walking", {
+      origin: origin.join(","),
+      destination: destination.join(","),
+      show_fields: "cost,polyline",
+    });
+    const parsed = z
+      .object({
+        route: z.object({
+          paths: z.array(
+            z.object({
+              distance: numeric,
+              cost: z.object({ duration: numeric }).partial().optional(),
+              steps: z.array(z.object({ polyline: text })).optional(),
+            }),
+          ),
+        }),
+      })
+      .parse(raw);
+    const path = parsed.route.paths[0];
+    if (!path) {
+      throw new AppError("upstream", "未找到步行路线");
+    }
+    const seconds = path.cost?.duration ?? null;
     return {
-      mode: mode === "driving" ? "driving" : "walking",
-      meters: nonnegative(leg.distance),
-      seconds: nonnegative(leg.cost?.duration),
-      segments,
-      detail: mode === "driving" ? "打车／驾车参考，未含实时路况与计价" : null,
-      source: source(),
+      minutes: seconds === null ? null : Math.max(1, Math.round(seconds / 60)),
+      meters: path.distance,
+      costCny: 0,
+      path: (path.steps ?? []).flatMap((step) =>
+        step.polyline ? parsePolyline(step.polyline) : [],
+      ),
+      summary: "步行",
     };
   }
+
+  async driving(origin: Coordinate, destination: Coordinate): Promise<RouteResult> {
+    const raw = await this.request("/v5/direction/driving", {
+      origin: origin.join(","),
+      destination: destination.join(","),
+      show_fields: "cost,polyline",
+    });
+    const parsed = z
+      .object({
+        route: z.object({
+          taxi_cost: numeric,
+          paths: z.array(
+            z.object({
+              distance: numeric,
+              cost: z.object({ duration: numeric }).partial().optional(),
+              steps: z.array(z.object({ polyline: text })).optional(),
+            }),
+          ),
+        }),
+      })
+      .parse(raw);
+    const path = parsed.route.paths[0];
+    if (!path) {
+      throw new AppError("upstream", "未找到驾车路线");
+    }
+    const seconds = path.cost?.duration ?? null;
+    return {
+      minutes: seconds === null ? null : Math.max(1, Math.round(seconds / 60)),
+      meters: path.distance,
+      costCny: parsed.route.taxi_cost,
+      path: (path.steps ?? []).flatMap((step) =>
+        step.polyline ? parsePolyline(step.polyline) : [],
+      ),
+      summary: "打车",
+    };
+  }
+
+  async transit(
+    origin: Coordinate,
+    destination: Coordinate,
+    citycode: string,
+  ): Promise<RouteResult | null> {
+    const raw = await this.request("/v5/direction/transit/integrated", {
+      origin: origin.join(","),
+      destination: destination.join(","),
+      city1: citycode,
+      city2: citycode,
+      strategy: "0",
+      show_fields: "cost,polyline",
+    });
+    const parsed = z
+      .object({
+        route: z
+          .object({
+            transits: z
+              .array(
+                z
+                  .object({
+                    distance: numeric,
+                    cost: z
+                      .object({ duration: numeric, transit_fee: numeric })
+                      .partial()
+                      .optional(),
+                    segments: z.array(z.unknown()).optional(),
+                  })
+                  .passthrough(),
+              )
+              .optional(),
+          })
+          .optional(),
+      })
+      .parse(raw);
+    const plan = parsed.route?.transits?.[0];
+    if (!plan) {
+      return null;
+    }
+    const seconds = plan.cost?.duration ?? null;
+    const lines: string[] = [];
+    const path: Coordinate[] = [];
+    collectTransit(plan.segments ?? [], lines, path);
+    return {
+      minutes: seconds === null ? null : Math.max(1, Math.round(seconds / 60)),
+      meters: plan.distance,
+      costCny: plan.cost?.transit_fee ?? null,
+      path,
+      summary: lines.length ? lines.join(" → ") : "公交/地铁",
+    };
+  }
+
+  async weather(adcode: string): Promise<Weather[]> {
+    const raw = await this.request("/v3/weather/weatherInfo", {
+      city: adcode,
+      extensions: "all",
+    });
+    const parsed = z
+      .object({
+        forecasts: z.array(
+          z.object({
+            casts: z.array(
+              z.object({
+                date: z.string(),
+                dayweather: z.string(),
+                nightweather: z.string(),
+                daytemp: z.string(),
+                nighttemp: z.string(),
+                daywind: z.string(),
+                daypower: z.string(),
+              }),
+            ),
+          }),
+        ),
+      })
+      .parse(raw);
+    return (parsed.forecasts[0]?.casts ?? []).map((cast) => ({
+      date: cast.date,
+      dayWeather: cast.dayweather,
+      nightWeather: cast.nightweather,
+      high: Number(cast.daytemp),
+      low: Number(cast.nighttemp),
+      wind: `${cast.daywind}风 ${cast.daypower}级`,
+    }));
+  }
+}
+
+/** 公交方案的分段结构较深，这里只提取线路名称与真实折线 */
+function collectTransit(segments: unknown[], lines: string[], path: Coordinate[]) {
+  for (const segment of segments) {
+    if (!segment || typeof segment !== "object") {
+      continue;
+    }
+    const record = segment as Record<string, unknown>;
+    const bus = record.bus as { buslines?: { name?: string }[] } | undefined;
+    const busName = bus?.buslines?.[0]?.name;
+    if (busName) {
+      lines.push(busName.replace(/\(.*\)$/, ""));
+    }
+    const railway = record.railway as { name?: string } | undefined;
+    if (railway?.name) {
+      lines.push(railway.name);
+    }
+    walkPolylines(record, path);
+  }
+}
+
+function walkPolylines(value: unknown, path: Coordinate[]) {
+  if (Array.isArray(value)) {
+    value.forEach((item) => walkPolylines(item, path));
+    return;
+  }
+  if (!value || typeof value !== "object") {
+    return;
+  }
+  for (const [key, child] of Object.entries(value)) {
+    if (key === "polyline" && typeof child === "string") {
+      path.push(...parsePolyline(child));
+    } else if (key === "polyline" && child && typeof child === "object") {
+      const inner = (child as { polyline?: unknown }).polyline;
+      if (typeof inner === "string") {
+        path.push(...parsePolyline(inner));
+      }
+    } else {
+      walkPolylines(child, path);
+    }
+  }
+}
+
+export function amapFromEnv(): AmapClient {
+  const key = process.env.AMAP_WEB_SERVICE_KEY;
+  if (!key) {
+    throw new AppError(
+      "not_configured",
+      "服务端未配置高德 Web 服务 Key（AMAP_WEB_SERVICE_KEY）",
+    );
+  }
+  return new AmapClient(key);
 }

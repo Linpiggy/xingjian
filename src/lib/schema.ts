@@ -1,0 +1,186 @@
+/**
+ * 前后端共享的数据契约。
+ * 所有进入页面的行程数据都先经过这里的 Zod 校验，类型由 schema 推导，避免两份定义漂移。
+ */
+import { z } from "zod";
+
+/** 高德使用 GCJ-02 坐标：[经度, 纬度] */
+export const coordinateSchema = z.tuple([
+  z.number().min(73).max(136),
+  z.number().min(3).max(54),
+]);
+export type Coordinate = z.infer<typeof coordinateSchema>;
+
+export const paceSchema = z.enum(["relaxed", "balanced", "packed"]);
+export type Pace = z.infer<typeof paceSchema>;
+
+export const travelerSchema = z.enum(["solo", "couple", "friends", "family", "elderly"]);
+export type Traveler = z.infer<typeof travelerSchema>;
+
+export const INTERESTS = [
+  "历史文化",
+  "自然风光",
+  "城市漫步",
+  "地道美食",
+  "博物馆",
+  "摄影出片",
+  "亲子游乐",
+  "夜生活",
+  "购物",
+  "小众秘境",
+] as const;
+
+/** 用户在首页提交的规划需求 */
+export const tripRequestSchema = z.object({
+  city: z.string().trim().min(1, "请填写目的地").max(20, "目的地过长"),
+  startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "日期格式无效"),
+  days: z.number().int().min(1, "至少 1 天").max(7, "单次最多规划 7 天"),
+  travelers: z.number().int().min(1).max(20),
+  travelerType: travelerSchema,
+  budgetPerPerson: z.number().int().min(0).max(200_000).nullable(),
+  pace: paceSchema,
+  interests: z.array(z.enum(INTERESTS)).max(6),
+  mustSee: z.string().trim().max(200),
+  foodPreference: z.string().trim().max(200),
+  notes: z.string().trim().max(500),
+  accessibility: z.boolean(),
+});
+export type TripRequest = z.infer<typeof tripRequestSchema>;
+
+/** 地点：只来自高德检索结果，模型不能自造 */
+export const placeSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  address: z.string().nullable(),
+  location: coordinateSchema,
+  type: z.string().nullable(),
+  rating: z.number().nullable(),
+  /** 高德返回的人均消费（元），不是门票 */
+  avgCost: z.number().nullable(),
+  openTime: z.string().nullable(),
+  photos: z.array(z.string()).max(3),
+  citycode: z.string().nullable(),
+  adcode: z.string().nullable(),
+});
+export type Place = z.infer<typeof placeSchema>;
+
+export const stopKindSchema = z.enum(["sight", "meal", "rest"]);
+export type StopKind = z.infer<typeof stopKindSchema>;
+
+export const stopSchema = z.object({
+  kind: stopKindSchema,
+  mealType: z.enum(["breakfast", "lunch", "dinner", "snack"]).nullable(),
+  place: placeSchema,
+  /** 计算后的到达时刻 HH:mm（确定性排程器给出） */
+  start: z.string(),
+  end: z.string(),
+  durationMin: z.number().int(),
+  title: z.string(),
+  description: z.string(),
+  highlights: z.array(z.string()),
+  tips: z.array(z.string()),
+  /** 每人门票估算（元）；null 代表未知，不等于免费 */
+  ticketCny: z.number().nullable(),
+  /** 每人餐费估算（元） */
+  mealCny: z.number().nullable(),
+  dishes: z.array(z.string()),
+  citations: z.array(z.string()),
+  warnings: z.array(z.string()),
+});
+export type Stop = z.infer<typeof stopSchema>;
+
+export const legModeSchema = z.enum(["walking", "transit", "taxi"]);
+export type LegMode = z.infer<typeof legModeSchema>;
+
+export const legSchema = z.object({
+  mode: legModeSchema,
+  minutes: z.number().nullable(),
+  meters: z.number().nullable(),
+  /** 每人费用（元）；打车按车均摊 */
+  costCny: z.number().nullable(),
+  summary: z.string(),
+  /** 真实路线折线，缺失时为空数组，前端不补直线 */
+  path: z.array(coordinateSchema),
+  alternative: z.string().nullable(),
+});
+export type Leg = z.infer<typeof legSchema>;
+
+export const weatherSchema = z.object({
+  date: z.string(),
+  dayWeather: z.string(),
+  nightWeather: z.string(),
+  high: z.number(),
+  low: z.number(),
+  wind: z.string(),
+});
+export type Weather = z.infer<typeof weatherSchema>;
+
+export const daySchema = z.object({
+  day: z.number().int(),
+  date: z.string(),
+  theme: z.string(),
+  summary: z.string(),
+  stops: z.array(stopSchema),
+  /** legs[i] 连接 stops[i] 与 stops[i+1] */
+  legs: z.array(legSchema),
+  weather: weatherSchema.nullable(),
+  warnings: z.array(z.string()),
+});
+export type Day = z.infer<typeof daySchema>;
+
+export const citationSchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  source: z.string(),
+  excerpt: z.string(),
+});
+export type Citation = z.infer<typeof citationSchema>;
+
+export const budgetSchema = z.object({
+  tickets: z.number().nullable(),
+  meals: z.number().nullable(),
+  transport: z.number().nullable(),
+  hotel: z.number().nullable(),
+  /** 每人合计（只计已知项） */
+  total: z.number(),
+  unknownItems: z.array(z.string()),
+  hotelNote: z.string(),
+});
+export type Budget = z.infer<typeof budgetSchema>;
+
+export const tripSchema = z.object({
+  title: z.string(),
+  subtitle: z.string(),
+  city: z.string(),
+  overview: z.string(),
+  days: z.array(daySchema),
+  tips: z.array(z.object({ text: z.string(), citations: z.array(z.string()) })),
+  packing: z.array(z.string()),
+  budget: budgetSchema,
+  citations: z.array(citationSchema),
+  changeSummary: z.string().nullable(),
+  generatedAt: z.string(),
+});
+export type Trip = z.infer<typeof tripSchema>;
+
+/** Agent 流式事件（NDJSON 每行一条） */
+export type AgentEvent =
+  | { type: "status"; message: string }
+  | { type: "thought"; delta: string }
+  | { type: "tool_call"; id: string; name: string; label: string }
+  | { type: "tool_result"; id: string; ok: boolean; summary: string; places?: Place[] }
+  | { type: "day"; day: Day }
+  | { type: "trip"; trip: Trip }
+  | { type: "error"; code: string; message: string }
+  | { type: "done" };
+
+export const agentInputSchema = z.discriminatedUnion("mode", [
+  z.object({ mode: z.literal("plan"), request: tripRequestSchema }),
+  z.object({
+    mode: z.literal("revise"),
+    request: tripRequestSchema,
+    trip: tripSchema,
+    instruction: z.string().trim().min(2, "请描述想怎么调整").max(300, "调整说明过长"),
+  }),
+]);
+export type AgentInput = z.infer<typeof agentInputSchema>;

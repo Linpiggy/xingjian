@@ -27,10 +27,6 @@ for (const key of [
   "DEEPSEEK_API_KEY",
   "AMAP_WEB_SERVICE_KEY",
   "AMAP_JS_SECURITY_CODE",
-  "DATABASE_URL",
-  "QWEATHER_API_KEY",
-  "QWEATHER_JWT",
-  "QWEATHER_PRIVATE_KEY",
 ]) {
   if (process.env[key]) {
     secrets.push(Buffer.from(process.env[key]));
