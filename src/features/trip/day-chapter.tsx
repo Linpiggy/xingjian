@@ -13,6 +13,7 @@ import {
   Loader2,
   Lock,
   LockOpen,
+  Maximize2,
   Minus,
   Plus,
   Repeat,
@@ -33,6 +34,8 @@ import {
   stopLabel,
 } from "@/lib/format";
 import type { Citation, Day, Hotel, Leg, Stop } from "@/lib/schema";
+import { LazyMount } from "@/components/lazy-mount";
+import { TripMap } from "@/features/map/trip-map";
 import type { DayEditor } from "./use-trip-editor";
 import { formatDateLabel } from "@/lib/time";
 
@@ -394,6 +397,7 @@ export function DayChapter({
   hotel = null,
   editor,
   onSwap,
+  onExpandMap,
 }: {
   day: Day;
   citations: Map<string, Citation>;
@@ -403,6 +407,8 @@ export function DayChapter({
   hotel?: Hotel | null;
   editor?: DayEditor;
   onSwap?: (day: number, index: number) => void;
+  /** 提供时在章节开头显示当天路线图，并可打开全屏地图 */
+  onExpandMap?: (day: number) => void;
 }) {
   const busy = editor?.busyDay === day.day;
   const { synthesis } = useSpeechSupport();
@@ -450,6 +456,32 @@ export function DayChapter({
           </button>
         ) : null}
       </div>
+
+      {onExpandMap ? (
+        <div className="no-print relative mt-6">
+          <LazyMount
+            placeholder={
+              <div className="h-[260px] rounded-2xl bg-paper-deep sm:h-[340px]" />
+            }
+          >
+            <TripMap
+              days={[day]}
+              hotel={hotel}
+              activeId={activeId}
+              onSelect={onFocus}
+              className="h-[260px] sm:h-[340px]"
+            />
+          </LazyMount>
+          <button
+            type="button"
+            onClick={() => onExpandMap(day.day)}
+            className="absolute right-3 top-3 flex items-center gap-1.5 rounded-lg bg-card/95 px-3 py-1.5 text-sm text-ink shadow-lift transition-colors hover:bg-card"
+          >
+            <Maximize2 size={14} aria-hidden />
+            全屏查看
+          </button>
+        </div>
+      ) : null}
 
       {day.warnings.length ? (
         <ul className="mt-4 space-y-1 rounded-lg border border-amber/25 bg-amber-soft/60 px-4 py-3">

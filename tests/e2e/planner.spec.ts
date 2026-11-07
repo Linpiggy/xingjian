@@ -34,7 +34,18 @@ test.describe("规划主流程（fixture 回放）", () => {
     await expect(page.getByText("闭园前仅剩 30 分钟").first()).toBeVisible();
     await expect(page.getByText("2 处景点门票未知", { exact: false })).toBeVisible();
     // 无地图 Key 时显示示意图并明确标注
-    await expect(page.getByText("路线示意 · 未加载底图")).toBeVisible();
+    await page.locator("#day-1").scrollIntoViewIfNeeded();
+    await expect(page.locator("#day-1").getByText("路线示意 · 未加载底图")).toBeVisible();
+    // 悬浮按钮打开全屏地图，列表与地图联动，“看详情”回到手册
+    await page.getByRole("button", { name: /全屏地图/ }).click();
+    const overlay = page.getByRole("dialog", { name: /路线地图/ });
+    await expect(overlay).toBeVisible();
+    await overlay
+      .locator("ol")
+      .getByRole("button", { name: /测试博物馆/ })
+      .click();
+    await overlay.getByRole("button", { name: "看详情" }).click();
+    await expect(overlay).toBeHidden();
     // 知识库引用可跳转到来源
     await expect(page.locator("#cite-hz-overview")).toContainText(
       "杭州：西湖片区怎么分区游",

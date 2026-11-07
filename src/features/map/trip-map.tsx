@@ -136,6 +136,7 @@ export function TripMap({
   activeId,
   onSelect,
   className = "",
+  framed = true,
 }: {
   days: Day[];
   candidates?: Place[];
@@ -143,7 +144,10 @@ export function TripMap({
   activeId?: string | null;
   onSelect?: (id: string) => void;
   className?: string;
+  /** 是否带圆角边框（全屏时关闭） */
+  framed?: boolean;
 }) {
+  const frame = framed ? "rounded-2xl border border-line" : "";
   const key = process.env.NEXT_PUBLIC_AMAP_JS_KEY;
   const container = useRef<HTMLDivElement>(null);
   const [map, setMap] = useState<{ instance: AMapMap; sdk: AMapSdk } | null>(null);
@@ -263,13 +267,12 @@ export function TripMap({
         activeId={activeId}
         onSelect={onSelect}
         className={className}
+        framed={framed}
       />
     );
   }
   return (
-    <div
-      className={`relative overflow-hidden rounded-2xl border border-line bg-paper-deep ${className}`}
-    >
+    <div className={`relative overflow-hidden ${frame} bg-paper-deep ${className}`}>
       {/* 高德 SDK 会把容器改为 position:relative，因此用文档流内的全尺寸而不是 absolute 铺满 */}
       <div
         ref={container}
@@ -316,11 +319,13 @@ function SchematicMap({
   activeId,
   onSelect,
   className,
+  framed,
 }: {
   data: { points: MapPoint[]; lines: MapLine[] };
   activeId?: string | null;
   onSelect?: (id: string) => void;
   className: string;
+  framed: boolean;
 }) {
   const all = [
     ...data.points.map((point) => point.location),
@@ -329,7 +334,7 @@ function SchematicMap({
   if (!all.length) {
     return (
       <div
-        className={`grid place-items-center rounded-2xl border border-dashed border-line bg-paper-deep/50 text-sm text-ink-faint ${className}`}
+        className={`grid place-items-center ${framed ? "rounded-2xl border border-dashed border-line" : ""} bg-paper-deep/50 text-sm text-ink-faint ${className}`}
       >
         地点确定后会显示在这里
       </div>
@@ -352,7 +357,7 @@ function SchematicMap({
   ];
   return (
     <div
-      className={`relative overflow-hidden rounded-2xl border border-line bg-paper-deep/60 paper-grain ${className}`}
+      className={`relative overflow-hidden ${framed ? "rounded-2xl border border-line" : ""} bg-paper-deep/60 paper-grain ${className}`}
     >
       <svg
         viewBox="0 0 400 300"

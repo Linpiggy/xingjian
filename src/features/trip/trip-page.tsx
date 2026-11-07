@@ -1,15 +1,16 @@
 "use client";
 
-import { Check, Copy, Printer, RotateCcw, X } from "lucide-react";
+import { Check, Copy, Map as MapIcon, Printer, RotateCcw, X } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui";
 import { SiteHeader } from "@/components/site-header";
 import { AgentTrace } from "@/features/agent/agent-trace";
 import { cancelAgent, isRunning, startAgent } from "@/features/agent/agent-client";
+import { MapOverlay } from "@/features/map/map-overlay";
 import { TripMap } from "@/features/map/trip-map";
 import { tripToMarkdown } from "@/lib/format";
-import type { Citation, Day } from "@/lib/schema";
+import type { Citation } from "@/lib/schema";
 import { formatDateLabel, addDays } from "@/lib/time";
 import { useHydrated } from "@/lib/use-hydrated";
 import { useTrips, type TripRecord } from "@/store/trips";
@@ -176,6 +177,7 @@ function TripBook({ record }: { record: TripRecord }) {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [activeDay, setActiveDay] = useState(1);
   const [copied, setCopied] = useState(false);
+  const [mapDay, setMapDay] = useState<number | null>(null);
   const [swapTarget, setSwapTarget] = useState<{ day: number; index: number } | null>(
     null,
   );
@@ -187,10 +189,6 @@ function TripBook({ record }: { record: TripRecord }) {
   const citations = useMemo(
     () => new Map<string, Citation>(trip.citations.map((c) => [c.id, c])),
     [trip],
-  );
-  const mapDays: Day[] = useMemo(
-    () => trip.days.filter((day) => day.day === activeDay),
-    [trip, activeDay],
   );
   const observer = useRef<IntersectionObserver | null>(null);
 
@@ -304,40 +302,8 @@ function TripBook({ record }: { record: TripRecord }) {
           </a>
         </nav>
 
-        <div className="mt-8 grid gap-10 lg:grid-cols-[minmax(0,1fr)_400px]">
-          <aside className="no-print lg:order-2">
-            <div className="lg:sticky lg:top-16">
-              <div className="mb-2 flex items-center justify-between text-sm">
-                <span className="font-medium text-ink">第 {activeDay} 天路线</span>
-                <div className="flex gap-1">
-                  {trip.days.map((day) => (
-                    <button
-                      key={day.day}
-                      type="button"
-                      onClick={() => setActiveDay(day.day)}
-                      aria-pressed={activeDay === day.day}
-                      className={`size-7 rounded-md text-xs tabular ${
-                        activeDay === day.day
-                          ? "bg-pine text-white"
-                          : "text-ink-soft hover:bg-paper-deep"
-                      }`}
-                    >
-                      {day.day}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <TripMap
-                days={mapDays}
-                hotel={trip.hotel}
-                activeId={activeId}
-                onSelect={focusStop}
-                className="h-[320px] lg:h-[calc(100dvh-9rem)]"
-              />
-            </div>
-          </aside>
-
-          <div className="min-w-0 lg:order-1">
+        <div className="mx-auto mt-8 max-w-[960px]">
+          <div className="min-w-0">
             <TripOverview trip={trip} request={request} />
             {trip.days.map((day) => (
               <DayChapter
@@ -349,6 +315,7 @@ function TripBook({ record }: { record: TripRecord }) {
                 hotel={trip.hotel}
                 editor={editor}
                 onSwap={(day, index) => setSwapTarget({ day, index })}
+                onExpandMap={setMapDay}
               />
             ))}
             <SwapDialog
@@ -470,6 +437,26 @@ function TripBook({ record }: { record: TripRecord }) {
           </div>
         </div>
       </main>
+      <button
+        type="button"
+        onClick={() => setMapDay(activeDay)}
+        className="no-print fixed bottom-[132px] right-4 z-30 flex h-12 items-center gap-2 rounded-full bg-ink px-4 text-sm font-medium text-paper shadow-float transition-colors hover:bg-pine-deep sm:bottom-8 sm:right-8"
+        aria-label={`打开第 ${activeDay} 天全屏地图`}
+      >
+        <MapIcon size={18} aria-hidden />
+        地图
+      </button>
+      <MapOverlay
+        days={trip.days}
+        hotel={trip.hotel}
+        day={mapDay}
+        onDayChange={setMapDay}
+        onClose={() => setMapDay(null)}
+        onLocate={(id) => {
+          setMapDay(null);
+          requestAnimationFrame(() => focusStop(id));
+        }}
+      />
       <ReviseDock record={record} />
     </>
   );
