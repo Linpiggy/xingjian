@@ -36,6 +36,5 @@ test-results/
 .DS_Store
 Thumbs.db
 
-# local design iteration shots
-shots/
-shots.config.ts
+# 赛题原文（仅本地参考）
+AI-WEB规则.md

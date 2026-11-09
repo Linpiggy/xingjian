@@ -116,7 +116,3 @@ export function retrieve(query: string, city: string, limit = 4): RetrievedChunk
     source: KNOWLEDGE_SOURCE,
   }));
 }
-
-export function knowledgeById(id: string): KnowledgeDoc | undefined {
-  return corpus.find((doc) => doc.id === id);
-}
