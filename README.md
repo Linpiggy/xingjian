@@ -12,6 +12,7 @@
 
 | 功能 | 说明 |
 | --- | --- |
+| 首页 | 滚动叙事：首屏标题逐行升起、照片视差；“Agent 怎么做功课”整段吸顶，随滚动逐步演示检索、查地点、看天气、画路线、校验修正；目的地长廊由纵向滚动驱动横向平移（窄屏改为原生横滑）；尊重系统“减少动态效果”设置 |
 | 一站式需求输入 | 目的地、日期（月历直接高亮整段行程）、天数、人数、同行类型（独自 / 情侣 / 朋友 / 亲子 / 长辈）、节奏、兴趣、必去、口味忌口、人均预算、无障碍需求；支持语音输入 |
 | 抵达、返程与住宿 | 填写第一天几点到、最后一天几点走和已订酒店；未订时 Agent 在行程重心附近推荐住处。每天从住处出发、回到住处，交通按真实路线计算；第一天按抵达时间开始，最后一天留足赶车时间，必吃正餐随之调整 |
 | Agent 实时规划 | 流式展示 Agent 的思考说明与每一次工具调用（检索了什么、搜到什么、哪里没通过校验），候选地点实时落到地图上，每天排好后立即呈现 |
@@ -124,7 +125,7 @@ Agent 主循环（OpenAI 兼容 Chat Completions，流式 + tools）
 | 层次 | 选型 |
 | --- | --- |
 | 框架 | Next.js 16（App Router、Route Handlers、Turbopack）、React 19、TypeScript |
-| 样式 | Tailwind CSS 4（设计变量集中在 `src/app/globals.css`）、Noto Serif / Sans SC、lucide 图标 |
+| 样式与动效 | Tailwind CSS 4（设计变量集中在 `src/app/globals.css`）、Motion（滚动驱动动画）、Noto Serif / Sans SC、lucide 图标 |
 | 状态 | Zustand（persist 到 localStorage） |
 | 校验 | Zod 4（表单、接口、模型工具参数、供应商响应） |
 | AI | DeepSeek（默认，可换任意 OpenAI 兼容并支持 Function Calling 的服务），原生 fetch 解析 SSE |
@@ -139,6 +140,7 @@ src/
   components/             基础交互组件、站点头部
   features/
     agent/                Agent 流式客户端、规划轨迹面板
+    home/                 首页滚动叙事、视差首屏、目的地长廊
     planner/              需求表单
     trip/                 手册：封面、总览、逐日章节、对话调整、行程列表
     map/                  高德地图与无底图示意

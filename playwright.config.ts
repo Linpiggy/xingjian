@@ -15,6 +15,8 @@ export default defineConfig({
     baseURL: "http://127.0.0.1:3100",
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
+    // 关闭平滑滚动与滚动动画，避免点击落在滚动途中的元素上；动效本身另行目测验收
+    reducedMotion: "reduce",
   },
   projects: [
     {

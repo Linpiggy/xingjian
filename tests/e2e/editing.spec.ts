@@ -1,9 +1,10 @@
 import { expect, test } from "@playwright/test";
 import { fixtureTrip, planEvents, toNdjson } from "../fixtures/trip";
+import { settleAt } from "./helpers";
 
 test.describe("日期选择、示例手册与手动编辑", () => {
   test("日期弹层可用键盘选择，并显示行程范围", async ({ page }) => {
-    await page.goto("/");
+    await settleAt(page, "/", "#planner");
     const trigger = page.locator("#field-startDate");
     await trigger.click();
     const dialog = page.getByRole("dialog", { name: "选择出发日期" });
@@ -20,7 +21,7 @@ test.describe("日期选择、示例手册与手动编辑", () => {
   });
 
   test("示例手册可直接打开", async ({ page }) => {
-    await page.goto("/");
+    await settleAt(page, "/", "#samples");
     await page.getByRole("button", { name: /两天，古寺/ }).click();
     await page.waitForURL(/\/plan\//);
     await expect(page.getByText("这是一份示例手册")).toBeVisible();
@@ -47,7 +48,7 @@ test.describe("日期选择、示例手册与手动编辑", () => {
       });
     });
 
-    await page.goto("/?city=杭州");
+    await settleAt(page, "/?city=杭州", "#planner");
     await page.getByRole("button", { name: "生成旅行手册" }).click();
     await expect(page.locator("#day-1")).toBeVisible();
 

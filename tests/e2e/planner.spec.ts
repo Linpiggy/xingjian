@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { planEvents, reviseEvents, toNdjson } from "../fixtures/trip";
+import { settleAt } from "./helpers";
 
 test.describe("规划主流程（fixture 回放）", () => {
   test.beforeEach(async ({ page }) => {
@@ -18,12 +19,12 @@ test.describe("规划主流程（fixture 回放）", () => {
   });
 
   test("表单校验后生成手册，可调整并撤销", async ({ page }) => {
-    await page.goto("/");
+    await settleAt(page, "/", "#planner");
     await page.getByRole("button", { name: "生成旅行手册" }).click();
     await expect(page.getByText("请填写目的地")).toBeVisible();
     await expect(page.locator("#field-city")).toBeFocused();
 
-    await page.getByRole("button", { name: "杭州" }).first().click();
+    await page.getByRole("button", { name: "杭州", exact: true }).first().click();
     await page.getByRole("button", { name: "减少天数" }).click();
     await page.getByRole("button", { name: "生成旅行手册" }).click();
     await page.waitForURL(/\/plan\//);
@@ -78,7 +79,7 @@ test.describe("规划主流程（fixture 回放）", () => {
         }),
       }),
     );
-    await page.goto("/?city=杭州");
+    await settleAt(page, "/?city=杭州", "#planner");
     await page.getByRole("button", { name: "生成旅行手册" }).click();
     await expect(page.getByRole("main").getByRole("alert")).toContainText(
       "服务端未配置大模型密钥",

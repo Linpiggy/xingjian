@@ -27,6 +27,7 @@
     "@fontsource-variable/noto-sans-sc": "5.3.1",
     "@fontsource-variable/noto-serif-sc": "5.3.1",
     "lucide-react": "1.55.0",
+    "motion": "14.8.0",
     "next": "16.4.3",
     "react": "19.3.0",
     "react-dom": "19.3.0",
