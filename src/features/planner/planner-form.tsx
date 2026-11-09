@@ -13,6 +13,7 @@ import {
   Stepper,
 } from "@/components/ui";
 import { DatePicker } from "@/components/date-picker";
+import { PhotoInspiration, type PhotoApply } from "./photo-inspiration";
 import { TimeSelect } from "@/components/time-select";
 import { QUICK_CITIES } from "@/lib/destinations";
 import {
@@ -67,6 +68,20 @@ export function PlannerForm({ initialCity = "" }: { initialCity?: string }) {
     setErrors((current) => ({ ...current, [key]: undefined }));
   };
 
+  /** 拍照识景结果填入表单：城市替换，兴趣合并（最多 6 个），补充说明追加 */
+  const applyPhoto = ({ city, interests, note }: PhotoApply) => {
+    setForm((current) => ({
+      ...current,
+      city,
+      interests: [...new Set([...interests, ...current.interests])].slice(0, 6),
+      notes:
+        note && !current.notes.includes(note)
+          ? `${current.notes ? `${current.notes}；` : ""}${note}`.slice(0, 500)
+          : current.notes,
+    }));
+    setErrors((current) => ({ ...current, city: undefined }));
+  };
+
   const toggleInterest = (interest: (typeof INTERESTS)[number]) => {
     set(
       "interests",
@@ -99,6 +114,7 @@ export function PlannerForm({ initialCity = "" }: { initialCity?: string }) {
 
   return (
     <form onSubmit={submit} noValidate className="grid gap-6" aria-label="旅行需求">
+      <PhotoInspiration onApply={applyPhoto} />
       <Field label="想去哪里" htmlFor="field-city">
         <input
           id="field-city"

@@ -28,6 +28,17 @@ export type TraceItem =
       summary: string;
     };
 
+/** 行前问答的一轮对话 */
+export interface ChatTurn {
+  role: "user" | "assistant";
+  content: string;
+  sources?: { id: string; title: string }[];
+  live?: boolean;
+  /** 回答过程中调用的工具（展示用） */
+  steps?: string[];
+  error?: boolean;
+}
+
 export type RunState = "idle" | "planning" | "revising" | "error";
 
 export interface TripRecord {
@@ -45,6 +56,8 @@ export interface TripRecord {
   versions: { trip: Trip; label: string; at: string }[];
   /** 首页导入的示例手册 */
   sample?: boolean;
+  /** 行前问答记录 */
+  chat?: ChatTurn[];
 }
 
 interface TripStore {
@@ -60,7 +73,9 @@ interface TripStore {
   /** 手动编辑后的新版本（旧版本进入历史，可撤销） */
   commitEdit: (id: string, trip: Trip) => void;
   toggleLock: (id: string, day: number, index: number) => void;
-  importSample: (request: TripRequest, trip: Trip) => string;
+  setChat: (id: string, chat: ChatTurn[]) => void;
+  /** 导入现成行程（示例手册或别人分享的链接） */
+  importSample: (request: TripRequest, trip: Trip, sample?: boolean) => string;
 }
 
 const MAX_RECORDS = 12;
@@ -139,7 +154,7 @@ export const useTrips = create<TripStore>()(
         );
         return id;
       },
-      importSample: (request, trip) => {
+      importSample: (request, trip, sample = true) => {
         const id = newId();
         set((state) =>
           insert(state, {
@@ -153,7 +168,7 @@ export const useTrips = create<TripStore>()(
             run: "idle",
             error: null,
             versions: [],
-            sample: true,
+            sample,
           }),
         );
         return id;
@@ -162,6 +177,8 @@ export const useTrips = create<TripStore>()(
         set((state) =>
           update(state, id, (record) => ({ trip, versions: pushVersion(record) })),
         ),
+      setChat: (id, chat) =>
+        set((state) => update(state, id, () => ({ chat: chat.slice(-20) }))),
       toggleLock: (id, day, index) =>
         set((state) =>
           update(state, id, (record) =>

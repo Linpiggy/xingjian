@@ -21,7 +21,10 @@ import { isToolName, tools, toolSpecs, type ToolOutcome } from "./tools";
 const MAX_ROUNDS = 18;
 const MAX_NUDGES = 2;
 
-async function executeTool(call: ToolCall, session: AgentSession): Promise<ToolOutcome> {
+export async function executeTool(
+  call: ToolCall,
+  session: AgentSession,
+): Promise<ToolOutcome> {
   if (!isToolName(call.name)) {
     return {
       ok: false,
@@ -64,7 +67,7 @@ async function executeTool(call: ToolCall, session: AgentSession): Promise<ToolO
   }
 }
 
-function labelOf(call: ToolCall, session: AgentSession): string {
+export function labelOf(call: ToolCall, session: AgentSession): string {
   if (!isToolName(call.name)) {
     return call.name;
   }

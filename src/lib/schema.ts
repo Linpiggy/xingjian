@@ -224,3 +224,57 @@ export const rescheduleInputSchema = z.object({
   label: z.string().trim().min(1).max(80),
 });
 export type RescheduleInput = z.infer<typeof rescheduleInputSchema>;
+
+/** 行前问答 */
+export const askInputSchema = z.object({
+  request: tripRequestSchema,
+  trip: tripSchema,
+  question: z.string().trim().min(2, "问题太短了").max(300, "问题请控制在 300 字以内"),
+  history: z
+    .array(
+      z.object({ role: z.enum(["user", "assistant"]), content: z.string().max(2000) }),
+    )
+    .max(8)
+    .default([]),
+});
+export type AskInput = z.infer<typeof askInputSchema>;
+
+export interface AskSource {
+  id: string;
+  title: string;
+}
+
+export type AskEvent =
+  | { type: "tool_call"; id: string; name: string; label: string }
+  | { type: "tool_result"; id: string; ok: boolean; summary: string }
+  | { type: "answer"; delta: string }
+  /** 本轮文字只是调用工具前的说明，不是最终回答 */
+  | { type: "answer_discard" }
+  | { type: "sources"; items: AskSource[]; live: boolean }
+  | { type: "error"; code: string; message: string }
+  | { type: "done" };
+
+/** 拍照识景：视觉模型对照片的理解结果 */
+export const photoInsightSchema = z.object({
+  scene: z.string().max(160).catch(""),
+  place: z.string().max(40).nullable().catch(null),
+  city: z.string().max(20).nullable().catch(null),
+  confidence: z.enum(["high", "medium", "low"]).catch("low"),
+  styles: z.array(z.string().max(12)).max(5).catch([]),
+  interests: z
+    .array(z.string())
+    .catch([])
+    .transform((items) =>
+      items
+        .filter((item): item is (typeof INTERESTS)[number] =>
+          (INTERESTS as readonly string[]).includes(item),
+        )
+        .slice(0, 4),
+    ),
+  suggestions: z
+    .array(z.object({ city: z.string().max(20), reason: z.string().max(80) }))
+    .max(3)
+    .catch([]),
+  note: z.string().max(120).catch(""),
+});
+export type PhotoInsight = z.infer<typeof photoInsightSchema>;

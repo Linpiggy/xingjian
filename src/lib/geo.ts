@@ -110,3 +110,35 @@ export function clusterByArea<T extends { location: Coordinate }>(
     .map((_, c) => items.filter((__, i) => assignment[i] === c))
     .filter((group) => group.length > 0);
 }
+
+/**
+ * Douglas–Peucker 折线简化（容差为经纬度度数，约 0.0002° ≈ 20 米）。
+ * 只用于压缩分享数据：保留起终点与转折，路线形状基本不变。
+ */
+export function simplifyPath(points: Coordinate[], tolerance = 0.0002): Coordinate[] {
+  if (points.length <= 2) {
+    return points;
+  }
+  const [start, end] = [points[0], points[points.length - 1]];
+  let maxDistance = 0;
+  let index = 0;
+  const dx = end[0] - start[0];
+  const dy = end[1] - start[1];
+  const length = Math.hypot(dx, dy) || 1e-12;
+  for (let i = 1; i < points.length - 1; i += 1) {
+    const [x, y] = points[i];
+    const distance =
+      Math.abs(dy * x - dx * y + end[0] * start[1] - end[1] * start[0]) / length;
+    if (distance > maxDistance) {
+      maxDistance = distance;
+      index = i;
+    }
+  }
+  if (maxDistance <= tolerance) {
+    return [start, end];
+  }
+  return [
+    ...simplifyPath(points.slice(0, index + 1), tolerance).slice(0, -1),
+    ...simplifyPath(points.slice(index), tolerance),
+  ];
+}

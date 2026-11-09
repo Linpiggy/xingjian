@@ -58,5 +58,10 @@ export function errorResponse(error: unknown): Response {
     }
     return response;
   }
+  // 未预期错误只在服务端记录消息，不把堆栈或内部信息返回给前端
+  console.error(
+    "[api] unexpected error:",
+    error instanceof Error ? error.message : error,
+  );
   return json({ code: "unavailable", message: "服务暂时不可用，请稍后重试" }, 503);
 }
