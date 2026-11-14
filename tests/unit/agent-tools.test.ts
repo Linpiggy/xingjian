@@ -240,6 +240,23 @@ describe("agent tools", () => {
     expect(outcome.content).toContain("锁定");
   });
 
+  it("relabels a lunch that starts after 15:00 as an afternoon snack", async () => {
+    const { s } = session();
+    const longSight = { ...stop("s1", "sight"), durationMin: 360 };
+    await tools.save_day_plan.run(
+      tools.save_day_plan.schema.parse({
+        day: 1,
+        theme: "长线",
+        summary: "",
+        stops: [longSight, stop("r1", "meal", "lunch"), stop("r2", "meal", "dinner")],
+      }),
+      s,
+    );
+    const lunch = s.days.get(1)!.stops[1];
+    expect(lunch.mealType).toBe("snack");
+    expect(lunch.warnings.join()).toContain("下午点心");
+  });
+
   it("refuses to finalize before every day is planned", async () => {
     const { s } = session();
     const outcome = await tools.finalize_trip.run(

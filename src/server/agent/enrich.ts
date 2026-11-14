@@ -6,8 +6,21 @@
  */
 import { distanceMeters } from "@/lib/geo";
 import { scheduleDay } from "@/lib/schedule";
-import type { Budget, Day, Intercity, Leg, Place, Stop, Train, Trip } from "@/lib/schema";
-import { addDays } from "@/lib/time";
+import type {
+  Budget,
+  Day,
+  Intercity,
+  Leg,
+  Place,
+  Station,
+  Stop,
+  Train,
+  Trip,
+} from "@/lib/schema";
+import { addDays, toMinutes } from "@/lib/time";
+
+/** 晚于此时刻开始的午餐改按下午点心处理 */
+const LATE_LUNCH_MIN = 15 * 60;
 import { KNOWLEDGE_SOURCE } from "@/server/rag/corpus";
 import type { AgentSession, DayDraft } from "./session";
 
@@ -91,6 +104,26 @@ async function computeLeg(session: AgentSession, from: Place, to: Place): Promis
   };
 }
 
+/** 把车站包装成地点，复用市内路线计算 */
+function stationPlace(station: Station): Place {
+  return {
+    id: `station-${station.name}`,
+    name: station.name,
+    address: null,
+    location: station.location,
+    type: "火车站",
+    rating: null,
+    avgCost: null,
+    openTime: null,
+    photos: [],
+    citycode: station.citycode,
+    adcode: null,
+    category: "other",
+    signatureDishes: [],
+    tel: null,
+  };
+}
+
 /** 门票来源只能是本次会话联网检索到的链接，或之前已核对并保存的来源 */
 function resolveTicketSource(
   session: AgentSession,
@@ -116,9 +149,23 @@ export async function buildDay(session: AgentSession, draft: DayDraft): Promise<
   const departureTime = session.effectiveDeparture();
   const hotel = session.needsHotel() ? session.hotel?.place : null;
   const isLast = draft.day === totalDays;
-  const startLeg = hotel ? await computeLeg(session, hotel, places[0]) : null;
-  const endLeg =
-    hotel && !isLast ? await computeLeg(session, places[places.length - 1], hotel) : null;
+  // 第一天乘车抵达时从到达站出发；最后一天乘车返程时以前往出发站结束；其余从住处出发、回到住处
+  const arrivalStation =
+    draft.day === 1 && session.intercity?.outbound
+      ? session.intercity.arrivalStation
+      : null;
+  const departureStation =
+    isLast && session.intercity?.inbound ? session.intercity.departureStation : null;
+  const startFrom = arrivalStation ? stationPlace(arrivalStation) : hotel;
+  const endAt = departureStation
+    ? stationPlace(departureStation)
+    : hotel && !isLast
+      ? hotel
+      : null;
+  const startLeg = startFrom ? await computeLeg(session, startFrom, places[0]) : null;
+  const endLeg = endAt
+    ? await computeLeg(session, places[places.length - 1], endAt)
+    : null;
   const { slots, warnings } = scheduleDay(
     session.request.pace,
     draft.stops.map((stop, i) => ({
@@ -131,14 +178,20 @@ export async function buildDay(session: AgentSession, draft: DayDraft): Promise<
     {
       startLeg,
       arrival: draft.day === 1 ? arrivalTime : null,
+      arrivalSettle: arrivalStation ? 20 : undefined,
       departure: isLast ? departureTime : null,
+      departureLeg: departureStation ? endLeg : null,
     },
   );
   const date = addDays(session.request.startDate, draft.day - 1);
   const weather = session.weather?.find((item) => item.date === date) ?? null;
+  // 下午三点以后才吃的“午餐”实际是点心：改标为小食，避免时间轴出现 16 点吃午饭
+  const lateLunch = (i: number) =>
+    draft.stops[i].mealType === "lunch" &&
+    (toMinutes(slots[i].start) ?? 0) >= LATE_LUNCH_MIN;
   const stops: Stop[] = draft.stops.map((stop, i) => ({
     kind: stop.kind,
-    mealType: stop.mealType,
+    mealType: lateLunch(i) ? "snack" : stop.mealType,
     place: places[i],
     start: slots[i].start,
     end: slots[i].end,
@@ -151,7 +204,12 @@ export async function buildDay(session: AgentSession, draft: DayDraft): Promise<
     mealCny: stop.kind === "meal" ? (stop.mealCny ?? places[i].avgCost) : null,
     dishes: stop.dishes,
     citations: stop.citations.filter((id) => session.knowledge.has(id)),
-    warnings: slots[i].warnings,
+    warnings: lateLunch(i)
+      ? [
+          ...slots[i].warnings.filter((warning) => !warning.startsWith("用餐时间偏晚")),
+          "已过午餐时间，按下午点心安排",
+        ]
+      : slots[i].warnings,
     ticketSource: stop.kind === "sight" ? resolveTicketSource(session, stop) : null,
     locked: stop.locked ?? false,
     userEdited: stop.userEdited ?? false,

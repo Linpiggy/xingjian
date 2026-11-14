@@ -20,7 +20,8 @@
     "browser:install": "node scripts/playwright.mjs install chromium --only-shell",
     "e2e": "node scripts/playwright.mjs test",
     "mcp": "tsx scripts/mcp-server.ts",
-    "evaluate": "tsx scripts/evaluate.ts"
+    "evaluate": "tsx scripts/evaluate.ts",
+    "docs:pdf": "node scripts/build-doc-pdf.mjs"
   },
   "dependencies": {
     "@amap/amap-jsapi-loader": "1.0.1",

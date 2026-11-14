@@ -9,7 +9,7 @@ const PIXEL = Buffer.from(
 
 async function openSample(page: import("@playwright/test").Page) {
   await settleAt(page, "/", "#samples");
-  await page.getByRole("button", { name: /两天，西湖日落/ }).click();
+  await page.getByRole("button", { name: /两天，灵隐听钟/ }).click();
   await expect(page.locator("#overview")).toBeVisible();
 }
 

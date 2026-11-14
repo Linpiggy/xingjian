@@ -386,6 +386,7 @@ function TripBook({ record }: { record: TripRecord }) {
       <MapOverlay
         days={trip.days}
         hotel={trip.hotel}
+        intercity={trip.intercity}
         day={mapDay}
         onDayChange={setMapDay}
         onClose={() => setMapDay(null)}

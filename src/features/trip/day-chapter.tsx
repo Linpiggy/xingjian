@@ -25,7 +25,7 @@ import {
   Volume2,
 } from "lucide-react";
 import type { ReactNode } from "react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { PlacePhoto } from "@/components/place-photo";
 import { useSpeaker, useSpeechSupport } from "@/features/voice/speech";
 import {
@@ -38,7 +38,7 @@ import {
 } from "@/lib/format";
 import type { Citation, Day, Hotel, Intercity, Leg, Stop } from "@/lib/schema";
 import { LazyMount } from "@/components/lazy-mount";
-import { TripMap } from "@/features/map/trip-map";
+import { stationsForDay, TripMap } from "@/features/map/trip-map";
 import type { DayEditor } from "./use-trip-editor";
 import { formatDateLabel } from "@/lib/time";
 
@@ -490,6 +490,15 @@ export function DayChapter({
   totalDays?: number;
 }) {
   const busy = editor?.busyDay === day.day;
+  // 乘车抵达/离开的那天，起终点是车站而不是住处
+  const fromStation =
+    day.day === 1 && Boolean(intercity?.outbound && intercity.arrivalStation);
+  const toStation =
+    day.day === totalDays && Boolean(intercity?.inbound && intercity.departureStation);
+  const stations = useMemo(
+    () => stationsForDay(day.day, totalDays, intercity),
+    [day.day, totalDays, intercity],
+  );
   const { synthesis } = useSpeechSupport();
   const { speaking, speak, stop } = useSpeaker();
   return (
@@ -546,6 +555,7 @@ export function DayChapter({
             <TripMap
               days={[day]}
               hotel={hotel}
+              stations={stations}
               activeId={activeId}
               onSelect={onFocus}
               className="h-[260px] sm:h-[340px]"
@@ -589,7 +599,12 @@ export function DayChapter({
             text={`乘 ${intercity.outbound.trip} 抵达：${intercity.outbound.from} ${intercity.outbound.depart} → ${intercity.outbound.to} ${intercity.outbound.arrive}`}
           />
         ) : null}
-        {hotel && day.startLeg ? (
+        {fromStation && day.startLeg ? (
+          <LegRow
+            leg={day.startLeg}
+            label={`出${intercity?.arrivalStation?.name ?? "站"}前往第一站`}
+          />
+        ) : hotel && day.startLeg ? (
           <>
             <HotelRow hotel={hotel} text="从住处出发：" />
             <LegRow leg={day.startLeg} label="前往第一站" />
@@ -624,7 +639,12 @@ export function DayChapter({
             />,
           ];
         })}
-        {hotel && day.endLeg ? (
+        {toStation && day.endLeg ? (
+          <LegRow
+            leg={day.endLeg}
+            label={`前往${intercity?.departureStation?.name ?? "车站"}`}
+          />
+        ) : hotel && day.endLeg ? (
           <>
             <LegRow leg={day.endLeg} label="返回住处" />
             <HotelRow hotel={hotel} text="回到住处休息：" />
@@ -632,7 +652,7 @@ export function DayChapter({
         ) : null}
         {intercity?.inbound && day.day === totalDays ? (
           <TrainRow
-            text={`前往${intercity.inbound.from}，乘 ${intercity.inbound.trip} ${intercity.inbound.depart} 返程（到 ${intercity.inbound.to} ${intercity.inbound.arrive}）`}
+            text={`乘 ${intercity.inbound.trip} 返程：${intercity.inbound.from} ${intercity.inbound.depart} → ${intercity.inbound.to} ${intercity.inbound.arrive}`}
           />
         ) : null}
       </ol>

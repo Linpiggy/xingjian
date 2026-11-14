@@ -203,11 +203,21 @@ export const trainSchema = z.object({
 });
 export type Train = z.infer<typeof trainSchema>;
 
+export const stationSchema = z.object({
+  name: z.string(),
+  location: coordinateSchema,
+  citycode: z.string().nullable().default(null),
+});
+export type Station = z.infer<typeof stationSchema>;
+
 export const intercitySchema = z.object({
   origin: z.string(),
   outbound: trainSchema.nullable(),
   inbound: trainSchema.nullable(),
   note: z.string(),
+  /** 去程到达站、返程出发站在目的地城市的位置：第一天从到达站出发，最后一天前往出发站 */
+  arrivalStation: stationSchema.nullable().default(null),
+  departureStation: stationSchema.nullable().default(null),
 });
 export type Intercity = z.infer<typeof intercitySchema>;
 

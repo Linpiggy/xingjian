@@ -39,3 +39,6 @@ Thumbs.db
 
 # 赛题原文（仅本地参考）
 AI-WEB规则.md
+
+# 文档构建中间文件
+docs/.*.build.html

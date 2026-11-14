@@ -22,7 +22,7 @@ test.describe("日期选择、示例手册与手动编辑", () => {
 
   test("示例手册可直接打开", async ({ page }) => {
     await settleAt(page, "/", "#samples");
-    await page.getByRole("button", { name: /两天，西湖日落/ }).click();
+    await page.getByRole("button", { name: /两天，灵隐听钟/ }).click();
     await page.waitForURL(/\/plan\//);
     await expect(page.getByText("这是一份示例手册")).toBeVisible();
     await expect(page.locator("#day-1")).toBeVisible();

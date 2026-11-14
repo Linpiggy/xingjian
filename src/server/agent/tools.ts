@@ -7,7 +7,7 @@ import { z } from "zod";
 import { clusterByArea, distanceMeters, orderByShortestPath } from "@/lib/geo";
 import { requiredMeals } from "@/lib/schedule";
 import { toClock, toMinutes } from "@/lib/time";
-import type { Place, Train } from "@/lib/schema";
+import type { Place, Station, Train } from "@/lib/schema";
 import { addDays } from "@/lib/time";
 import { webSearch, webSearchConfigured } from "@/server/providers/websearch";
 import { hasCityKnowledge, retrieve } from "@/server/rag/retriever";
@@ -35,6 +35,21 @@ async function stationOf(
     : null;
   session.stations.set(city, result);
   return result;
+}
+
+/** 在目的地城市定位具体车站（如“杭州东”），用于第一天从站出发、最后一天前往车站 */
+async function locateStation(
+  session: AgentSession,
+  name: string,
+): Promise<Station | null> {
+  session.amapCalls += 1;
+  const places = await session.amap
+    .searchText(session.request.city, `${name}站`, 3)
+    .catch(() => []);
+  const match = places.find((place) => place.name.startsWith(name)) ?? places[0];
+  return match
+    ? { name: match.name, location: match.location, citycode: match.citycode }
+    : null;
 }
 
 const MAX_SIGHTS: Record<string, number> = { relaxed: 3, balanced: 4, packed: 6 };
@@ -496,11 +511,17 @@ export const tools = {
       } catch (error) {
         return fail(error instanceof Error ? error.message : "车次无效");
       }
+      const [arrivalStation, departureStation] = await Promise.all([
+        outbound ? locateStation(session, outbound.to) : null,
+        inbound ? locateStation(session, inbound.from) : null,
+      ]);
       session.intercity = {
         origin: session.request.origin,
         outbound,
         inbound,
         note: cleanText(args.note),
+        arrivalStation,
+        departureStation,
       };
       if (session.days.size) {
         session.staleDays = new Set(session.days.keys());

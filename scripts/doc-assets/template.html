@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <title>$title$</title>
+    $for(css)$
+    <link rel="stylesheet" href="$css$" />
+    $endfor$
+  </head>
+  <body>
+    <section class="cover">
+      <p class="cover-kicker">$kicker$</p>
+      <h1 class="cover-title">$title$</h1>
+      <p class="cover-sub">$subtitle$</p>
+      <div class="cover-meta">$cover$</div>
+    </section>
+    <nav id="TOC">$toc$</nav>
+    $body$
+  </body>
+</html>

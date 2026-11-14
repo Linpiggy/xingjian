@@ -4,16 +4,17 @@
  */
 "use client";
 
-import { BedDouble, X } from "lucide-react";
+import { BedDouble, TrainFront, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { duration, LEG_LABEL, stopLabel } from "@/lib/format";
-import type { Day, Hotel } from "@/lib/schema";
+import type { Day, Hotel, Intercity } from "@/lib/schema";
 import { formatDateLabel } from "@/lib/time";
-import { TripMap } from "./trip-map";
+import { stationsForDay, TripMap } from "./trip-map";
 
 export function MapOverlay({
   days,
   hotel,
+  intercity = null,
   day,
   onDayChange,
   onClose,
@@ -21,6 +22,7 @@ export function MapOverlay({
 }: {
   days: Day[];
   hotel: Hotel | null;
+  intercity?: Intercity | null;
   /** 当前查看的天；null 表示关闭 */
   day: number | null;
   onDayChange: (day: number) => void;
@@ -37,6 +39,12 @@ export function MapOverlay({
   const activeId = selection.day === day ? selection.id : null;
   const setActiveId = (id: string) => setSelection({ day, id });
   const current = days.find((item) => item.day === day) ?? null;
+  const startStation =
+    current?.day === 1 && intercity?.outbound ? intercity.arrivalStation : null;
+  const endStation =
+    current?.day === days.length && intercity?.inbound
+      ? intercity.departureStation
+      : null;
 
   useEffect(() => {
     const node = dialog.current;
@@ -106,17 +114,22 @@ export function MapOverlay({
               key={current.day}
               days={[current]}
               hotel={hotel}
+              stations={stationsForDay(current.day, days.length, intercity)}
               activeId={activeId}
               onSelect={setActiveId}
               framed={false}
               className="h-full lg:order-2"
             />
             <ol className="min-h-0 overflow-y-auto border-t border-line bg-card px-3 py-3 lg:order-1 lg:border-r lg:border-t-0">
-              {hotel && current.startLeg ? (
+              {current.startLeg && (startStation || hotel) ? (
                 <li className="flex items-center gap-2 px-2 py-2 text-sm text-ink-soft">
-                  <BedDouble size={15} className="text-sky" aria-hidden />从{" "}
-                  {hotel.place.name} 出发 · {LEG_LABEL[current.startLeg.mode]}{" "}
-                  {duration(current.startLeg.minutes)}
+                  {startStation ? (
+                    <TrainFront size={15} className="text-ink" aria-hidden />
+                  ) : (
+                    <BedDouble size={15} className="text-sky" aria-hidden />
+                  )}
+                  从 {startStation?.name ?? hotel?.place.name} 出发 ·{" "}
+                  {LEG_LABEL[current.startLeg.mode]} {duration(current.startLeg.minutes)}
                 </li>
               ) : null}
               {current.stops.map((stop, index) => {
@@ -170,11 +183,15 @@ export function MapOverlay({
                   </li>
                 );
               })}
-              {hotel && current.endLeg ? (
+              {current.endLeg && (endStation || hotel) ? (
                 <li className="flex items-center gap-2 px-2 py-2 text-sm text-ink-soft">
-                  <BedDouble size={15} className="text-sky" aria-hidden />
+                  {endStation ? (
+                    <TrainFront size={15} className="text-ink" aria-hidden />
+                  ) : (
+                    <BedDouble size={15} className="text-sky" aria-hidden />
+                  )}
                   {LEG_LABEL[current.endLeg.mode]} {duration(current.endLeg.minutes)}{" "}
-                  返回住处
+                  {endStation ? `前往${endStation.name}` : "返回住处"}
                 </li>
               ) : null}
             </ol>

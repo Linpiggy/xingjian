@@ -107,6 +107,8 @@ describe("往返车次", () => {
       outbound,
       inbound: { ...outbound, trip: "G7360" },
       note: "",
+      arrivalStation: null,
+      departureStation: null,
     });
     expect(budget.intercity).toBe(166);
     expect(budget.total).toBe(166);

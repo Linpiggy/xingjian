@@ -45,9 +45,16 @@ export interface DayConstraints {
   startLeg?: Pick<Leg, "minutes"> | null;
   /** 当天最早可开始时间（第一天抵达时间） */
   arrival?: string | null;
+  /** 抵达后到可以出发的缓冲；默认按“先去酒店放行李”计 60 分钟，直接从车站出发时更短 */
+  arrivalSettle?: number;
   /** 当天必须离开的时间（最后一天返程时间） */
   departure?: string | null;
+  /** 最后一站前往车站的交通；已知时按“接驳耗时 + 进站缓冲”精确判断能否赶上 */
+  departureLeg?: Pick<Leg, "minutes"> | null;
 }
+
+/** 到站后进站、安检、候车的缓冲 */
+export const STATION_BUFFER_MIN = 30;
 
 export function scheduleDay(
   pace: Pace,
@@ -59,7 +66,10 @@ export function scheduleDay(
   let cursor = toMinutes(DAY_START[pace]) ?? 540;
   const arrival = constraints.arrival ? toMinutes(constraints.arrival) : null;
   if (arrival !== null) {
-    cursor = Math.max(cursor, arrival + ARRIVAL_SETTLE_MIN);
+    cursor = Math.max(
+      cursor,
+      arrival + (constraints.arrivalSettle ?? ARRIVAL_SETTLE_MIN),
+    );
   }
   if (constraints.startLeg) {
     cursor += (constraints.startLeg.minutes ?? UNKNOWN_LEG_MIN) + TRANSFER_BUFFER_MIN;
@@ -111,10 +121,16 @@ export function scheduleDay(
   });
 
   const departure = constraints.departure ? toMinutes(constraints.departure) : null;
-  if (departure !== null && cursor > departure - DEPARTURE_RESERVE_MIN) {
-    dayWarnings.push(
-      `最后一站 ${toClock(cursor)} 结束，距离 ${constraints.departure} 返程不足 ${DEPARTURE_RESERVE_MIN / 60} 小时，可能赶不上车`,
-    );
+  if (departure !== null) {
+    const reserve =
+      constraints.departureLeg?.minutes != null
+        ? constraints.departureLeg.minutes + STATION_BUFFER_MIN
+        : DEPARTURE_RESERVE_MIN;
+    if (cursor > departure - reserve) {
+      dayWarnings.push(
+        `最后一站 ${toClock(cursor)} 结束，前往车站并进站约需 ${reserve} 分钟，可能赶不上 ${constraints.departure} 的返程车`,
+      );
+    }
   }
   if (cursor > 22 * 60) {
     dayWarnings.push(`当天行程预计 ${toClock(cursor)} 才结束，节奏偏紧，建议删减一项`);

@@ -5,14 +5,14 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { Coordinate, Day, Hotel, Place } from "@/lib/schema";
+import type { Coordinate, Day, Hotel, Intercity, Place, Station } from "@/lib/schema";
 
 interface MapPoint {
   id: string;
   name: string;
   location: Coordinate;
   label: string;
-  tone: "sight" | "meal" | "candidate" | "hotel";
+  tone: "sight" | "meal" | "candidate" | "hotel" | "station";
 }
 
 interface MapLine {
@@ -43,6 +43,7 @@ interface AMapSdk {
 
 const COLORS: Record<MapPoint["tone"], string> = {
   hotel: "#2d5b78",
+  station: "#1d1914",
   sight: "#1f5a47",
   meal: "#b0512a",
   candidate: "#8d8274",
@@ -82,6 +83,7 @@ export function buildMapData(
   days: Day[],
   candidates: Place[],
   hotel: Hotel | null = null,
+  stations: Station[] = [],
 ): { points: MapPoint[]; lines: MapLine[] } {
   const points: MapPoint[] = [];
   const lines: MapLine[] = [];
@@ -126,13 +128,41 @@ export function buildMapData(
       tone: "hotel",
     });
   }
+  for (const station of stations) {
+    points.push({
+      id: `station-${station.name}`,
+      name: station.name,
+      location: station.location,
+      label: "站",
+      tone: "station",
+    });
+  }
   return { points, lines };
+}
+
+/** 某一天地图上需要显示的车站：第一天的到达站、最后一天的出发站 */
+export function stationsForDay(
+  day: number,
+  totalDays: number,
+  intercity: Intercity | null,
+): Station[] {
+  const result: Station[] = [];
+  if (day === 1 && intercity?.outbound && intercity.arrivalStation) {
+    result.push(intercity.arrivalStation);
+  }
+  if (day === totalDays && intercity?.inbound && intercity.departureStation) {
+    if (!result.some((item) => item.name === intercity.departureStation?.name)) {
+      result.push(intercity.departureStation);
+    }
+  }
+  return result;
 }
 
 export function TripMap({
   days,
   candidates = [],
   hotel = null,
+  stations = [],
   activeId,
   onSelect,
   className = "",
@@ -141,6 +171,7 @@ export function TripMap({
   days: Day[];
   candidates?: Place[];
   hotel?: Hotel | null;
+  stations?: Station[];
   activeId?: string | null;
   onSelect?: (id: string) => void;
   className?: string;
@@ -153,8 +184,8 @@ export function TripMap({
   const [map, setMap] = useState<{ instance: AMapMap; sdk: AMapSdk } | null>(null);
   const [failed, setFailed] = useState(!key);
   const data = useMemo(
-    () => buildMapData(days, candidates, hotel),
-    [days, candidates, hotel],
+    () => buildMapData(days, candidates, hotel, stations),
+    [days, candidates, hotel, stations],
   );
   const select = useRef(onSelect);
   useEffect(() => {
@@ -243,7 +274,11 @@ export function TripMap({
         zIndex: point.tone === "candidate" ? 20 : point.id === activeId ? 40 : 30,
         anchor: "center",
       });
-      if (point.tone !== "candidate" && point.tone !== "hotel") {
+      if (
+        point.tone !== "candidate" &&
+        point.tone !== "hotel" &&
+        point.tone !== "station"
+      ) {
         marker.on("click", () => select.current?.(point.id));
       }
       overlays.push(marker);
