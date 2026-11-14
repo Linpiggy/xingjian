@@ -316,8 +316,9 @@ export const useTrips = create<TripStore>()(
     }),
     {
       name: "xingjian-trips",
-      version: 2,
-      // v1 → v2：补齐抵达/返程、住宿、候选、锁定等新字段
+      // 每次给 tripSchema / tripRequestSchema 增加字段都要提升版本号，
+      // 旧数据才会经过 migrate 用 Schema 默认值补齐（v2：住宿、锁定等；v3：招牌菜、车次、门票来源等）
+      version: 3,
       migrate: (persisted) => {
         const state = persisted as {
           order: string[];

@@ -43,8 +43,8 @@ import type { DayEditor } from "./use-trip-editor";
 import { formatDateLabel } from "@/lib/time";
 
 /** 推荐菜是否属于高德收录的招牌菜（名称互相包含即算，兼容“精品”等前缀差异） */
-function isSignature(dish: string, signature: string[]): boolean {
-  return signature.some((item) => item.includes(dish) || dish.includes(item));
+function isSignature(dish: string, signature: string[] | undefined): boolean {
+  return (signature ?? []).some((item) => item.includes(dish) || dish.includes(item));
 }
 
 const LEG_ICON = { walking: Footprints, transit: Bus, taxi: CarTaxiFront };
