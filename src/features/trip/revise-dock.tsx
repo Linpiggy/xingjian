@@ -10,6 +10,7 @@ import {
   BookOpenText,
   Check,
   ChevronDown,
+  ExternalLink,
   Loader2,
   MessageCircleQuestion,
   MessageSquareText,
@@ -243,15 +244,29 @@ export function ReviseDock({ record }: { record: TripRecord }) {
                           高德实时数据
                         </span>
                       ) : null}
-                      {turn.sources?.slice(0, 3).map((source) => (
-                        <span
-                          key={source.id}
-                          className="flex items-center gap-1 rounded-full bg-paper-deep px-2 py-0.5 text-ink-soft"
-                        >
-                          <BookOpenText size={11} aria-hidden />
-                          {source.title}
-                        </span>
-                      ))}
+                      {turn.sources?.slice(0, 4).map((source) =>
+                        source.url ? (
+                          <a
+                            key={source.id}
+                            href={source.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex max-w-56 items-center gap-1 truncate rounded-full bg-pine-soft px-2 py-0.5 text-pine-deep hover:underline"
+                          >
+                            <ExternalLink size={11} aria-hidden />
+                            {source.official ? "官方 · " : ""}
+                            <span className="truncate">{source.title}</span>
+                          </a>
+                        ) : (
+                          <span
+                            key={source.id}
+                            className="flex items-center gap-1 rounded-full bg-paper-deep px-2 py-0.5 text-ink-soft"
+                          >
+                            <BookOpenText size={11} aria-hidden />
+                            {source.title}
+                          </span>
+                        ),
+                      )}
                     </div>
                   ) : null}
                 </div>

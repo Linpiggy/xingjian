@@ -1,10 +1,56 @@
 "use client";
 
-import { Check, Copy, Download, Link2, Loader2, X } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import {
+  Check,
+  Copy,
+  Download,
+  ExternalLink,
+  Link2,
+  Loader2,
+  Share,
+  X,
+} from "lucide-react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import type { Trip, TripRequest } from "@/lib/schema";
 import { encodeShare } from "@/lib/share";
 import { renderPoster } from "./poster";
+
+/** 文件名去掉 Windows/手机系统不允许的字符 */
+function safeName(title: string): string {
+  return (
+    title
+      .replace(/[\\/:*?"<>|]/g, " ")
+      .trim()
+      .slice(0, 60) || "行程长图"
+  );
+}
+
+const noop = () => () => {};
+
+/** 分享环境：是否本机地址、是否 App 内置浏览器、是否支持系统分享文件 */
+function useShareEnvironment() {
+  const host = useSyncExternalStore(
+    noop,
+    () => window.location.host,
+    () => "",
+  );
+  const ua = useSyncExternalStore(
+    noop,
+    () => navigator.userAgent,
+    () => "",
+  );
+  const shareFiles = useSyncExternalStore(
+    noop,
+    () => typeof navigator.canShare === "function",
+    () => false,
+  );
+  return {
+    host,
+    localOnly: /^(localhost|127\.0\.0\.1)(:\d+)?$/.test(host),
+    inApp: /MicroMessenger|QQ\/|DingTalk|Weibo|AlipayClient/i.test(ua),
+    shareFiles,
+  };
+}
 
 export function ShareDialog({
   open,
@@ -20,6 +66,7 @@ export function ShareDialog({
   const dialog = useRef<HTMLDialogElement>(null);
   const [link, setLink] = useState<string | null>(null);
   const [poster, setPoster] = useState<string | null>(null);
+  const [posterFile, setPosterFile] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
@@ -52,6 +99,9 @@ export function ShareDialog({
         url = URL.createObjectURL(blob);
         if (!cancelled) {
           setPoster(url);
+          setPosterFile(
+            new File([blob], `${safeName(trip.title)}.png`, { type: "image/png" }),
+          );
         }
       } catch {
         if (!cancelled) {
@@ -66,9 +116,23 @@ export function ShareDialog({
       }
       setLink(null);
       setPoster(null);
+      setPosterFile(null);
       setError(null);
     };
   }, [open, trip, request]);
+
+  const env = useShareEnvironment();
+  const canShareFile = Boolean(
+    posterFile && env.shareFiles && navigator.canShare?.({ files: [posterFile] }),
+  );
+
+  const sharePoster = async () => {
+    if (posterFile) {
+      await navigator
+        .share({ files: [posterFile], title: trip.title })
+        .catch(() => undefined);
+    }
+  };
 
   const copy = async () => {
     if (!link) {
@@ -140,6 +204,12 @@ export function ShareDialog({
                   {copied ? "已复制" : "复制"}
                 </button>
               </div>
+              {env.localOnly ? (
+                <p className="mt-2 rounded-md bg-amber-soft px-3 py-2 text-xs leading-relaxed text-amber">
+                  当前是本机地址（{env.host}
+                  ），只有这台电脑能打开。要发给别人，请用部署后的网址或局域网地址访问本站后再分享。
+                </p>
+              ) : null}
               <p className="mt-2 text-xs leading-relaxed text-ink-faint">
                 对方打开后可以浏览完整手册和地图，也可以一键存到自己的行程里继续修改；你之后的改动不会同步到已发出的链接。
               </p>
@@ -153,14 +223,41 @@ export function ShareDialog({
                 适合发给同伴或发到社交平台，包含每天的时间、地点和人均预算。
               </p>
               {poster ? (
-                <a
-                  href={poster}
-                  download={`${trip.title}.png`}
-                  className="mt-3 inline-flex h-11 items-center gap-1.5 rounded-lg border border-line bg-card px-4 text-sm font-medium text-ink hover:border-ink-faint"
-                >
-                  <Download size={15} aria-hidden />
-                  下载长图
-                </a>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {canShareFile ? (
+                    <button
+                      type="button"
+                      onClick={sharePoster}
+                      className="inline-flex h-11 items-center gap-1.5 rounded-lg bg-pine px-4 text-sm font-medium text-white hover:bg-pine-deep"
+                    >
+                      <Share size={15} aria-hidden />
+                      保存或发送长图
+                    </button>
+                  ) : null}
+                  <a
+                    href={poster}
+                    download={posterFile?.name ?? "行程长图.png"}
+                    className="inline-flex h-11 items-center gap-1.5 rounded-lg border border-line bg-card px-4 text-sm font-medium text-ink hover:border-ink-faint"
+                  >
+                    <Download size={15} aria-hidden />
+                    下载长图
+                  </a>
+                  <a
+                    href={poster}
+                    target="_blank"
+                    rel="noopener"
+                    className="inline-flex h-11 items-center gap-1.5 rounded-lg px-3 text-sm text-ink-soft hover:bg-paper-deep hover:text-ink"
+                  >
+                    <ExternalLink size={15} aria-hidden />
+                    查看原图
+                  </a>
+                </div>
+              ) : null}
+              {env.inApp ? (
+                <p className="mt-2 text-xs text-amber">
+                  当前在 App
+                  内置浏览器中，可能无法直接下载：请长按右侧长图保存，或用系统浏览器打开本页。
+                </p>
               ) : null}
             </section>
             {error ? (

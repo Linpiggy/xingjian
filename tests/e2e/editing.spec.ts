@@ -22,10 +22,19 @@ test.describe("日期选择、示例手册与手动编辑", () => {
 
   test("示例手册可直接打开", async ({ page }) => {
     await settleAt(page, "/", "#samples");
-    await page.getByRole("button", { name: /两天，古寺/ }).click();
+    await page.getByRole("button", { name: /两天，西湖日落/ }).click();
     await page.waitForURL(/\/plan\//);
     await expect(page.getByText("这是一份示例手册")).toBeVisible();
     await expect(page.locator("#day-1")).toBeVisible();
+    // 往返车次（高德跨城数据）与 12306 购票入口
+    const trains = page.getByRole("region", { name: "往返车次" });
+    await expect(trains).toContainText("G225");
+    await expect(trains.getByRole("link", { name: /12306/ })).toHaveAttribute(
+      "href",
+      /12306\.cn/,
+    );
+    // 推荐菜标出高德招牌菜
+    await expect(page.locator("#day-1").getByText("招牌").first()).toBeVisible();
   });
 
   test("锁定、换一个与重新排程", async ({ page }) => {

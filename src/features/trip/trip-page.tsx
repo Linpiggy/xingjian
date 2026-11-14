@@ -324,6 +324,8 @@ function TripBook({ record }: { record: TripRecord }) {
                 activeId={activeId}
                 onFocus={focusStop}
                 hotel={trip.hotel}
+                intercity={trip.intercity}
+                totalDays={trip.days.length}
                 editor={editor}
                 onSwap={(day, index) => setSwapTarget({ day, index })}
                 onExpandMap={setMapDay}

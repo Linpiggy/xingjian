@@ -38,7 +38,7 @@ export const UNKNOWN_LEG_MIN = 30;
 /** 抵达后出站、去酒店放行李的预留时间 */
 export const ARRIVAL_SETTLE_MIN = 60;
 /** 离开前回酒店取行李并赶往车站/机场的预留时间 */
-export const DEPARTURE_RESERVE_MIN = 120;
+export const DEPARTURE_RESERVE_MIN = 90;
 
 export interface DayConstraints {
   /** 从酒店到第一站的交通 */

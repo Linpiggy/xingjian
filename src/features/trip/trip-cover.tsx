@@ -2,6 +2,8 @@
 
 import { CalendarDays, Footprints, Users } from "lucide-react";
 import Image from "next/image";
+import { useState } from "react";
+import { PlacePhoto } from "@/components/place-photo";
 import { destinationFor } from "@/lib/destinations";
 import { PACE_TEXT, TRAVELER_TEXT } from "@/lib/format";
 import type { Trip, TripRequest } from "@/lib/schema";
@@ -12,10 +14,13 @@ export function TripCover({ trip, request }: { trip: Trip; request: TripRequest 
   const firstPhoto = trip.days
     .flatMap((day) => day.stops)
     .find((stop) => stop.kind === "sight" && stop.place.photos[0]);
-  const photo = destination?.photo ?? firstPhoto?.place.photos[0] ?? null;
+  const [remoteFailed, setRemoteFailed] = useState(false);
+  const remote =
+    !destination && !remoteFailed ? (firstPhoto?.place.photos[0] ?? null) : null;
+  const photo = destination?.photo ?? remote;
   const credit = destination
     ? `摄影 ${destination.credit.author} · ${destination.credit.license}`
-    : firstPhoto
+    : remote && firstPhoto
       ? `${firstPhoto.place.name} · 图片来自高德地图`
       : null;
   const end = addDays(request.startDate, request.days - 1);
@@ -24,15 +29,23 @@ export function TripCover({ trip, request }: { trip: Trip; request: TripRequest 
     <section className="relative overflow-hidden rounded-3xl bg-ink text-paper">
       {photo ? (
         <>
-          <Image
-            src={photo}
-            alt=""
-            fill
-            priority
-            sizes="(min-width: 1280px) 1216px, 100vw"
-            className="object-cover"
-            unoptimized={!destination}
-          />
+          {destination ? (
+            <Image
+              src={photo}
+              alt=""
+              fill
+              priority
+              sizes="(min-width: 1280px) 1216px, 100vw"
+              className="object-cover"
+            />
+          ) : (
+            <PlacePhoto
+              src={photo}
+              alt=""
+              onUnavailable={() => setRemoteFailed(true)}
+              className="absolute inset-0 size-full object-cover"
+            />
+          )}
           <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/35 to-black/10" />
         </>
       ) : (

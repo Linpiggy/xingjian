@@ -33,6 +33,7 @@ for (const key of [
   "AMAP_WEB_SERVICE_KEY",
   "AMAP_JS_SECURITY_CODE",
   "VISION_API_KEY",
+  "TAVILY_API_KEY",
 ]) {
   if (process.env[key]) {
     secrets.push(Buffer.from(process.env[key]));

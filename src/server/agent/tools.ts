@@ -6,13 +6,36 @@
 import { z } from "zod";
 import { clusterByArea, distanceMeters, orderByShortestPath } from "@/lib/geo";
 import { requiredMeals } from "@/lib/schedule";
-import type { Place } from "@/lib/schema";
+import { toClock, toMinutes } from "@/lib/time";
+import type { Place, Train } from "@/lib/schema";
 import { addDays } from "@/lib/time";
+import { webSearch, webSearchConfigured } from "@/server/providers/websearch";
 import { hasCityKnowledge, retrieve } from "@/server/rag/retriever";
 import type { ToolSpec } from "@/server/llm/client";
 import { assembleTrip, buildDay, dayToDraft } from "./enrich";
 import { cleanText, cleanList } from "./guard";
 import type { AgentSession, DayDraft } from "./session";
+
+/** 城市主要火车站（缓存于会话）：用作跨城铁路查询的起终点 */
+async function stationOf(
+  session: AgentSession,
+  city: string,
+): Promise<{ location: Place["location"]; citycode: string } | null> {
+  const cached = session.stations.get(city);
+  if (cached !== undefined) {
+    return cached;
+  }
+  session.amapCalls += 1;
+  const places = await session.amap.searchText(city, "火车站", 5).catch(() => []);
+  const station =
+    places.find((place) => /站$/.test(place.name) && place.citycode) ??
+    places.find((place) => place.citycode);
+  const result = station?.citycode
+    ? { location: station.location, citycode: station.citycode }
+    : null;
+  session.stations.set(city, result);
+  return result;
+}
 
 const MAX_SIGHTS: Record<string, number> = { relaxed: 3, balanced: 4, packed: 6 };
 /** 同一天最多提交次数，超过后要求模型接受结果继续，避免死循环 */
@@ -28,6 +51,9 @@ function compactPlace(place: Place, origin?: Place) {
     open: place.openTime,
     address: place.address,
     lnglat: place.location.map((n) => n.toFixed(4)).join(","),
+    ...(place.signatureDishes.length
+      ? { signatureDishes: place.signatureDishes.slice(0, 6) }
+      : {}),
     ...(origin
       ? { distanceM: Math.round(distanceMeters(origin.location, place.location)) }
       : {}),
@@ -70,8 +96,21 @@ const stopArgs = z.object({
     .default(null)
     .describe("每人门票估算，免费填 0，不确定填 null"),
   mealCny: z.number().min(0).max(5000).nullable().default(null).describe("每人餐费估算"),
-  dishes: z.array(z.string().max(16)).max(4).default([]),
+  dishes: z
+    .array(z.string().max(16))
+    .max(4)
+    .default([])
+    .describe(
+      "推荐菜 2-4 道：优先从该餐厅的 signatureDishes（高德招牌菜）中挑选，并避开忌口",
+    ),
   citations: z.array(z.string()).max(4).default([]).describe("引用的知识库条目 ID"),
+  ticketSourceId: z
+    .string()
+    .nullable()
+    .default(null)
+    .describe(
+      "门票价格若来自 verify_ticket 的结果，填对应来源 id（如 S3）；估算则填 null",
+    ),
 });
 
 const saveDayArgs = z.object({
@@ -91,6 +130,34 @@ const setHotelArgs = z.object({
     .nullable()
     .default(null)
     .describe("每间每晚参考价"),
+});
+
+const verifyTicketArgs = z.object({
+  placeId: z.string().describe("要核对门票的景点 ID"),
+});
+
+const MAX_TICKET_CHECKS = 8;
+
+const searchTrainsArgs = z.object({
+  direction: z
+    .enum(["outbound", "return"])
+    .describe("outbound=去程（第一天），return=返程（最后一天）"),
+  earliest: z
+    .string()
+    .regex(/^\d{2}:\d{2}$/)
+    .describe("最早出发时间 HH:mm，去程一般 07:00 起，返程一般 13:00 起"),
+});
+
+const setTrainsArgs = z.object({
+  outboundId: z
+    .string()
+    .nullable()
+    .describe("选中的去程车次 id；没有合适铁路方案时填 null"),
+  returnId: z
+    .string()
+    .nullable()
+    .describe("选中的返程车次 id；没有合适铁路方案时填 null"),
+  note: z.string().max(120).describe("为什么选这两趟车，或没有铁路方案时的出行建议"),
 });
 
 const finalizeArgs = z.object({
@@ -269,6 +336,203 @@ export const tools = {
       );
     },
   }),
+  verify_ticket: define({
+    schema: verifyTicketArgs,
+    description:
+      "联网搜索景点的门票价格与预约政策，结果标注是否为官方来源（政府/景区官网）。只对收费景点调用；采用官方来源的价格，并在 save_day_plan 的 ticketSourceId 中引用来源 id。",
+    label: (args, session) =>
+      `联网核对门票：${session.places.get(args.placeId)?.name ?? "景点"}`,
+    run: async (args, session) => {
+      const place = session.places.get(args.placeId);
+      if (!place) {
+        return fail(`未知地点 ID ${args.placeId}`);
+      }
+      if (!webSearchConfigured()) {
+        return fail("联网核对未开启，门票请按估算填写并保持 ticketSourceId 为 null");
+      }
+      if (session.ticketChecks >= MAX_TICKET_CHECKS) {
+        return fail(`本次最多核对 ${MAX_TICKET_CHECKS} 个景点，其余按估算`);
+      }
+      session.ticketChecks += 1;
+      const results = await webSearch(
+        `${session.request.city} ${place.name} 门票价格 预约 官网`,
+      );
+      const items = results.slice(0, 5).map((result) => {
+        const id = `S${session.verifiedSources.size + 1}`;
+        session.verifiedSources.set(id, {
+          url: result.url,
+          title: result.title,
+          official: result.official,
+        });
+        return {
+          id,
+          official: result.official,
+          title: result.title,
+          site: new URL(result.url).hostname,
+          snippet: result.snippet,
+        };
+      });
+      const official = items.filter((item) => item.official).length;
+      return ok(
+        {
+          place: place.name,
+          results: items,
+          hint: "摘要只是网页片段，价格以官方来源为准；不确定时仍填估算",
+        },
+        items.length
+          ? `找到 ${items.length} 条，其中官方来源 ${official} 条`
+          : "没有搜到相关信息",
+      );
+    },
+  }),
+  search_trains: define({
+    schema: searchTrainsArgs,
+    description:
+      "查询出发城市与目的地之间的铁路车次（高德跨城公交规划：车次、站点、时刻、各席别票价，不含余票）。用户填写了出发城市时，规划前先查去程和返程。",
+    label: (args, session) =>
+      args.direction === "outbound"
+        ? `查询去程车次：${session.request.origin} → ${session.request.city}`
+        : `查询返程车次：${session.request.city} → ${session.request.origin}`,
+    run: async (args, session) => {
+      if (!session.needsTrains()) {
+        return fail("用户没有填写出发城市，不需要查询车次");
+      }
+      const [origin, destination] = await Promise.all([
+        stationOf(session, session.request.origin),
+        stationOf(session, session.request.city),
+      ]);
+      if (!origin || !destination) {
+        return fail("没有找到出发地或目的地的火车站");
+      }
+      const outbound = args.direction === "outbound";
+      const [from, to] = outbound ? [origin, destination] : [destination, origin];
+      const date = outbound
+        ? session.request.startDate
+        : addDays(session.request.startDate, session.request.days - 1);
+      const start = toMinutes(args.earliest) ?? (outbound ? 420 : 780);
+      const found = new Map<string, Train>();
+      for (const offset of [0, 150, 300]) {
+        const minute = Math.min(start + offset, 22 * 60);
+        session.amapCalls += 1;
+        const options = await session.amap
+          .railOptions(
+            from.location,
+            to.location,
+            from.citycode,
+            to.citycode,
+            date,
+            toClock(minute),
+          )
+          .catch(() => []);
+        for (const option of options) {
+          if (!found.has(option.trip) && (toMinutes(option.depart) ?? 0) >= start) {
+            found.set(option.trip, { ...option, date });
+          }
+        }
+      }
+      const trains = [...found.values()]
+        .sort((a, b) => a.depart.localeCompare(b.depart))
+        .slice(0, 6);
+      const prefix = outbound ? "out" : "ret";
+      for (const train of trains) {
+        session.trainOptions.set(`${prefix}-${train.trip}`, train);
+      }
+      if (!trains.length) {
+        return ok(
+          {
+            trains: [],
+            hint: "没有找到铁路方案（可能需要飞机或多次换乘），可在 set_trains 中填 null 并在 note 说明",
+          },
+          "没有找到铁路方案",
+        );
+      }
+      return ok(
+        {
+          date,
+          trains: trains.map((train) => ({
+            id: `${prefix}-${train.trip}`,
+            trip: train.trip,
+            from: train.from,
+            to: train.to,
+            depart: train.depart,
+            arrive: `${train.arrive}${train.arriveNextDay ? "（次日）" : ""}`,
+            minutes: train.minutes,
+            lowestPrice: train.seats[0]?.price ?? null,
+            doorToDoorMinutes: train.doorToDoorMinutes,
+          })),
+        },
+        `找到 ${trains.length} 趟：${trains
+          .slice(0, 3)
+          .map((train) => `${train.trip} ${train.depart}`)
+          .join("、")}`,
+      );
+    },
+  }),
+  set_trains: define({
+    schema: setTrainsArgs,
+    description:
+      "从 search_trains 的结果中选定去程和返程车次。选定后第一天从到站时间开始安排、最后一天在返程发车前 1.5 小时结束，返回更新后的每日约束。",
+    label: (args, session) => {
+      const names = [args.outboundId, args.returnId]
+        .map((id) => (id ? session.trainOptions.get(id)?.trip : null))
+        .filter(Boolean);
+      return names.length ? `确定往返车次：${names.join(" / ")}` : "确定往返交通";
+    },
+    run: async (args, session) => {
+      const pick = (id: string | null, prefix: string) => {
+        if (!id) {
+          return null;
+        }
+        if (!id.startsWith(prefix) || !session.trainOptions.has(id)) {
+          throw new Error(`车次 ${id} 不在 search_trains 的结果中`);
+        }
+        return session.trainOptions.get(id) ?? null;
+      };
+      let outbound: Train | null;
+      let inbound: Train | null;
+      try {
+        outbound = pick(args.outboundId, "out-");
+        inbound = pick(args.returnId, "ret-");
+      } catch (error) {
+        return fail(error instanceof Error ? error.message : "车次无效");
+      }
+      session.intercity = {
+        origin: session.request.origin,
+        outbound,
+        inbound,
+        note: cleanText(args.note),
+      };
+      if (session.days.size) {
+        session.staleDays = new Set(session.days.keys());
+      }
+      const { days } = session.request;
+      return ok(
+        {
+          day1Start: session.effectiveArrival()
+            ? `${session.effectiveArrival()} 到站，约 1 小时后开始游玩`
+            : "不限",
+          lastDayEnd: session.effectiveDeparture()
+            ? `${session.effectiveDeparture()} 发车，最后一站需在发车前 1.5 小时结束`
+            : "不限",
+          requiredMeals: Array.from({ length: days }, (_, i) => {
+            const meals = requiredMeals(
+              i + 1,
+              days,
+              session.effectiveArrival(),
+              session.effectiveDeparture(),
+            );
+            return `第${i + 1}天：${meals.length ? meals.map((meal) => (meal === "lunch" ? "午餐" : "晚餐")).join("、") : "无硬性要求"}`;
+          }),
+        },
+        [
+          outbound && `去程 ${outbound.trip} ${outbound.depart}→${outbound.arrive}`,
+          inbound && `返程 ${inbound.trip} ${inbound.depart}`,
+        ]
+          .filter(Boolean)
+          .join("，") || "不乘火车",
+      );
+    },
+  }),
   set_hotel: define({
     schema: setHotelArgs,
     description:
@@ -335,6 +599,11 @@ export const tools = {
       if (args.day > days) {
         return fail(`行程只有 ${days} 天，day 超出范围`);
       }
+      if (session.needsTrains() && !session.intercity) {
+        return fail(
+          "用户填写了出发城市，请先用 search_trains 查询往返车次并调用 set_trains，再提交每天安排",
+        );
+      }
       if (session.needsHotel() && !session.hotel) {
         return fail("多日行程请先搜索酒店并调用 set_hotel 确定住宿，再提交每天安排");
       }
@@ -363,8 +632,8 @@ export const tools = {
       const required = requiredMeals(
         args.day,
         days,
-        session.request.arrivalTime,
-        session.request.departureTime,
+        session.effectiveArrival(),
+        session.effectiveDeparture(),
       );
       const missing = required.filter((meal) => !meals.has(meal));
       if (missing.length) {

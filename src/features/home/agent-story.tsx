@@ -255,7 +255,7 @@ function Stage({
     { ok: true, text: "12 个地点都来自高德检索结果" },
     { ok: true, text: "每天都安排了午餐和晚餐" },
     { ok: false, text: "雷峰塔 18:40 到达时已闭园", fix: "已与晚餐对调，16:30 先上塔" },
-    { ok: true, text: "最后一站在返程前 2 小时结束" },
+    { ok: true, text: "最后一站在返程前 1.5 小时结束" },
   ];
   return (
     <div className="flex size-full flex-col justify-center gap-2 p-4 sm:gap-3 sm:p-10">

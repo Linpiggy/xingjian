@@ -2,6 +2,8 @@
 
 import { BedDouble, CloudRain, CloudSun, Snowflake, Sun } from "lucide-react";
 import { money } from "@/lib/format";
+import { PlacePhoto } from "@/components/place-photo";
+import { IntercityCard } from "./intercity-card";
 import type { Trip, TripRequest, Weather } from "@/lib/schema";
 import { formatDateLabel } from "@/lib/time";
 
@@ -24,6 +26,7 @@ const BUDGET_PARTS = [
   { key: "meals", label: "餐饮", color: "bg-clay" },
   { key: "transport", label: "市内交通", color: "bg-sky" },
   { key: "hotel", label: "住宿", color: "bg-amber" },
+  { key: "intercity", label: "往返车票", color: "bg-ink-soft" },
 ] as const;
 
 export function TripOverview({ trip, request }: { trip: Trip; request: TripRequest }) {
@@ -35,6 +38,8 @@ export function TripOverview({ trip, request }: { trip: Trip; request: TripReque
     .flatMap((day) => day.stops)
     .filter((stop) => stop.kind === "meal").length;
   const over = request.budgetPerPerson !== null && budget.total > request.budgetPerPerson;
+  const hasTrains = Boolean(trip.intercity?.outbound || trip.intercity?.inbound);
+  const parts = BUDGET_PARTS.filter((part) => part.key !== "intercity" || hasTrains);
 
   return (
     <section id="overview" className="scroll-mt-24">
@@ -109,7 +114,7 @@ export function TripOverview({ trip, request }: { trip: Trip; request: TripReque
             className="mt-4 flex h-2.5 overflow-hidden rounded-full bg-paper-deep"
             aria-hidden
           >
-            {BUDGET_PARTS.map((part) => {
+            {parts.map((part) => {
               const value = budget[part.key];
               return value && budget.total ? (
                 <div
@@ -121,7 +126,7 @@ export function TripOverview({ trip, request }: { trip: Trip; request: TripReque
             })}
           </div>
           <ul className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm">
-            {BUDGET_PARTS.map((part) => (
+            {parts.map((part) => (
               <li key={part.key} className="flex items-center justify-between gap-2">
                 <span className="flex items-center gap-1.5 text-ink-soft">
                   <i className={`size-2 rounded-full ${part.color}`} />
@@ -136,22 +141,22 @@ export function TripOverview({ trip, request }: { trip: Trip; request: TripReque
             ))}
           </ul>
           <p className="mt-3 text-xs leading-relaxed text-ink-faint">
-            住宿：{budget.hotelNote}。门票与餐费为 AI 估算，交通费来自高德路线。
+            住宿：{budget.hotelNote}。门票除标注“已核对”的外为 AI
+            估算，市内交通与车票来自高德数据。
             {budget.unknownItems.length
               ? ` 未计入：${budget.unknownItems.join("、")}。`
               : ""}
           </p>
         </div>
       </div>
+      {trip.intercity ? <IntercityCard intercity={trip.intercity} /> : null}
+
       {trip.hotel ? (
         <div className="mt-8 flex gap-4 rounded-xl border border-line bg-card p-4 sm:p-5">
           {trip.hotel.place.photos[0] ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
+            <PlacePhoto
               src={trip.hotel.place.photos[0]}
               alt={trip.hotel.place.name}
-              referrerPolicy="no-referrer"
-              loading="lazy"
               className="hidden size-24 shrink-0 rounded-lg object-cover sm:block"
             />
           ) : null}

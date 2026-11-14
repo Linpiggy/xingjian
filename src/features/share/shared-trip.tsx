@@ -117,6 +117,8 @@ export function SharedTrip() {
               activeId={activeId}
               onFocus={setActiveId}
               hotel={trip.hotel}
+              intercity={trip.intercity}
+              totalDays={trip.days.length}
               onExpandMap={setMapDay}
             />
           ))}

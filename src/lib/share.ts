@@ -3,7 +3,9 @@
  * # 之后的内容不会发送到服务器，因此分享不需要后端存储，服务端也看不到行程内容。
  * 解码时把链接视为不可信输入：Zod 全量校验，图片只保留高德域名。
  */
+import { deflateSync, inflateSync } from "fflate";
 import { simplifyPath } from "./geo";
+import { isAllowedPhoto } from "./photo";
 import {
   tripRequestSchema,
   tripSchema,
@@ -26,14 +28,6 @@ function fromBase64Url(text: string): Uint8Array {
   const base64 = text.replace(/-/g, "+").replace(/_/g, "/");
   const binary = atob(base64 + "=".repeat((4 - (base64.length % 4)) % 4));
   return Uint8Array.from(binary, (char) => char.charCodeAt(0));
-}
-
-async function transform(
-  data: Uint8Array,
-  stream: CompressionStream | DecompressionStream,
-): Promise<Uint8Array> {
-  const output = new Blob([data as BlobPart]).stream().pipeThrough(stream);
-  return new Uint8Array(await new Response(output).arrayBuffer());
 }
 
 const round = (value: number) => Math.round(value * 1e5) / 1e5;
@@ -72,26 +66,14 @@ export function compactTrip(trip: Trip): Trip {
 
 export async function encodeShare(request: TripRequest, trip: Trip): Promise<string> {
   const json = JSON.stringify({ request, trip: compactTrip(trip) });
-  const compressed = await transform(
-    new TextEncoder().encode(json),
-    new CompressionStream("deflate-raw"),
-  );
+  // fflate 的 deflateSync 输出原始 deflate 流，与浏览器 CompressionStream("deflate-raw") 兼容；
+  // 用纯 JS 实现是为了让不支持该 API 的旧浏览器、App 内置浏览器也能打开分享链接
+  const compressed = deflateSync(new TextEncoder().encode(json), { level: 9 });
   return `${VERSION}.${toBase64Url(compressed)}`;
 }
 
-function safePhoto(url: string): boolean {
-  try {
-    const parsed = new URL(url);
-    return (
-      parsed.protocol === "https:" && /(^|\.)(autonavi|amap)\.com$/.test(parsed.hostname)
-    );
-  } catch {
-    return false;
-  }
-}
-
 function sanitizePlace(place: Place): Place {
-  return { ...place, photos: place.photos.filter(safePhoto) };
+  return { ...place, photos: place.photos.filter((url) => isAllowedPhoto(url) !== null) };
 }
 
 export async function decodeShare(
@@ -101,9 +83,7 @@ export async function decodeShare(
   if (version !== VERSION || !body || body.length > 400_000) {
     throw new Error("分享链接无效或已损坏");
   }
-  const json = new TextDecoder().decode(
-    await transform(fromBase64Url(body), new DecompressionStream("deflate-raw")),
-  );
+  const json = new TextDecoder().decode(inflateSync(fromBase64Url(body)));
   const data = JSON.parse(json) as { request: unknown; trip: unknown };
   const request = tripRequestSchema.parse(data.request);
   const trip = tripSchema.parse(data.trip);

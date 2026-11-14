@@ -59,6 +59,7 @@ export function PlannerForm({ initialCity = "" }: { initialCity?: string }) {
     arrivalTime: null,
     departureTime: null,
     hotelName: "",
+    origin: "",
   }));
   const [errors, setErrors] = useState<Partial<Record<keyof TripRequest, string>>>({});
   const [notesBase, setNotesBase] = useState("");
@@ -182,20 +183,38 @@ export function PlannerForm({ initialCity = "" }: { initialCity?: string }) {
         </Field>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-3">
-        <Field label="第一天几点到" hint="选填" htmlFor="field-arrivalTime">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <Field label="从哪出发" hint="选填，推荐车次" htmlFor="field-origin">
+          <input
+            id="field-origin"
+            className={inputClass}
+            placeholder="如：上海"
+            value={form.origin}
+            maxLength={20}
+            onChange={(event) => set("origin", event.target.value)}
+          />
+        </Field>
+        <Field
+          label={form.origin ? "希望几点前到" : "第一天几点到"}
+          hint="选填"
+          htmlFor="field-arrivalTime"
+        >
           <TimeSelect
             id="field-arrivalTime"
             value={form.arrivalTime}
-            placeholder="不限，全天可玩"
+            placeholder={form.origin ? "不限，AI 挑车次" : "不限，全天可玩"}
             onChange={(value) => set("arrivalTime", value)}
           />
         </Field>
-        <Field label="最后一天几点走" hint="选填" htmlFor="field-departureTime">
+        <Field
+          label={form.origin ? "最早几点返程" : "最后一天几点走"}
+          hint="选填"
+          htmlFor="field-departureTime"
+        >
           <TimeSelect
             id="field-departureTime"
             value={form.departureTime}
-            placeholder="不限，玩到晚上"
+            placeholder={form.origin ? "不限，AI 挑车次" : "不限，玩到晚上"}
             onChange={(value) => set("departureTime", value)}
           />
         </Field>

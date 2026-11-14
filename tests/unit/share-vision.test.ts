@@ -83,3 +83,15 @@ describe("vision output parsing", () => {
     expect(insight.suggestions).toEqual([]);
   });
 });
+
+describe("photo proxy allowlist", () => {
+  it("only accepts https images on Amap domains", async () => {
+    const { isAllowedPhoto } = await import("@/lib/photo");
+    expect(isAllowedPhoto("https://store.is.autonavi.com/showpic/abc")).not.toBeNull();
+    expect(isAllowedPhoto("https://aos-comment.amap.com/x.jpg")).not.toBeNull();
+    expect(isAllowedPhoto("http://store.is.autonavi.com/showpic/abc")).toBeNull();
+    expect(isAllowedPhoto("https://evil.example/autonavi.com.jpg")).toBeNull();
+    expect(isAllowedPhoto("https://user:pw@store.is.autonavi.com/x")).toBeNull();
+    expect(isAllowedPhoto("not a url")).toBeNull();
+  });
+});

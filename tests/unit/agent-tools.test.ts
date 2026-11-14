@@ -21,6 +21,7 @@ const request: TripRequest = {
   arrivalTime: null,
   departureTime: null,
   hotelName: "",
+  origin: "",
 };
 
 function place(id: string, lng: number, extra: Partial<Place> = {}): Place {
@@ -37,6 +38,8 @@ function place(id: string, lng: number, extra: Partial<Place> = {}): Place {
     citycode: "0571",
     adcode: "330106",
     category: "sight",
+    signatureDishes: [],
+    tel: null,
     ...extra,
   };
 }

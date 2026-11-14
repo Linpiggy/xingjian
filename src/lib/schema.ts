@@ -52,6 +52,8 @@ export const tripRequestSchema = z.object({
   departureTime: clockSchema.nullable().default(null),
   /** 已订酒店名称，留空由 Agent 推荐住宿区域 */
   hotelName: z.string().trim().max(60).default(""),
+  /** 出发城市，填写后 Agent 推荐往返车次 */
+  origin: z.string().trim().max(20).default(""),
 });
 export type TripRequest = z.infer<typeof tripRequestSchema>;
 
@@ -71,6 +73,10 @@ export const placeSchema = z.object({
   adcode: z.string().nullable(),
   /** 由高德 typecode 归类，用于替换候选与地图样式 */
   category: z.enum(["sight", "food", "hotel", "other"]).default("other"),
+  /** 高德收录的招牌菜（仅餐厅） */
+  signatureDishes: z.array(z.string()).max(8).default([]),
+  /** 高德收录的联系电话（第一个） */
+  tel: z.string().nullable().default(null),
 });
 export type Place = z.infer<typeof placeSchema>;
 
@@ -96,6 +102,16 @@ export const stopSchema = z.object({
   dishes: z.array(z.string()),
   citations: z.array(z.string()),
   warnings: z.array(z.string()),
+  /** 门票价格的联网核对来源；null 表示 AI 估算 */
+  ticketSource: z
+    .object({
+      url: z.string(),
+      title: z.string(),
+      official: z.boolean(),
+      checkedAt: z.string(),
+    })
+    .nullable()
+    .default(null),
   /** 用户锁定：AI 调整时必须保留 */
   locked: z.boolean().default(false),
   /** 用户手动替换/修改过 */
@@ -158,12 +174,42 @@ export const budgetSchema = z.object({
   meals: z.number().nullable(),
   transport: z.number().nullable(),
   hotel: z.number().nullable(),
+  /** 往返火车（每人，按二等座或最低价） */
+  intercity: z.number().nullable().default(null),
   /** 每人合计（只计已知项） */
   total: z.number(),
   unknownItems: z.array(z.string()),
   hotelNote: z.string(),
 });
 export type Budget = z.infer<typeof budgetSchema>;
+
+/** 铁路车次（来自高德跨城公交规划：时刻表与票价，不含余票） */
+export const trainSchema = z.object({
+  trip: z.string(),
+  type: z.string(),
+  date: z.string(),
+  from: z.string(),
+  to: z.string(),
+  depart: z.string(),
+  arrive: z.string(),
+  arriveNextDay: z.boolean(),
+  minutes: z.number(),
+  /** 各席别票价：同一席别可能有多档（不同站点组合），price 为最低、maxPrice 为最高 */
+  seats: z.array(
+    z.object({ name: z.string(), price: z.number(), maxPrice: z.number().optional() }),
+  ),
+  /** 含两端市内接驳的门到门耗时（分钟） */
+  doorToDoorMinutes: z.number().nullable(),
+});
+export type Train = z.infer<typeof trainSchema>;
+
+export const intercitySchema = z.object({
+  origin: z.string(),
+  outbound: trainSchema.nullable(),
+  inbound: trainSchema.nullable(),
+  note: z.string(),
+});
+export type Intercity = z.infer<typeof intercitySchema>;
 
 export const hotelSchema = z.object({
   place: placeSchema,
@@ -188,6 +234,7 @@ export const tripSchema = z.object({
   changeSummary: z.string().nullable(),
   generatedAt: z.string(),
   hotel: hotelSchema.nullable().default(null),
+  intercity: intercitySchema.nullable().default(null),
   /** Agent 检索到但未采用的地点，供手动替换 */
   candidates: z.array(placeSchema).max(80).default([]),
 });
@@ -242,6 +289,9 @@ export type AskInput = z.infer<typeof askInputSchema>;
 export interface AskSource {
   id: string;
   title: string;
+  /** 联网来源才有链接 */
+  url?: string;
+  official?: boolean;
 }
 
 export type AskEvent =

@@ -4,7 +4,7 @@
  * 所有响应都用 Zod 宽松解析，缺失字段归一为 null，而不是猜测值。
  */
 import { z } from "zod";
-import type { Coordinate, Place, Weather } from "@/lib/schema";
+import type { Coordinate, Place, Train, Weather } from "@/lib/schema";
 import { AppError } from "@/server/errors";
 
 const MIN_INTERVAL_MS = 380;
@@ -54,7 +54,14 @@ const poiSchema = z.object({
   citycode: text,
   adcode: text,
   business: z
-    .object({ rating: numeric, cost: numeric, opentime_week: text, opentime_today: text })
+    .object({
+      rating: numeric,
+      cost: numeric,
+      opentime_week: text,
+      opentime_today: text,
+      tag: text,
+      tel: text,
+    })
     .partial()
     .optional(),
   photos: z.array(z.object({ url: z.string() }).passthrough()).optional(),
@@ -108,6 +115,30 @@ export function categoryOf(typecode: string | null): Place["category"] {
   return "other";
 }
 
+const GENERIC_TAGS =
+  /^(特色菜|招牌菜|鸡肉|牛肉|猪肉|羊肉|鱼|鱼肉|虾|虾仁|海鲜|蔬菜|素菜|主食|小吃|饮品|甜品|酒水|单人餐|双人餐|三人餐|四人餐|多人餐|.*套餐.*)$/;
+
+/** 从高德 tag 中提取招牌菜：去掉泛化词、重复与过长条目 */
+export function parseSignatureDishes(tag: string | null): string[] {
+  if (!tag) {
+    return [];
+  }
+  const seen = new Set<string>();
+  const dishes: string[] = [];
+  for (const raw of tag.split(/[,，;；|]/)) {
+    const dish = raw.trim().replace(/^精品/, "");
+    if (!dish || dish.length > 12 || GENERIC_TAGS.test(dish) || seen.has(dish)) {
+      continue;
+    }
+    seen.add(dish);
+    dishes.push(dish);
+    if (dishes.length === 8) {
+      break;
+    }
+  }
+  return dishes;
+}
+
 function toPlace(raw: z.infer<typeof poiSchema>): Place | null {
   const location = parseLocation(raw.location);
   if (!location) {
@@ -129,6 +160,11 @@ function toPlace(raw: z.infer<typeof poiSchema>): Place | null {
     citycode: raw.citycode,
     adcode: raw.adcode,
     category: categoryOf(raw.typecode?.split("|")[0] ?? null),
+    signatureDishes:
+      categoryOf(raw.typecode?.split("|")[0] ?? null) === "food"
+        ? parseSignatureDishes(raw.business?.tag ?? null)
+        : [],
+    tel: raw.business?.tel?.split(";")[0]?.trim() || null,
   };
 }
 
@@ -343,6 +379,109 @@ export class AmapClient {
     };
   }
 
+  /**
+   * 跨城铁路方案：高德跨城公交规划会返回途经的铁路分段（车次、站点、时刻、各席别票价）。
+   * 只有时刻表与票价，不含余票；结果按出发时间排序、按车次去重。
+   */
+  async railOptions(
+    origin: Coordinate,
+    destination: Coordinate,
+    fromCitycode: string,
+    toCitycode: string,
+    date: string,
+    time: string,
+  ): Promise<Omit<Train, "date">[]> {
+    const raw = await this.request("/v5/direction/transit/integrated", {
+      origin: origin.join(","),
+      destination: destination.join(","),
+      city1: fromCitycode,
+      city2: toCitycode,
+      date,
+      time,
+      strategy: "0",
+      AlternativeRoute: "5",
+      show_fields: "cost",
+    });
+    const stop = z.object({ name: z.string(), time: text }).partial();
+    const railway = z.object({
+      trip: z.string(),
+      type: text,
+      time: numeric,
+      departure_stop: stop.optional(),
+      arrival_stop: stop.optional(),
+      spaces: z
+        .array(z.object({ code: z.string(), cost: numeric }))
+        .optional()
+        .catch([]),
+    });
+    const parsed = z
+      .object({
+        route: z
+          .object({
+            transits: z
+              .array(
+                z
+                  .object({
+                    cost: z.object({ duration: numeric }).partial().optional(),
+                    segments: z
+                      .array(
+                        z
+                          .object({ railway: railway.optional().catch(undefined) })
+                          .passthrough(),
+                      )
+                      .optional(),
+                  })
+                  .passthrough(),
+              )
+              .optional(),
+          })
+          .optional(),
+      })
+      .parse(raw);
+    const clock = (value: string | null | undefined) =>
+      value && /^\d{4}$/.test(value) ? `${value.slice(0, 2)}:${value.slice(2)}` : null;
+    const results: Omit<Train, "date">[] = [];
+    for (const transit of parsed.route?.transits ?? []) {
+      const rail = transit.segments?.find((segment) => segment.railway)?.railway;
+      const depart = clock(rail?.departure_stop?.time);
+      const arrive = clock(rail?.arrival_stop?.time);
+      if (
+        !rail ||
+        !depart ||
+        !arrive ||
+        !rail.departure_stop?.name ||
+        !rail.arrival_stop?.name
+      ) {
+        continue;
+      }
+      const seats = groupSeats(
+        (rail.spaces ?? [])
+          .filter(
+            (seat): seat is { code: string; cost: number } =>
+              seat.cost !== null && seat.cost > 0,
+          )
+          .map((seat) => ({
+            name: seat.code.replace(/^火车/, ""),
+            price: Math.round(seat.cost),
+          })),
+      );
+      results.push({
+        trip: rail.trip,
+        type: rail.type ?? "火车",
+        from: rail.departure_stop.name,
+        to: rail.arrival_stop.name,
+        depart,
+        arrive,
+        arriveNextDay: arrive < depart,
+        minutes: rail.time !== null ? Math.round(rail.time / 60) : 0,
+        seats,
+        doorToDoorMinutes:
+          transit.cost?.duration != null ? Math.round(transit.cost.duration / 60) : null,
+      });
+    }
+    return results;
+  }
+
   async weather(adcode: string): Promise<Weather[]> {
     const raw = await this.request("/v3/weather/weatherInfo", {
       city: adcode,
@@ -376,6 +515,24 @@ export class AmapClient {
       wind: `${cast.daywind}风 ${cast.daypower}级`,
     }));
   }
+}
+
+/** 同一席别合并为价格区间；无座排在最后，其余按最低价排序 */
+export function groupSeats(seats: { name: string; price: number }[]): Train["seats"] {
+  const grouped = new Map<string, { name: string; price: number; maxPrice: number }>();
+  for (const seat of seats) {
+    const current = grouped.get(seat.name);
+    grouped.set(seat.name, {
+      name: seat.name,
+      price: Math.min(current?.price ?? seat.price, seat.price),
+      maxPrice: Math.max(current?.maxPrice ?? seat.price, seat.price),
+    });
+  }
+  return [...grouped.values()].sort(
+    (a, b) =>
+      Number(a.name.includes("无座")) - Number(b.name.includes("无座")) ||
+      a.price - b.price,
+  );
 }
 
 /** 公交方案的分段结构较深，这里只提取线路名称与真实折线 */

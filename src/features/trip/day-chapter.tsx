@@ -20,10 +20,13 @@ import {
   Square,
   Star,
   Ticket,
+  TrainFront,
   Trash2,
   Volume2,
 } from "lucide-react";
 import type { ReactNode } from "react";
+import { useState } from "react";
+import { PlacePhoto } from "@/components/place-photo";
 import { useSpeaker, useSpeechSupport } from "@/features/voice/speech";
 import {
   dayNarration,
@@ -33,11 +36,16 @@ import {
   money,
   stopLabel,
 } from "@/lib/format";
-import type { Citation, Day, Hotel, Leg, Stop } from "@/lib/schema";
+import type { Citation, Day, Hotel, Intercity, Leg, Stop } from "@/lib/schema";
 import { LazyMount } from "@/components/lazy-mount";
 import { TripMap } from "@/features/map/trip-map";
 import type { DayEditor } from "./use-trip-editor";
 import { formatDateLabel } from "@/lib/time";
+
+/** 推荐菜是否属于高德收录的招牌菜（名称互相包含即算，兼容“精品”等前缀差异） */
+function isSignature(dish: string, signature: string[]): boolean {
+  return signature.some((item) => item.includes(dish) || dish.includes(item));
+}
 
 const LEG_ICON = { walking: Footprints, transit: Bus, taxi: CarTaxiFront };
 
@@ -72,6 +80,20 @@ function LegRow({ leg, label }: { leg: Leg; label?: string }) {
           ) : null}
         </div>
       </div>
+    </li>
+  );
+}
+
+function TrainRow({ text }: { text: string }) {
+  return (
+    <li className="grid grid-cols-[56px_1fr] gap-3 sm:grid-cols-[72px_1fr] sm:gap-5">
+      <div className="relative flex justify-center">
+        <span className="absolute inset-y-0 w-px bg-line" aria-hidden />
+        <span className="relative z-10 mt-2 grid size-7 place-items-center rounded-full bg-ink text-paper ring-4 ring-paper">
+          <TrainFront size={14} aria-hidden />
+        </span>
+      </div>
+      <p className="py-2.5 text-sm font-medium text-ink">{text}</p>
     </li>
   );
 }
@@ -226,7 +248,8 @@ function StopCard({
   toolbar?: ReactNode;
 }) {
   const meal = stop.kind === "meal";
-  const photo = stop.place.photos[0];
+  const [photoFailed, setPhotoFailed] = useState(false);
+  const photo = photoFailed ? undefined : stop.place.photos[0];
   const cost = meal ? stop.mealCny : stop.ticketCny;
   return (
     <li
@@ -304,10 +327,35 @@ function StopCard({
             ) : null}
 
             {stop.dishes.length ? (
-              <p className="mt-3 text-sm text-ink-soft">
-                <span className="font-medium text-clay">推荐点：</span>
-                {stop.dishes.join("、")}
-              </p>
+              <div className="mt-3">
+                <p className="text-sm font-medium text-clay">推荐点</p>
+                <ul className="mt-1.5 flex flex-wrap gap-1.5">
+                  {stop.dishes.map((dish) => {
+                    const signature = isSignature(dish, stop.place.signatureDishes);
+                    return (
+                      <li
+                        key={dish}
+                        className="flex items-center gap-1 rounded-md bg-clay-soft/70 px-2 py-0.5 text-sm text-ink"
+                        title={signature ? "高德收录的该店招牌菜" : "AI 根据当地口味推荐"}
+                      >
+                        {dish}
+                        {signature ? (
+                          <span className="rounded bg-clay px-1 text-[10px] leading-4 text-white">
+                            招牌
+                          </span>
+                        ) : null}
+                      </li>
+                    );
+                  })}
+                </ul>
+                {stop.dishes.some(
+                  (dish) => !isSignature(dish, stop.place.signatureDishes),
+                ) ? (
+                  <p className="mt-1 text-xs text-ink-faint">
+                    未标“招牌”的为 AI 按当地口味推荐，以店内菜单为准。
+                  </p>
+                ) : null}
+              </div>
             ) : null}
 
             {stop.tips.length ? (
@@ -340,8 +388,29 @@ function StopCard({
               <span className="flex items-center gap-1">
                 <Ticket size={12} aria-hidden />
                 {meal ? "人均" : "门票"} {cost === 0 ? "免费" : money(cost)}
-                {cost !== null && cost > 0 ? "（估）" : ""}
+                {cost !== null && cost > 0 && !stop.ticketSource ? "（估）" : ""}
               </span>
+              {stop.ticketSource ? (
+                <a
+                  href={stop.ticketSource.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={(event) => event.stopPropagation()}
+                  title={`${stop.ticketSource.title}（${stop.ticketSource.checkedAt} 联网核对）`}
+                  className="flex max-w-60 items-center gap-1 truncate text-pine hover:underline"
+                >
+                  <span
+                    className={`rounded px-1 text-[10px] leading-4 ${
+                      stop.ticketSource.official
+                        ? "bg-pine text-white"
+                        : "bg-paper-deep text-ink-soft"
+                    }`}
+                  >
+                    {stop.ticketSource.official ? "官方核对" : "网络信息"}
+                  </span>
+                  <span className="truncate">{stop.ticketSource.title}</span>
+                </a>
+              ) : null}
               {stop.place.openTime ? (
                 <span
                   className="max-w-full truncate sm:max-w-80"
@@ -349,6 +418,15 @@ function StopCard({
                 >
                   营业 {stop.place.openTime}
                 </span>
+              ) : null}
+              {meal && stop.place.tel ? (
+                <a
+                  href={`tel:${stop.place.tel}`}
+                  onClick={(event) => event.stopPropagation()}
+                  className="tabular hover:text-ink"
+                >
+                  订座电话 {stop.place.tel}
+                </a>
               ) : null}
               {stop.citations.map((cid) => {
                 const citation = citations.get(cid);
@@ -367,13 +445,10 @@ function StopCard({
           </div>
           {photo ? (
             <div className="relative h-44 bg-paper-deep sm:h-auto">
-              {/* 高德 POI 实景图，按原图展示，不经过 Next 图片优化代理 */}
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
+              <PlacePhoto
                 src={photo}
                 alt={stop.place.name}
-                loading="lazy"
-                referrerPolicy="no-referrer"
+                onUnavailable={() => setPhotoFailed(true)}
                 className="absolute inset-0 size-full object-cover"
               />
               <span className="absolute bottom-1.5 right-2 text-[10px] text-white/80 drop-shadow">
@@ -398,6 +473,8 @@ export function DayChapter({
   editor,
   onSwap,
   onExpandMap,
+  intercity = null,
+  totalDays = 0,
 }: {
   day: Day;
   citations: Map<string, Citation>;
@@ -409,6 +486,8 @@ export function DayChapter({
   onSwap?: (day: number, index: number) => void;
   /** 提供时在章节开头显示当天路线图，并可打开全屏地图 */
   onExpandMap?: (day: number) => void;
+  intercity?: Intercity | null;
+  totalDays?: number;
 }) {
   const busy = editor?.busyDay === day.day;
   const { synthesis } = useSpeechSupport();
@@ -505,6 +584,11 @@ export function DayChapter({
       ) : null}
 
       <ol className={`mt-4 transition-opacity ${busy ? "opacity-50" : ""}`}>
+        {intercity?.outbound && day.day === 1 ? (
+          <TrainRow
+            text={`乘 ${intercity.outbound.trip} 抵达：${intercity.outbound.from} ${intercity.outbound.depart} → ${intercity.outbound.to} ${intercity.outbound.arrive}`}
+          />
+        ) : null}
         {hotel && day.startLeg ? (
           <>
             <HotelRow hotel={hotel} text="从住处出发：" />
@@ -545,6 +629,11 @@ export function DayChapter({
             <LegRow leg={day.endLeg} label="返回住处" />
             <HotelRow hotel={hotel} text="回到住处休息：" />
           </>
+        ) : null}
+        {intercity?.inbound && day.day === totalDays ? (
+          <TrainRow
+            text={`前往${intercity.inbound.from}，乘 ${intercity.inbound.trip} ${intercity.inbound.depart} 返程（到 ${intercity.inbound.to} ${intercity.inbound.arrive}）`}
+          />
         ) : null}
       </ol>
     </section>

@@ -32,7 +32,7 @@ export type TraceItem =
 export interface ChatTurn {
   role: "user" | "assistant";
   content: string;
-  sources?: { id: string; title: string }[];
+  sources?: { id: string; title: string; url?: string; official?: boolean }[];
   live?: boolean;
   /** 回答过程中调用的工具（展示用） */
   steps?: string[];

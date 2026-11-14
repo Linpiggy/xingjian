@@ -16,8 +16,8 @@ const SAMPLES = [
   {
     key: "hangzhou",
     city: "杭州",
-    title: "两天，古寺、湖光与一场日落",
-    meta: "2 天 · 情侣 · 上午到、下午五点走",
+    title: "两天，西湖日落与灵隐茶山",
+    meta: "2 天 · 情侣 · 上海出发，含往返高铁",
     load: () => import("@/data/samples/hangzhou.json"),
   },
   {

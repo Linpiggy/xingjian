@@ -91,6 +91,17 @@ export function tripToMarkdown(trip: Trip, request: TripRequest): string {
     "",
     trip.overview,
     "",
+    ...(trip.intercity?.outbound
+      ? [
+          `去程：${trip.intercity.outbound.trip} ${trip.intercity.outbound.from} ${trip.intercity.outbound.depart} → ${trip.intercity.outbound.to} ${trip.intercity.outbound.arrive}`,
+        ]
+      : []),
+    ...(trip.intercity?.inbound
+      ? [
+          `返程：${trip.intercity.inbound.trip} ${trip.intercity.inbound.from} ${trip.intercity.inbound.depart} → ${trip.intercity.inbound.to} ${trip.intercity.inbound.arrive}`,
+          "",
+        ]
+      : []),
     ...(trip.hotel ? [`住宿：${trip.hotel.place.name}——${trip.hotel.reason}`, ""] : []),
   ];
   for (const day of trip.days) {
@@ -120,7 +131,7 @@ export function tripToMarkdown(trip: Trip, request: TripRequest): string {
   }
   lines.push(`## 预算（每人）`, "");
   lines.push(
-    `门票 ${money(trip.budget.tickets)}｜餐饮 ${money(trip.budget.meals)}｜交通 ${money(trip.budget.transport)}｜住宿 ${money(trip.budget.hotel)}｜合计约 ${money(trip.budget.total)}`,
+    `门票 ${money(trip.budget.tickets)}｜餐饮 ${money(trip.budget.meals)}｜交通 ${money(trip.budget.transport)}｜住宿 ${money(trip.budget.hotel)}${trip.budget.intercity !== null ? `｜往返车票 ${money(trip.budget.intercity)}` : ""}｜合计约 ${money(trip.budget.total)}`,
     "",
   );
   if (trip.tips.length) {

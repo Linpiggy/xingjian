@@ -6,7 +6,7 @@
  */
 import { distanceMeters } from "@/lib/geo";
 import { scheduleDay } from "@/lib/schedule";
-import type { Budget, Day, Leg, Place, Stop, Trip } from "@/lib/schema";
+import type { Budget, Day, Intercity, Leg, Place, Stop, Train, Trip } from "@/lib/schema";
 import { addDays } from "@/lib/time";
 import { KNOWLEDGE_SOURCE } from "@/server/rag/corpus";
 import type { AgentSession, DayDraft } from "./session";
@@ -91,13 +91,29 @@ async function computeLeg(session: AgentSession, from: Place, to: Place): Promis
   };
 }
 
+/** 门票来源只能是本次会话联网检索到的链接，或之前已核对并保存的来源 */
+function resolveTicketSource(
+  session: AgentSession,
+  stop: DayDraft["stops"][number],
+): Stop["ticketSource"] {
+  if (stop.ticketSourceId) {
+    const source = session.verifiedSources.get(stop.ticketSourceId);
+    if (source) {
+      return { ...source, checkedAt: new Date().toISOString().slice(0, 10) };
+    }
+  }
+  return stop.ticketSource ?? null;
+}
+
 export async function buildDay(session: AgentSession, draft: DayDraft): Promise<Day> {
   const places = draft.stops.map((stop) => session.places.get(stop.placeId) as Place);
   const legs: Leg[] = [];
   for (let i = 1; i < places.length; i += 1) {
     legs.push(await computeLeg(session, places[i - 1], places[i]));
   }
-  const { days: totalDays, arrivalTime, departureTime } = session.request;
+  const totalDays = session.request.days;
+  const arrivalTime = session.effectiveArrival();
+  const departureTime = session.effectiveDeparture();
   const hotel = session.needsHotel() ? session.hotel?.place : null;
   const isLast = draft.day === totalDays;
   const startLeg = hotel ? await computeLeg(session, hotel, places[0]) : null;
@@ -136,6 +152,7 @@ export async function buildDay(session: AgentSession, draft: DayDraft): Promise<
     dishes: stop.dishes,
     citations: stop.citations.filter((id) => session.knowledge.has(id)),
     warnings: slots[i].warnings,
+    ticketSource: stop.kind === "sight" ? resolveTicketSource(session, stop) : null,
     locked: stop.locked ?? false,
     userEdited: stop.userEdited ?? false,
   }));
@@ -175,6 +192,7 @@ export function dayToDraft(day: Day): DayDraft {
       mealCny: stop.mealCny,
       dishes: stop.dishes,
       citations: stop.citations,
+      ticketSource: stop.ticketSource,
       locked: stop.locked,
       userEdited: stop.userEdited,
     })),
@@ -186,11 +204,24 @@ function sumKnown(values: (number | null)[]): number | null {
   return known.length ? Math.round(known.reduce((a, b) => a + b, 0)) : null;
 }
 
+/** 往返车票每人费用：取二等座（没有时取最便宜的有座席别）的最高档价格，预算偏保守 */
+export function trainFare(train: Train | null): number | null {
+  if (!train || !train.seats.length) {
+    return null;
+  }
+  const seat =
+    train.seats.find((item) => item.name.includes("二等")) ??
+    train.seats.find((item) => !item.name.includes("无座")) ??
+    train.seats[0];
+  return seat.maxPrice ?? seat.price;
+}
+
 export function computeBudget(
   days: Day[],
   travelers: number,
   hotelPerNightCny: number | null,
   hotelNote: string,
+  intercity: Intercity | null = null,
 ): Budget {
   const stops = days.flatMap((day) => day.stops);
   const sights = stops.filter((stop) => stop.kind === "sight");
@@ -224,6 +255,16 @@ export function computeBudget(
   if (hotel === null) {
     unknownItems.push("住宿费用未估算");
   }
+  const hasTrains = Boolean(intercity?.outbound || intercity?.inbound);
+  const rail = hasTrains
+    ? sumKnown([
+        trainFare(intercity?.outbound ?? null),
+        trainFare(intercity?.inbound ?? null),
+      ])
+    : null;
+  if (hasTrains && rail === null) {
+    unknownItems.push("往返车票价格未知");
+  }
   const tickets = sumKnown(sights.map((stop) => stop.ticketCny));
   const mealTotal = sumKnown(meals.map((stop) => stop.mealCny));
   const transport = sumKnown(legs.map((leg) => leg.costCny));
@@ -232,7 +273,9 @@ export function computeBudget(
     meals: mealTotal,
     transport,
     hotel,
-    total: (tickets ?? 0) + (mealTotal ?? 0) + (transport ?? 0) + (hotel ?? 0),
+    intercity: rail,
+    total:
+      (tickets ?? 0) + (mealTotal ?? 0) + (transport ?? 0) + (hotel ?? 0) + (rail ?? 0),
     unknownItems,
     hotelNote:
       nights === 0
@@ -276,6 +319,7 @@ export function assembleTrip(
       session.request.travelers,
       args.hotelPerNightCny ?? session.hotel?.pricePerNightCny ?? null,
       session.hotel ? session.hotel.place.name : args.hotelNote,
+      session.intercity,
     ),
     citations: [...cited].flatMap((id) => {
       const chunk = session.knowledge.get(id);
@@ -293,6 +337,7 @@ export function assembleTrip(
     changeSummary: args.changeSummary,
     generatedAt: new Date().toISOString(),
     hotel: session.hotel,
+    intercity: session.intercity,
     candidates: collectCandidates(session, days),
   };
 }
@@ -318,6 +363,7 @@ export function recomputeBudget(trip: Trip, travelers: number): Budget {
     travelers,
     trip.hotel?.pricePerNightCny ?? null,
     trip.hotel?.place.name ?? "",
+    trip.intercity,
   );
   if (!trip.hotel) {
     const unknownItems = next.unknownItems.filter((item) => item !== "住宿费用未估算");

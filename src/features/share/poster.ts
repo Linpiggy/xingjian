@@ -5,6 +5,7 @@
 "use client";
 
 import { destinationFor } from "@/lib/destinations";
+import { proxiedPhoto } from "@/lib/photo";
 import { LEG_LABEL, money, PACE_TEXT, stopLabel, TRAVELER_TEXT } from "@/lib/format";
 import type { Trip, TripRequest } from "@/lib/schema";
 import { addDays, formatDateLabel } from "@/lib/time";
@@ -58,6 +59,37 @@ function wrap(ctx: Ctx, text: string, width: number, maxLines = Infinity): strin
   return lines;
 }
 
+/** 按“铺满裁切”方式把图片画进圆角矩形 */
+function drawCover(
+  ctx: Ctx,
+  image: HTMLImageElement,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  radius: number,
+) {
+  const scale = Math.max(w / image.width, h / image.height);
+  const sw = w / scale;
+  const sh = h / scale;
+  ctx.save();
+  ctx.beginPath();
+  ctx.roundRect(x, y, w, h, radius);
+  ctx.clip();
+  ctx.drawImage(
+    image,
+    (image.width - sw) / 2,
+    (image.height - sh) / 2,
+    sw,
+    sh,
+    x,
+    y,
+    w,
+    h,
+  );
+  ctx.restore();
+}
+
 function loadImage(src: string): Promise<HTMLImageElement | null> {
   return new Promise((resolve) => {
     const image = new Image();
@@ -88,7 +120,7 @@ function collectText(trip: Trip, request: TripRequest): string {
       ...day.stops.map((stop) => `${stop.place.name}${stop.title}`),
     ]),
     ...trip.tips.map((tip) => tip.text),
-    "第天日一二三四五六游览午餐晚餐早餐小食休憩步行公交地铁打车分钟人均预算住宿门票餐饮交通由行间旅行规划生成出发前请核实开放与预约信息约周人同行",
+    "去程返程车票往第天日一二三四五六游览午餐晚餐早餐小食休憩步行公交地铁打车分钟人均预算住宿门票餐饮交通由行间旅行规划生成出发前请核实开放与预约信息约周人同行",
   ].join("");
 }
 
@@ -96,6 +128,15 @@ export async function renderPoster(trip: Trip, request: TripRequest): Promise<Bl
   await ensureFonts(collectText(trip, request));
   const destination = destinationFor(request.city);
   const cover = destination ? await loadImage(destination.photo) : null;
+  // 景点实景图经同源代理加载，画布不会被跨域图片污染，可以正常导出
+  const photoUrls = [
+    ...new Set(trip.days.flatMap((day) => day.stops.map((stop) => stop.place.photos[0]))),
+  ].filter((url): url is string => Boolean(url));
+  const thumbs = new Map<string, HTMLImageElement | null>(
+    await Promise.all(
+      photoUrls.map(async (url) => [url, await loadImage(proxiedPhoto(url))] as const),
+    ),
+  );
 
   const measureCanvas = document.createElement("canvas");
   const measure = measureCanvas.getContext("2d") as Ctx;
@@ -164,12 +205,22 @@ export async function renderPoster(trip: Trip, request: TripRequest): Promise<Bl
     y += overview.length * 50 + 48;
 
     // 预算条
+    const parts: [string, number | null][] = [
+      ["门票", trip.budget.tickets],
+      ["餐饮", trip.budget.meals],
+      ["交通", trip.budget.transport],
+      ["住宿", trip.budget.hotel],
+    ];
+    if (trip.intercity?.outbound || trip.intercity?.inbound) {
+      parts.push(["车票", trip.budget.intercity]);
+    }
+    const boxHeight = Math.max(150, 40 + Math.ceil(parts.length / 2) * 48);
     if (paint) {
       ctx.fillStyle = COLORS.card;
       ctx.strokeStyle = COLORS.line;
       ctx.lineWidth = 2;
       ctx.beginPath();
-      ctx.roundRect(PAD, y, content, 150, 20);
+      ctx.roundRect(PAD, y, content, boxHeight, 20);
       ctx.fill();
       ctx.stroke();
       ctx.fillStyle = COLORS.faint;
@@ -178,12 +229,6 @@ export async function renderPoster(trip: Trip, request: TripRequest): Promise<Bl
       ctx.fillStyle = COLORS.ink;
       ctx.font = `600 56px ${SERIF}`;
       ctx.fillText(money(trip.budget.total), PAD + 36, y + 118);
-      const parts = [
-        ["门票", trip.budget.tickets],
-        ["餐饮", trip.budget.meals],
-        ["交通", trip.budget.transport],
-        ["住宿", trip.budget.hotel],
-      ] as const;
       ctx.font = `400 24px ${SANS}`;
       parts.forEach(([label, value], i) => {
         const x = PAD + 380 + (i % 2) * 260;
@@ -194,7 +239,21 @@ export async function renderPoster(trip: Trip, request: TripRequest): Promise<Bl
         ctx.fillText(money(value), x + 70, row);
       });
     }
-    y += 150 + 40;
+    y += boxHeight + 40;
+    const trainLines = [
+      trip.intercity?.outbound &&
+        `去程 ${trip.intercity.outbound.trip}  ${trip.intercity.outbound.from} ${trip.intercity.outbound.depart} → ${trip.intercity.outbound.to} ${trip.intercity.outbound.arrive}`,
+      trip.intercity?.inbound &&
+        `返程 ${trip.intercity.inbound.trip}  ${trip.intercity.inbound.from} ${trip.intercity.inbound.depart} → ${trip.intercity.inbound.to} ${trip.intercity.inbound.arrive}`,
+    ].filter((line): line is string => Boolean(line));
+    if (trainLines.length) {
+      if (paint) {
+        ctx.fillStyle = COLORS.ink;
+        ctx.font = `500 26px ${SANS}`;
+        trainLines.forEach((line, i) => ctx.fillText(line, PAD, y + 26 + i * 42));
+      }
+      y += trainLines.length * 42 + 12;
+    }
     if (trip.hotel) {
       ctx.font = `400 26px ${SANS}`;
       const hotelLines = wrap(ctx, `住在 ${trip.hotel.place.name}`, content, 2);
@@ -249,8 +308,23 @@ export async function renderPoster(trip: Trip, request: TripRequest): Promise<Bl
           }
           y += 48;
         }
+        const thumb = stop.place.photos[0] ? thumbs.get(stop.place.photos[0]) : null;
+        const thumbW = 200;
+        const thumbH = 150;
+        const textWidth = content - 200 - (thumb ? thumbW + 24 : 0);
         ctx.font = `600 32px ${SANS}`;
-        const nameLines = wrap(ctx, stop.place.name, content - 200, 2);
+        const nameLines = wrap(ctx, stop.place.name, textWidth, 2);
+        const extra =
+          stop.kind === "meal" && stop.dishes.length
+            ? ` · ${stop.dishes.slice(0, 3).join("、")}`
+            : "";
+        ctx.font = `400 24px ${SANS}`;
+        const metaLines = wrap(
+          ctx,
+          `${stopLabel(stop)} · ${stop.start}–${stop.end}${extra}`,
+          textWidth,
+          2,
+        );
         if (paint) {
           ctx.fillStyle = COLORS.ink;
           ctx.font = `600 32px ${SERIF}`;
@@ -264,17 +338,15 @@ export async function renderPoster(trip: Trip, request: TripRequest): Promise<Bl
           nameLines.forEach((line, i) => ctx.fillText(line, PAD + 184, y + 34 + i * 44));
           ctx.fillStyle = COLORS.faint;
           ctx.font = `400 24px ${SANS}`;
-          const extra =
-            stop.kind === "meal" && stop.dishes.length
-              ? ` · ${stop.dishes.slice(0, 3).join("、")}`
-              : "";
-          ctx.fillText(
-            `${stopLabel(stop)} · ${stop.start}–${stop.end}${extra}`,
-            PAD + 184,
-            y + 34 + nameLines.length * 44 + 4,
+          metaLines.forEach((line, i) =>
+            ctx.fillText(line, PAD + 184, y + 38 + nameLines.length * 44 + i * 34),
           );
+          if (thumb) {
+            drawCover(ctx, thumb, WIDTH - PAD - thumbW, y, thumbW, thumbH, 14);
+          }
         }
-        y += nameLines.length * 44 + 52;
+        const textHeight = nameLines.length * 44 + metaLines.length * 34 + 30;
+        y += thumb ? Math.max(textHeight, thumbH + 28) : textHeight;
       });
     }
 

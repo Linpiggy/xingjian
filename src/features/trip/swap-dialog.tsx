@@ -3,6 +3,7 @@
 import { MapPin, Star, X } from "lucide-react";
 import { useEffect, useRef } from "react";
 import { distance, money } from "@/lib/format";
+import { PlacePhoto } from "@/components/place-photo";
 import { distanceMeters } from "@/lib/geo";
 import type { Place, Stop } from "@/lib/schema";
 
@@ -90,12 +91,9 @@ export function SwapDialog({
                   >
                     <span className="relative size-14 shrink-0 overflow-hidden rounded-md bg-paper-deep">
                       {place.photos[0] ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
+                        <PlacePhoto
                           src={place.photos[0]}
                           alt=""
-                          referrerPolicy="no-referrer"
-                          loading="lazy"
                           className="size-full object-cover"
                         />
                       ) : (

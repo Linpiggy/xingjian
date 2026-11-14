@@ -16,6 +16,8 @@ const place = (id: string, name: string, lng: number, lat: number): Place => ({
   citycode: "0571",
   adcode: "330106",
   category: "sight",
+  signatureDishes: [],
+  tel: null,
 });
 
 const lake = place("T1", "测试湖畔", 120.15, 30.25);
@@ -57,6 +59,7 @@ export function fixtureDay(day: number, museumTitle = "测试博物馆"): Day {
         dishes: [],
         citations: ["hz-overview"],
         warnings: [],
+        ticketSource: null,
         locked: false,
         userEdited: false,
       },
@@ -76,6 +79,7 @@ export function fixtureDay(day: number, museumTitle = "测试博物馆"): Day {
         dishes: ["片儿川"],
         citations: [],
         warnings: [],
+        ticketSource: null,
         locked: false,
         userEdited: false,
       },
@@ -95,6 +99,7 @@ export function fixtureDay(day: number, museumTitle = "测试博物馆"): Day {
         dishes: [],
         citations: [],
         warnings: ["闭园前仅剩 30 分钟，游览可能不完整"],
+        ticketSource: null,
         locked: false,
         userEdited: false,
       },
@@ -114,6 +119,7 @@ export function fixtureDay(day: number, museumTitle = "测试博物馆"): Day {
         dishes: ["东坡肉"],
         citations: [],
         warnings: [],
+        ticketSource: null,
         locked: false,
         userEdited: false,
       },
@@ -170,6 +176,7 @@ export function fixtureTrip(
       meals: 250,
       transport: 20,
       hotel: 300,
+      intercity: null,
       total: 570,
       unknownItems: ["2 处景点门票未知"],
       hotelNote: "1 晚 × 1 间（AI 参考价，非实时报价）",
@@ -185,6 +192,7 @@ export function fixtureTrip(
     changeSummary,
     generatedAt: "2026-11-07T12:00:00.000Z",
     hotel: null,
+    intercity: null,
     candidates: [{ ...restaurant, id: "T5", name: "测试备选餐厅", category: "food" }],
   };
 }
