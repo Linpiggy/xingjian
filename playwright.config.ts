@@ -45,6 +45,7 @@ export default defineConfig({
       AMAP_WEB_SERVICE_KEY: "",
       OPENAI_API_KEY: "",
       DEEPSEEK_API_KEY: "",
+      VISION_API_KEY: "",
       NEXT_TELEMETRY_DISABLED: "1",
     },
   },

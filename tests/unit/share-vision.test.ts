@@ -95,3 +95,37 @@ describe("photo proxy allowlist", () => {
     expect(isAllowedPhoto("not a url")).toBeNull();
   });
 });
+
+describe("vision model configuration", () => {
+  it("reuses the main DeepSeek key and model when no separate vision key is set", async () => {
+    const { vi } = await import("vitest");
+    const { analyzePhoto } = await import("@/server/llm/vision");
+    vi.stubEnv("VISION_API_KEY", "");
+    vi.stubEnv("OPENAI_API_KEY", "");
+    vi.stubEnv("OPENAI_BASE_URL", "");
+    vi.stubEnv("OPENAI_MODEL", "");
+    vi.stubEnv("DEEPSEEK_API_KEY", "ds-test");
+    const fetchMock = vi.fn(async () =>
+      Response.json({
+        choices: [
+          { message: { content: '{"scene":"湖","city":"杭州","confidence":"high"}' } },
+        ],
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const insight = await analyzePhoto(
+      "data:image/jpeg;base64,AAAA",
+      new AbortController().signal,
+    );
+    expect(insight.city).toBe("杭州");
+    const [url, init] = fetchMock.mock.calls[0] as unknown as [URL, RequestInit];
+    expect(String(url)).toBe("https://api.deepseek.com/chat/completions");
+    const body = JSON.parse(String(init.body));
+    expect(body.model).toBe("deepseek-flash");
+    expect(body.thinking).toEqual({ type: "disabled" });
+    expect(body.messages[0].content[0].image_url.url).toBe("data:image/jpeg;base64,AAAA");
+    expect((init.headers as Record<string, string>).Authorization).toBe("Bearer ds-test");
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
+  });
+});

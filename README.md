@@ -76,7 +76,7 @@
 ### 5. 行前问答 Agent 与多模态
 
 - 问答 Agent（`src/server/agent/ask-agent.ts`）复用规划 Agent 的检索类工具（知识库、高德地点 / 周边、天气），但不提供任何修改行程的工具；行程以 JSON 数据块注入上下文，回答流式返回。模型在调用工具前输出的过渡文字会被丢弃，只保留最终回答；检索到的知识条目与是否使用实时数据随回答一起返回。
-- 拍照识景（`src/server/llm/vision.ts`）调用 OpenAI 兼容的多模态接口（默认智谱 GLM-4V-Flash），要求模型只输出 JSON；服务端提取 JSON、用 Zod 宽松校验（非法字段回退为安全默认值、兴趣只保留预设列表内的值），并对识别文本做内容安全检查。照片只转发给模型，不落盘。
+- 拍照识景（`src/server/llm/vision.ts`）默认直接使用主模型 DeepSeek-V4.1-Flash 的图片输入能力（复用同一个密钥，也可换成其他 OpenAI 兼容的多模态服务），要求模型只输出 JSON；服务端提取 JSON、用 Zod 宽松校验（非法字段回退为安全默认值、兴趣只保留预设列表内的值），并对识别文本做内容安全检查。照片只转发给模型，不落盘。
 
 ### 6. MCP Server
 
@@ -192,8 +192,8 @@ npm run dev                  # http://127.0.0.1:3000
 | `DEEPSEEK_API_KEY` / `OPENAI_API_KEY` | 二选一 | 模型密钥 |
 | `OPENAI_BASE_URL` / `OPENAI_MODEL` | 否 | 默认 `https://api.deepseek.com` / `deepseek-flash` |
 | `TAVILY_API_KEY` | 否 | 联网搜索密钥（门票官方核对）；不填时门票按 AI 估算并标注 |
-| `VISION_API_KEY` | 否 | 视觉模型密钥（拍照识景）；不填时该功能提示“暂未开启”，其他功能不受影响 |
-| `VISION_BASE_URL` / `VISION_MODEL` | 否 | 默认 `https://open.bigmodel.cn/api/paas/v4` / `glm-4v-flash`，可换成其他 OpenAI 兼容的多模态服务 |
+| `VISION_API_KEY` | 否 | 仅在拍照识景要换用其他视觉模型时填写；默认复用 DeepSeek 密钥 |
+| `VISION_BASE_URL` / `VISION_MODEL` | 否 | 配合 `VISION_API_KEY` 使用，默认 `https://api.deepseek.com` / `deepseek-flash` |
 
 生产运行：`npm run build && npm run start`。Windows 下也可以双击 `一键部署-行间旅行规划.cmd`，脚本会检查依赖与密钥后构建并启动（`--lan` 参数开放局域网访问）。
 
