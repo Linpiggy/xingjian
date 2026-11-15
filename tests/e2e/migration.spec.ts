@@ -49,7 +49,7 @@ test("旧版本本地行程可以正常打开", async ({ page }) => {
   const migrated = await page.evaluate(() =>
     JSON.parse(localStorage.getItem("xingjian-trips") ?? "{}"),
   );
-  expect(migrated.version).toBe(3);
+  expect(migrated.version).toBe(4);
   expect(migrated.state.records.old.trip.days[0].stops[0].place.signatureDishes).toEqual(
     [],
   );

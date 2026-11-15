@@ -4,7 +4,8 @@
  * 所有响应都用 Zod 宽松解析，缺失字段归一为 null，而不是猜测值。
  */
 import { z } from "zod";
-import type { Coordinate, Place, Train, Weather } from "@/lib/schema";
+import type { Coordinate, Place, Train, TrainLeg, Weather } from "@/lib/schema";
+import { toMinutes } from "@/lib/time";
 import { AppError } from "@/server/errors";
 
 const MIN_INTERVAL_MS = 380;
@@ -442,39 +443,29 @@ export class AmapClient {
       value && /^\d{4}$/.test(value) ? `${value.slice(0, 2)}:${value.slice(2)}` : null;
     const results: Omit<Train, "date">[] = [];
     for (const transit of parsed.route?.transits ?? []) {
-      const rail = transit.segments?.find((segment) => segment.railway)?.railway;
-      const depart = clock(rail?.departure_stop?.time);
-      const arrive = clock(rail?.arrival_stop?.time);
-      if (
-        !rail ||
-        !depart ||
-        !arrive ||
-        !rail.departure_stop?.name ||
-        !rail.arrival_stop?.name
-      ) {
+      const rails = (transit.segments ?? [])
+        .map((segment) => segment.railway)
+        .filter((rail): rail is z.infer<typeof railway> => Boolean(rail));
+      const legs = buildLegs(rails, clock);
+      if (!legs) {
         continue;
       }
-      const seats = groupSeats(
-        (rail.spaces ?? [])
-          .filter(
-            (seat): seat is { code: string; cost: number } =>
-              seat.cost !== null && seat.cost > 0,
-          )
-          .map((seat) => ({
-            name: seat.code.replace(/^火车/, ""),
-            price: Math.round(seat.cost),
-          })),
-      );
+      const first = legs[0];
+      const last = legs[legs.length - 1];
+      const startMinutes = (toMinutes(first.depart) ?? 0) + first.departDayOffset * 1440;
+      const endMinutes = (toMinutes(last.arrive) ?? 0) + last.arriveDayOffset * 1440;
       results.push({
-        trip: rail.trip,
-        type: rail.type ?? "火车",
-        from: rail.departure_stop.name,
-        to: rail.arrival_stop.name,
-        depart,
-        arrive,
-        arriveNextDay: arrive < depart,
-        minutes: rail.time !== null ? Math.round(rail.time / 60) : 0,
-        seats,
+        trip: legs.map((leg) => leg.trip).join(" → "),
+        type: legs.length > 1 ? `中转 ${legs.length - 1} 次` : first.type,
+        from: first.from,
+        to: last.to,
+        depart: first.depart,
+        arrive: last.arrive,
+        arriveNextDay: last.arriveDayOffset > 0,
+        arriveDayOffset: last.arriveDayOffset,
+        minutes: endMinutes - startMinutes,
+        seats: legs.length === 1 ? first.seats : [],
+        legs,
         doorToDoorMinutes:
           transit.cost?.duration != null ? Math.round(transit.cost.duration / 60) : null,
       });
@@ -515,6 +506,79 @@ export class AmapClient {
       wind: `${cast.daywind}风 ${cast.daypower}级`,
     }));
   }
+}
+
+/**
+ * 把一个跨城方案中的所有铁路分段转换为车次列表，并计算每段相对出发日的天数偏移。
+ * 优先用分段运行时长推算到达日（可处理运行超过 24 小时的车次），没有时长时按时刻先后推断。
+ */
+function buildLegs(
+  rails: {
+    trip: string;
+    type: string | null;
+    time: number | null;
+    departure_stop?: { name?: string; time?: string | null };
+    arrival_stop?: { name?: string; time?: string | null };
+    spaces?: { code: string; cost: number | null }[];
+  }[],
+  clock: (value: string | null | undefined) => string | null,
+): TrainLeg[] | null {
+  const legs: TrainLeg[] = [];
+  let previousArrival: number | null = null;
+  for (const rail of rails) {
+    const depart = clock(rail.departure_stop?.time);
+    const arrive = clock(rail.arrival_stop?.time);
+    if (!depart || !arrive || !rail.departure_stop?.name || !rail.arrival_stop?.name) {
+      return null;
+    }
+    const departClock = toMinutes(depart) ?? 0;
+    const arriveClock = toMinutes(arrive) ?? 0;
+    // 出发时刻：不早于上一段到达（同一天放不下就顺延到下一天）
+    let departAbsolute = departClock;
+    if (previousArrival !== null) {
+      while (departAbsolute < previousArrival) {
+        departAbsolute += 1440;
+      }
+    }
+    let arriveAbsolute: number;
+    if (rail.time !== null && rail.time > 0) {
+      arriveAbsolute = departAbsolute + Math.round(rail.time / 60);
+      // 用时长推算后再对齐到实际到达时刻，消除秒级取整误差
+      const day = Math.floor(arriveAbsolute / 1440);
+      const candidate = day * 1440 + arriveClock;
+      arriveAbsolute =
+        Math.abs(candidate - arriveAbsolute) <= 720 ? candidate : arriveAbsolute;
+    } else {
+      arriveAbsolute = departAbsolute - (departAbsolute % 1440) + arriveClock;
+      if (arriveAbsolute < departAbsolute) {
+        arriveAbsolute += 1440;
+      }
+    }
+    previousArrival = arriveAbsolute;
+    legs.push({
+      trip: rail.trip,
+      type: rail.type ?? "火车",
+      from: rail.departure_stop.name,
+      to: rail.arrival_stop.name,
+      depart,
+      arrive,
+      departDayOffset: Math.floor(departAbsolute / 1440),
+      arriveDayOffset: Math.floor(arriveAbsolute / 1440),
+      minutes: arriveAbsolute - departAbsolute,
+      seats: groupSeats(
+        (rail.spaces ?? [])
+          .filter(
+            (seat): seat is { code: string; cost: number } =>
+              seat.cost !== null && seat.cost > 0,
+          )
+          .map((seat) => ({
+            name: seat.code.replace(/^火车/, ""),
+            price: Math.round(seat.cost),
+          })),
+      ),
+    });
+  }
+  return legs.length ? legs : null;
 }
 
 /** 同一席别合并为价格区间；无座排在最后，其余按最低价排序 */

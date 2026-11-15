@@ -1,40 +1,53 @@
-/** 往返车次卡片：车次、站点、时刻与各席别票价（高德时刻表数据，余票与最终票价以 12306 为准） */
+/**
+ * 往返车次卡片：每趟车列出全部车次段（中转时逐段显示换乘站与等候时间）、各席别票价，
+ * 数据来自高德跨城交通（时刻表与票价，不含余票），余票与最终票价以 12306 为准。
+ */
 "use client";
 
-import { ExternalLink, TrainFront } from "lucide-react";
+import { ArrowRightLeft, ExternalLink, TrainFront } from "lucide-react";
 import { duration, money } from "@/lib/format";
-import type { Intercity, Train } from "@/lib/schema";
+import type { Intercity, Train, TrainLeg } from "@/lib/schema";
 import { formatDateLabel } from "@/lib/time";
+import { trainFare, trainLegs, transferWait } from "@/lib/train";
 
-function TrainRow({ label, train }: { label: string; train: Train }) {
+function Clock({ time, offset }: { time: string; offset: number }) {
   return (
-    <li className="grid gap-3 py-4 sm:grid-cols-[88px_1fr_auto] sm:items-center">
-      <div>
-        <p className="text-xs text-ink-faint">{label}</p>
-        <p className="font-display text-xl text-ink">{train.trip}</p>
-      </div>
-      <div className="flex items-center gap-3">
+    <span className="font-display tabular text-ink">
+      {time}
+      {offset > 0 ? (
+        <sup
+          className="ml-0.5 font-sans text-[10px] text-clay"
+          title={`出发后第 ${offset} 天`}
+        >
+          +{offset}
+        </sup>
+      ) : null}
+    </span>
+  );
+}
+
+function LegRow({ leg }: { leg: TrainLeg }) {
+  return (
+    <li className="grid gap-2 py-2.5 sm:grid-cols-[96px_1fr_auto] sm:items-center">
+      <span className="w-fit rounded-md bg-ink px-2 py-0.5 font-display text-sm text-paper">
+        {leg.trip}
+      </span>
+      <div className="flex items-center gap-3 text-sm">
         <div className="text-right">
-          <p className="font-display text-xl tabular text-ink">{train.depart}</p>
-          <p className="text-xs text-ink-soft">{train.from}</p>
+          <Clock time={leg.depart} offset={leg.departDayOffset} />
+          <p className="text-xs text-ink-soft">{leg.from}</p>
         </div>
-        <div className="flex min-w-16 flex-1 flex-col items-center text-[11px] text-ink-faint">
-          <span>{duration(train.minutes)}</span>
+        <div className="flex min-w-14 flex-1 flex-col items-center text-[11px] text-ink-faint">
+          <span>{duration(leg.minutes)}</span>
           <span className="my-0.5 h-px w-full bg-line" aria-hidden />
-          <span>{formatDateLabel(train.date)}</span>
         </div>
         <div>
-          <p className="font-display text-xl tabular text-ink">
-            {train.arrive}
-            {train.arriveNextDay ? (
-              <sup className="ml-0.5 text-[10px] text-clay">+1</sup>
-            ) : null}
-          </p>
-          <p className="text-xs text-ink-soft">{train.to}</p>
+          <Clock time={leg.arrive} offset={leg.arriveDayOffset} />
+          <p className="text-xs text-ink-soft">{leg.to}</p>
         </div>
       </div>
       <ul className="flex flex-wrap gap-1.5 sm:justify-end">
-        {train.seats.slice(0, 3).map((seat) => (
+        {leg.seats.slice(0, 3).map((seat) => (
           <li
             key={seat.name}
             className="rounded-md bg-paper-deep px-2 py-0.5 text-xs tabular text-ink-soft"
@@ -44,6 +57,65 @@ function TrainRow({ label, train }: { label: string; train: Train }) {
           </li>
         ))}
       </ul>
+    </li>
+  );
+}
+
+function TransferRow({ previous, next }: { previous: TrainLeg; next: TrainLeg }) {
+  const wait = transferWait(previous, next);
+  const changeStation = previous.to !== next.from;
+  return (
+    <li className="flex items-center gap-2 rounded-md bg-amber-soft/60 px-3 py-1.5 text-xs text-amber">
+      <ArrowRightLeft size={13} aria-hidden />
+      {changeStation
+        ? `${previous.to} 出站，前往 ${next.from} 换乘`
+        : `在 ${previous.to} 换乘`}
+      <span className="tabular">· 等候 {duration(wait)}</span>
+      {wait < 30 ? <span>· 换乘时间紧张</span> : null}
+    </li>
+  );
+}
+
+function JourneyRow({ label, train }: { label: string; train: Train }) {
+  const legs = trainLegs(train);
+  const fare = trainFare(train);
+  return (
+    <li className="py-4">
+      <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+        <p className="flex flex-wrap items-baseline gap-x-3">
+          <span className="text-xs text-ink-faint">{label}</span>
+          <span className="text-lg">
+            <Clock time={train.depart} offset={0} />
+            <span className="mx-1.5 text-ink-faint">→</span>
+            <Clock time={train.arrive} offset={train.arriveDayOffset} />
+          </span>
+          <span className="text-sm text-ink-soft">
+            {train.from} → {train.to}
+          </span>
+        </p>
+        <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-ink-soft [&>span]:whitespace-nowrap">
+          <span>{formatDateLabel(train.date)} 出发</span>
+          <span>· 全程 {duration(train.minutes)}</span>
+          <span
+            className={`rounded px-1.5 py-0.5 ${legs.length > 1 ? "bg-amber-soft text-amber" : "bg-pine-soft text-pine-deep"}`}
+          >
+            {legs.length > 1 ? `中转 ${legs.length - 1} 次` : "直达"}
+          </span>
+          {fare !== null ? <span className="tabular">· 每人约 {money(fare)}</span> : null}
+        </p>
+      </div>
+      <ol className="mt-2 space-y-1">
+        {legs.map((leg, index) => [
+          index > 0 ? (
+            <TransferRow
+              key={`transfer-${index}`}
+              previous={legs[index - 1]}
+              next={leg}
+            />
+          ) : null,
+          <LegRow key={`${leg.trip}-${index}`} leg={leg} />,
+        ])}
+      </ol>
     </li>
   );
 }
@@ -84,13 +156,15 @@ export function IntercityCard({ intercity }: { intercity: Intercity }) {
         </a>
       </div>
       <ul className="divide-y divide-line-soft">
-        {intercity.outbound ? <TrainRow label="去程" train={intercity.outbound} /> : null}
-        {intercity.inbound ? <TrainRow label="返程" train={intercity.inbound} /> : null}
+        {intercity.outbound ? (
+          <JourneyRow label="去程" train={intercity.outbound} />
+        ) : null}
+        {intercity.inbound ? <JourneyRow label="返程" train={intercity.inbound} /> : null}
       </ul>
       <p className="border-t border-line-soft py-3 text-xs leading-relaxed text-ink-faint">
         {intercity.note ? `${intercity.note} ` : ""}
-        车次、时刻与票价来自高德跨城交通数据，不含余票信息；出发前请在 12306
-        确认余票与实际票价。
+        车次、时刻与票价来自高德跨城交通数据，不含余票信息；中转方案需分别购票，出发前请在
+        12306 确认余票与实际票价。
       </p>
     </section>
   );

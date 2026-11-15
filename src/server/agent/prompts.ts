@@ -1,5 +1,6 @@
 import type { Trip, TripRequest } from "@/lib/schema";
 import { requiredMeals } from "@/lib/schedule";
+import { describeTrain } from "@/lib/train";
 import { addDays } from "@/lib/time";
 
 const PACE_LABEL = {
@@ -21,7 +22,7 @@ export const SYSTEM_PROMPT = `你是「行间」旅行规划 Agent，为中国�
 你通过调用工具获取真实数据并逐步完成规划。每次调用工具前，用一句简短中文说明你接下来要做什么、为什么（这句话会实时展示给用户）。不要输出长篇内容，最终内容都通过工具提交。
 
 推荐流程：
-0. 如果用户填写了出发城市：同一轮并行调用 search_trains 查询去程（outbound）和返程（return），再用 set_trains 选定车次。去程尽量上午到达、返程尽量下午或傍晚出发，优先高铁动车、耗时短；用户填了“第一天几点到/最后一天几点走”时，以此作为偏好。选定后按返回的每日约束安排行程。
+0. 如果用户填写了出发城市：同一轮并行调用 search_trains 查询去程（outbound）和返程（return），再用 set_trains 选定车次。去程尽量上午到达、返程尽量下午或傍晚出发，优先直达的高铁动车、耗时短，没有直达时才选中转；去程必须当天到达；用户填了“第一天几点到/最后一天几点走”时，以此作为偏好。选定后按返回的每日约束安排行程。
 1. search_knowledge：检索目的地玩法、分区、美食与注意事项（可多次、多角度）。
 2. get_weather：了解天气，雨天/高温优先安排室内。
 3. search_places：按用户兴趣、必去地点搜索真实景点（可在同一轮并行多个关键词）。
@@ -94,8 +95,8 @@ function trainSummary(trip: Trip): string {
     return "";
   }
   const parts = [
-    outbound && `去程 ${outbound.trip} ${outbound.depart}→${outbound.arrive}`,
-    inbound && `返程 ${inbound.trip} ${inbound.depart}`,
+    outbound && `去程 ${describeTrain(outbound)}`,
+    inbound && `返程 ${describeTrain(inbound)}`,
   ].filter(Boolean);
   return `当前往返车次：${parts.join("，")}。如需改车次，先 search_trains 再 set_trains。`;
 }

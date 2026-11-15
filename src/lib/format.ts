@@ -1,5 +1,6 @@
 import type { Day, LegMode, Stop, Trip, TripRequest } from "./schema";
 import { formatDateLabel } from "./time";
+import { describeTrain } from "./train";
 
 export function money(value: number | null): string {
   return value === null ? "未知" : `¥${Math.round(value).toLocaleString("zh-CN")}`;
@@ -92,15 +93,10 @@ export function tripToMarkdown(trip: Trip, request: TripRequest): string {
     trip.overview,
     "",
     ...(trip.intercity?.outbound
-      ? [
-          `去程：${trip.intercity.outbound.trip} ${trip.intercity.outbound.from} ${trip.intercity.outbound.depart} → ${trip.intercity.outbound.to} ${trip.intercity.outbound.arrive}`,
-        ]
+      ? [`去程：${describeTrain(trip.intercity.outbound)}`]
       : []),
     ...(trip.intercity?.inbound
-      ? [
-          `返程：${trip.intercity.inbound.trip} ${trip.intercity.inbound.from} ${trip.intercity.inbound.depart} → ${trip.intercity.inbound.to} ${trip.intercity.inbound.arrive}`,
-          "",
-        ]
+      ? [`返程：${describeTrain(trip.intercity.inbound)}`, ""]
       : []),
     ...(trip.hotel ? [`住宿：${trip.hotel.place.name}——${trip.hotel.reason}`, ""] : []),
   ];

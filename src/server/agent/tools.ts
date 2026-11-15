@@ -7,6 +7,7 @@ import { z } from "zod";
 import { clusterByArea, distanceMeters, orderByShortestPath } from "@/lib/geo";
 import { requiredMeals } from "@/lib/schedule";
 import { toClock, toMinutes } from "@/lib/time";
+import { describeTrain, trainFare, trainLegs, transferCount } from "@/lib/train";
 import type { Place, Station, Train } from "@/lib/schema";
 import { addDays } from "@/lib/time";
 import { webSearch, webSearchConfigured } from "@/server/providers/websearch";
@@ -440,17 +441,26 @@ export const tools = {
           )
           .catch(() => []);
         for (const option of options) {
+          // 中转方案也按整趟车次组合去重；只保留不早于最早出发时间的
           if (!found.has(option.trip) && (toMinutes(option.depart) ?? 0) >= start) {
             found.set(option.trip, { ...option, date });
           }
         }
       }
+      // 直达优先，其次按出发时间
       const trains = [...found.values()]
-        .sort((a, b) => a.depart.localeCompare(b.depart))
+        .sort(
+          (a, b) =>
+            transferCount(a) - transferCount(b) || a.depart.localeCompare(b.depart),
+        )
         .slice(0, 6);
       const prefix = outbound ? "out" : "ret";
+      const idOf = (train: Train) =>
+        `${prefix}-${trainLegs(train)
+          .map((leg) => leg.trip)
+          .join("+")}`;
       for (const train of trains) {
-        session.trainOptions.set(`${prefix}-${train.trip}`, train);
+        session.trainOptions.set(idOf(train), train);
       }
       if (!trains.length) {
         return ok(
@@ -465,16 +475,16 @@ export const tools = {
         {
           date,
           trains: trains.map((train) => ({
-            id: `${prefix}-${train.trip}`,
-            trip: train.trip,
-            from: train.from,
-            to: train.to,
+            id: idOf(train),
+            transfers: transferCount(train),
+            route: describeTrain(train),
             depart: train.depart,
-            arrive: `${train.arrive}${train.arriveNextDay ? "（次日）" : ""}`,
-            minutes: train.minutes,
-            lowestPrice: train.seats[0]?.price ?? null,
+            arrive: `${train.arrive}${train.arriveDayOffset ? `（第 ${train.arriveDayOffset} 天后）` : ""}`,
+            totalMinutes: train.minutes,
+            farePerPerson: trainFare(train),
             doorToDoorMinutes: train.doorToDoorMinutes,
           })),
+          hint: "优先选择直达；中转方案的 route 列出了每一段车次与换乘站",
         },
         `找到 ${trains.length} 趟：${trains
           .slice(0, 3)
@@ -491,7 +501,7 @@ export const tools = {
       const names = [args.outboundId, args.returnId]
         .map((id) => (id ? session.trainOptions.get(id)?.trip : null))
         .filter(Boolean);
-      return names.length ? `确定往返车次：${names.join(" / ")}` : "确定往返交通";
+      return names.length ? `确定往返车次：${names.join(" ／ ")}` : "确定往返交通";
     },
     run: async (args, session) => {
       const pick = (id: string | null, prefix: string) => {
@@ -507,6 +517,11 @@ export const tools = {
       let inbound: Train | null;
       try {
         outbound = pick(args.outboundId, "out-");
+        if (outbound && outbound.arriveDayOffset > 0) {
+          return fail(
+            `去程 ${outbound.trip} 要到出发后第 ${outbound.arriveDayOffset} 天才到达，第一天行程无法开始；请选当天到达的车次，都跨天时 outboundId 填 null，并在 note 建议提前出发`,
+          );
+        }
         inbound = pick(args.returnId, "ret-");
       } catch (error) {
         return fail(error instanceof Error ? error.message : "车次无效");

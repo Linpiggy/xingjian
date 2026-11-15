@@ -1,13 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { AgentEvent, Place, Train, TripRequest } from "@/lib/schema";
-import { computeBudget, trainFare } from "@/server/agent/enrich";
+import { computeBudget } from "@/server/agent/enrich";
+import { trainFare } from "@/lib/train";
 import { AgentSession } from "@/server/agent/session";
 import { tools } from "@/server/agent/tools";
-import {
-  groupSeats,
-  parseSignatureDishes,
-  type AmapClient,
-} from "@/server/providers/amap";
+import { AmapClient, groupSeats, parseSignatureDishes } from "@/server/providers/amap";
 import { isOfficialSource, webSearch } from "@/server/providers/websearch";
 
 const request: TripRequest = {
@@ -37,11 +34,13 @@ const train = (trip: string, depart: string, arrive: string): Omit<Train, "date"
   depart,
   arrive,
   arriveNextDay: false,
+  arriveDayOffset: 0,
   minutes: 45,
   seats: [
     { name: "二等座", price: 74, maxPrice: 83 },
     { name: "一等座", price: 119, maxPrice: 126 },
   ],
+  legs: [],
   doorToDoorMinutes: 80,
 });
 
@@ -247,5 +246,101 @@ describe("门票联网核对", () => {
     const outcome = await tools.verify_ticket.run({ placeId: "灵隐寺" }, session);
     expect(outcome.ok).toBe(true);
     expect(session.verifiedSources.get("S1")?.official).toBe(true);
+  });
+});
+
+describe("中转车次", () => {
+  const railway = (
+    trip: string,
+    from: string,
+    dep: string,
+    to: string,
+    arr: string,
+    seconds: number,
+    price: number,
+  ) => ({
+    railway: {
+      trip,
+      type: "Z字头的直达特快",
+      time: String(seconds),
+      departure_stop: { name: from, time: dep },
+      arrival_stop: { name: to, time: arr },
+      spaces: [{ code: "火车硬卧中铺", cost: String(price) }],
+    },
+  });
+  const transport = (segments: unknown[]) =>
+    (async () =>
+      Response.json({
+        status: "1",
+        infocode: "10000",
+        route: { transits: [{ cost: { duration: "200000" }, segments }] },
+      })) as unknown as typeof fetch;
+
+  it("保留每一段车次并按运行时长计算跨天", async () => {
+    const amap = new AmapClient(
+      "key",
+      transport([
+        { walking: {} },
+        railway("Z297", "张家界西", "2135", "郑州", "0942", 43620, 260),
+        { walking: {} },
+        railway("Z274", "郑州", "1711", "青岛北", "0507", 42960, 230),
+      ]),
+    );
+    const [train] = await amap.railOptions(
+      [110.4, 29.1],
+      [120.3, 36.1],
+      "0744",
+      "0532",
+      "2026-11-20",
+      "08:00",
+    );
+    expect(train.legs.map((leg) => leg.trip)).toEqual(["Z297", "Z274"]);
+    expect(train.trip).toBe("Z297 → Z274");
+    expect(train.from).toBe("张家界西");
+    expect(train.to).toBe("青岛北");
+    expect(train.arrive).toBe("05:07");
+    expect(train.legs[0]).toMatchObject({ departDayOffset: 0, arriveDayOffset: 1 });
+    expect(train.legs[1]).toMatchObject({ departDayOffset: 1, arriveDayOffset: 2 });
+    expect(train.arriveDayOffset).toBe(2);
+    expect(train.minutes).toBe(2 * 1440 + 5 * 60 + 7 - (21 * 60 + 35));
+    expect(train.seats).toEqual([]);
+    expect(trainFare({ ...train, date: "2026-11-20" })).toBe(490);
+  });
+
+  it("运行超过 24 小时的车次也能算出正确到达日", async () => {
+    const amap = new AmapClient(
+      "key",
+      transport([
+        railway("Z288", "昆明", "1003", "杭州", "1400", (27 * 60 + 57) * 60, 421),
+      ]),
+    );
+    const [train] = await amap.railOptions(
+      [102.7, 25],
+      [120.2, 30.3],
+      "0871",
+      "0571",
+      "2026-11-20",
+      "08:00",
+    );
+    expect(train.arriveDayOffset).toBe(1);
+    expect(train.legs).toHaveLength(1);
+    expect(train.seats[0].price).toBe(421);
+  });
+
+  it("去程跨天到达时拒绝选择", async () => {
+    const overnight: Train = {
+      ...train("Z297 → Z274", "21:35", "05:07"),
+      date: "2026-11-21",
+      arriveNextDay: true,
+      arriveDayOffset: 2,
+    };
+    const session = new AgentSession(request, fakeAmap, () => undefined);
+    session.trainOptions.set("out-Z297+Z274", overnight);
+    const outcome = await tools.set_trains.run(
+      { outboundId: "out-Z297+Z274", returnId: null, note: "" },
+      session,
+    );
+    expect(outcome.ok).toBe(false);
+    expect(outcome.content).toContain("当天到达");
   });
 });

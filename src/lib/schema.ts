@@ -183,8 +183,34 @@ export const budgetSchema = z.object({
 });
 export type Budget = z.infer<typeof budgetSchema>;
 
-/** 铁路车次（来自高德跨城公交规划：时刻表与票价，不含余票） */
+const seatSchema = z.object({
+  name: z.string(),
+  price: z.number(),
+  maxPrice: z.number().optional(),
+});
+
+/** 一段铁路（一个车次）。dayOffset 相对整趟行程出发日期，跨夜或多日中转时大于 0 */
+export const trainLegSchema = z.object({
+  trip: z.string(),
+  type: z.string(),
+  from: z.string(),
+  to: z.string(),
+  depart: z.string(),
+  arrive: z.string(),
+  departDayOffset: z.number().int().default(0),
+  arriveDayOffset: z.number().int().default(0),
+  minutes: z.number(),
+  /** 各席别票价：同一席别可能有多档（不同站点组合），price 为最低、maxPrice 为最高 */
+  seats: z.array(seatSchema),
+});
+export type TrainLeg = z.infer<typeof trainLegSchema>;
+
+/**
+ * 一趟往返交通（来自高德跨城公交规划：时刻表与票价，不含余票）。
+ * 直达时 legs 只有一段；中转时 legs 按顺序列出每个车次，顶层字段是整趟的汇总。
+ */
 export const trainSchema = z.object({
+  /** 车次汇总，如 “G225” 或 “Z297 → Z274” */
   trip: z.string(),
   type: z.string(),
   date: z.string(),
@@ -192,12 +218,15 @@ export const trainSchema = z.object({
   to: z.string(),
   depart: z.string(),
   arrive: z.string(),
+  /** 兼容旧数据：是否次日及以后到达 */
   arriveNextDay: z.boolean(),
+  /** 到达日相对出发日的天数 */
+  arriveDayOffset: z.number().int().default(0),
+  /** 从首站发车到末站到达的总时长（分钟，含中转等候） */
   minutes: z.number(),
-  /** 各席别票价：同一席别可能有多档（不同站点组合），price 为最低、maxPrice 为最高 */
-  seats: z.array(
-    z.object({ name: z.string(), price: z.number(), maxPrice: z.number().optional() }),
-  ),
+  /** 直达时为该车次席别；中转时为空，票价见各段 */
+  seats: z.array(seatSchema),
+  legs: z.array(trainLegSchema).default([]),
   /** 含两端市内接驳的门到门耗时（分钟） */
   doorToDoorMinutes: z.number().nullable(),
 });

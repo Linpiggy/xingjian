@@ -41,6 +41,7 @@ import { LazyMount } from "@/components/lazy-mount";
 import { stationsForDay, TripMap } from "@/features/map/trip-map";
 import type { DayEditor } from "./use-trip-editor";
 import { formatDateLabel } from "@/lib/time";
+import { describeTrain } from "@/lib/train";
 
 /** 推荐菜是否属于高德收录的招牌菜（名称互相包含即算，兼容“精品”等前缀差异） */
 function isSignature(dish: string, signature: string[] | undefined): boolean {
@@ -595,9 +596,7 @@ export function DayChapter({
 
       <ol className={`mt-4 transition-opacity ${busy ? "opacity-50" : ""}`}>
         {intercity?.outbound && day.day === 1 ? (
-          <TrainRow
-            text={`乘 ${intercity.outbound.trip} 抵达：${intercity.outbound.from} ${intercity.outbound.depart} → ${intercity.outbound.to} ${intercity.outbound.arrive}`}
-          />
+          <TrainRow text={`乘车抵达：${describeTrain(intercity.outbound)}`} />
         ) : null}
         {fromStation && day.startLeg ? (
           <LegRow
@@ -651,9 +650,7 @@ export function DayChapter({
           </>
         ) : null}
         {intercity?.inbound && day.day === totalDays ? (
-          <TrainRow
-            text={`乘 ${intercity.inbound.trip} 返程：${intercity.inbound.from} ${intercity.inbound.depart} → ${intercity.inbound.to} ${intercity.inbound.arrive}`}
-          />
+          <TrainRow text={`乘车返程：${describeTrain(intercity.inbound)}`} />
         ) : null}
       </ol>
     </section>

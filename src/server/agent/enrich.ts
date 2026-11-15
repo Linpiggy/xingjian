@@ -6,6 +6,7 @@
  */
 import { distanceMeters } from "@/lib/geo";
 import { scheduleDay } from "@/lib/schedule";
+import { trainFare } from "@/lib/train";
 import type {
   Budget,
   Day,
@@ -14,7 +15,6 @@ import type {
   Place,
   Station,
   Stop,
-  Train,
   Trip,
 } from "@/lib/schema";
 import { addDays, toMinutes } from "@/lib/time";
@@ -260,18 +260,6 @@ export function dayToDraft(day: Day): DayDraft {
 function sumKnown(values: (number | null)[]): number | null {
   const known = values.filter((value): value is number => value !== null);
   return known.length ? Math.round(known.reduce((a, b) => a + b, 0)) : null;
-}
-
-/** 往返车票每人费用：取二等座（没有时取最便宜的有座席别）的最高档价格，预算偏保守 */
-export function trainFare(train: Train | null): number | null {
-  if (!train || !train.seats.length) {
-    return null;
-  }
-  const seat =
-    train.seats.find((item) => item.name.includes("二等")) ??
-    train.seats.find((item) => !item.name.includes("无座")) ??
-    train.seats[0];
-  return seat.maxPrice ?? seat.price;
 }
 
 export function computeBudget(

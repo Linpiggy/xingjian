@@ -6,6 +6,7 @@
 
 import { destinationFor } from "@/lib/destinations";
 import { proxiedPhoto } from "@/lib/photo";
+import { describeTrain } from "@/lib/train";
 import { LEG_LABEL, money, PACE_TEXT, stopLabel, TRAVELER_TEXT } from "@/lib/format";
 import type { Trip, TripRequest } from "@/lib/schema";
 import { addDays, formatDateLabel } from "@/lib/time";
@@ -240,19 +241,20 @@ export async function renderPoster(trip: Trip, request: TripRequest): Promise<Bl
       });
     }
     y += boxHeight + 40;
+    // 中转车次可能很长，逐段描述并自动换行
+    ctx.font = `500 26px ${SANS}`;
     const trainLines = [
-      trip.intercity?.outbound &&
-        `去程 ${trip.intercity.outbound.trip}  ${trip.intercity.outbound.from} ${trip.intercity.outbound.depart} → ${trip.intercity.outbound.to} ${trip.intercity.outbound.arrive}`,
-      trip.intercity?.inbound &&
-        `返程 ${trip.intercity.inbound.trip}  ${trip.intercity.inbound.from} ${trip.intercity.inbound.depart} → ${trip.intercity.inbound.to} ${trip.intercity.inbound.arrive}`,
-    ].filter((line): line is string => Boolean(line));
+      trip.intercity?.outbound && `去程 ${describeTrain(trip.intercity.outbound)}`,
+      trip.intercity?.inbound && `返程 ${describeTrain(trip.intercity.inbound)}`,
+    ]
+      .filter((line): line is string => Boolean(line))
+      .flatMap((line) => wrap(ctx, line, content, 3));
     if (trainLines.length) {
       if (paint) {
         ctx.fillStyle = COLORS.ink;
-        ctx.font = `500 26px ${SANS}`;
-        trainLines.forEach((line, i) => ctx.fillText(line, PAD, y + 26 + i * 42));
+        trainLines.forEach((line, i) => ctx.fillText(line, PAD, y + 26 + i * 40));
       }
-      y += trainLines.length * 42 + 12;
+      y += trainLines.length * 40 + 12;
     }
     if (trip.hotel) {
       ctx.font = `400 26px ${SANS}`;
