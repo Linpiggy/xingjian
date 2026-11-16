@@ -58,12 +58,18 @@
   {\Large\bfseries\color{ink}}
   {\color{pine}\heavyfont\thesection}{0.8em}{}
   [\vspace{2pt}{\color{ink}\titlerule[0.8pt]}]
-\titlespacing*{\section}{0pt}{0pt}{12pt}
+\titlespacing*{\section}{0pt}{22pt}{12pt}
 \titleformat{\subsection}
   {\large\bfseries\color{pine}}{\thesubsection}{0.7em}{}
 \titlespacing*{\subsection}{0pt}{14pt}{6pt}
-% 每章另起一页
-\newcommand{\sectionbreak}{\clearpage}
+% 章节之间不强制换页；放宽浮动参数，减少图片造成的留白
+\renewcommand{\topfraction}{0.85}
+\renewcommand{\bottomfraction}{0.7}
+\renewcommand{\textfraction}{0.1}
+\renewcommand{\floatpagefraction}{0.75}
+\setcounter{topnumber}{3}
+\setcounter{bottomnumber}{2}
+\setcounter{totalnumber}{4}
 
 \titlecontents{section}[0pt]{\addvspace{4pt}\bfseries}
   {\thecontentslabel\quad}{}{\hfill\contentspage}
@@ -86,7 +92,7 @@
 
 % ---------- 图 ----------
 \captionsetup{font={small,color=inksoft},labelfont=bf,labelsep=quad,skip=5pt}
-\newcommand{\shot}[2][height=0.36\textheight]{%
+\newcommand{\shot}[2][height=0.3\textheight]{%
   \begin{tikzpicture}
     \node[inner sep=0pt] (img) {\includegraphics[width=\linewidth,#1,keepaspectratio]{#2}};
     \draw[line,line width=0.6pt,rounded corners=2pt] (img.south west) rectangle (img.north east);
@@ -168,38 +174,56 @@
 \begin{document}
 
 % ---------- 封面 ----------
+% 图片：public/images/destinations/hangzhou.jpg（西湖三潭印月），与产品首页同源
+\newcommand{\coverfield}[2]{%
+  \begin{minipage}[t]{0.47\linewidth}
+    {\scriptsize\color{inkfaint}#1}\par\vspace{1pt}
+    {\small\color{ink}#2}
+  \end{minipage}}
 \begin{titlepage}
 \thispagestyle{empty}
 \begin{tikzpicture}[remember picture,overlay]
-  \fill[pine] (current page.north west) rectangle ([yshift=-1.2cm]current page.north east);
-  \fill[paper] ([yshift=-1.2cm]current page.north west) rectangle (current page.south east);
-  \fill[pine] (current page.south west) rectangle ([yshift=0.6cm]current page.south east);
+  % 底色
+  \fill[paper] (current page.south west) rectangle (current page.north east);
+  % 满版照片（上半页）
+  \begin{scope}
+    \clip (current page.north west) rectangle ([yshift=-13.2cm]current page.north east);
+    \node[anchor=center,inner sep=0pt] at ([yshift=-6.6cm]current page.north)
+      {\includegraphics[height=13.4cm]{../public/images/destinations/hangzhou.jpg}};
+  \end{scope}
+  % 照片顶部压暗一条，承托刊名
+  \fill[black,opacity=0.28] (current page.north west) rectangle ([yshift=-1.9cm]current page.north east);
+  \node[anchor=west,text=white,font=\large\heavyfont] at ([xshift=2.3cm,yshift=-0.95cm]current page.north west) {行间};
+  \node[anchor=east,text=white,font=\footnotesize] at ([xshift=-2.3cm,yshift=-0.95cm]current page.north east)
+    {第九届“传智杯”AI Web 网页开发挑战赛};
+  % 照片图注
+  \node[anchor=south east,text=white,font=\scriptsize,fill=black,fill opacity=0.35,text opacity=1,inner sep=4pt]
+    at ([xshift=-2.3cm,yshift=-12.85cm]current page.north east) {杭州 · 西湖三潭印月};
+  % 照片下沿的松绿细条
+  \fill[pine] ([yshift=-13.2cm]current page.north west) rectangle ([yshift=-13.45cm]current page.north east);
+  % 页面底部
+  \fill[pine] (current page.south west) rectangle ([yshift=0.35cm]current page.south east);
 \end{tikzpicture}
-\vspace*{1.2cm}
-{\color{pine}\large 第九届“传智杯”AI Web 网页开发挑战赛\quad·\quad 技术文档}\par
-\vspace{0.8cm}
-{\fontsize{34}{42}\selectfont\heavyfont\bfseries 行间 · AI 旅行规划 Agent}\par
-\vspace{0.4cm}
-{\Large\color{inksoft}让 AI 做功课，交给你一本能直接出发的旅行手册}\par
-\vspace{0.8cm}
-\begin{tikzpicture}
-  \node[inner sep=0pt] (cover) {\includegraphics[width=\linewidth,height=8.6cm,keepaspectratio]{images/01-home-hero.jpg}};
-  \draw[line,line width=0.8pt,rounded corners=3pt] (cover.south west) rectangle (cover.north east);
-\end{tikzpicture}
-\par\vfill
-{\small\renewcommand{\arraystretch}{1.45}
-\begin{tabular}{>{\leavevmode\bfseries\color{inksoft}}p{2.4cm}p{11.5cm}}
-\toprule
-作品名称 & 行间 · AI 旅行规划 Agent \\
-赛道 & AI Web 网页开发挑战赛（选题方向：AI Agent 智能助手） \\
-参赛组别 & （待填写） \\
-团队成员 & （待填写） \\
-指导老师 & （待填写） \\
-代码仓库 & （待填写） \\
-文档版本 & 2026 年 11 月 \\
-\bottomrule
-\end{tabular}}
-\vspace*{0.6cm}
+
+\vspace*{11.6cm}
+{\footnotesize\color{pine}\bfseries 技 术 文 档\quad\textcolor{line}{|}\quad\mdseries TECHNICAL DOCUMENTATION}\par
+\vspace{0.55cm}
+{\fontsize{52}{58}\selectfont\heavyfont 行间}\par
+\vspace{0.25cm}
+{\fontsize{22}{28}\selectfont\heavyfont AI 旅行规划 Agent}\par
+\vspace{0.45cm}
+{\large\color{inksoft}让 AI 做功课，交给你一本能直接出发的旅行手册}\par
+\vspace{0.35cm}
+{\small\color{inkfaint}检索 · 编排 · 校验 · 修正：由高德实时数据与确定性排程器约束的旅行规划 Agent}\par
+\vfill
+{\color{ink}\rule{\linewidth}{0.8pt}}\par\vspace{0.45cm}
+\noindent\coverfield{赛道 / 选题方向}{AI Web 网页开发挑战赛 · AI Agent 智能助手}\hfill
+\coverfield{参赛组别}{（待填写）}\par\vspace{0.4cm}
+\noindent\coverfield{团队成员}{（待填写）}\hfill
+\coverfield{指导老师}{（待填写）}\par\vspace{0.4cm}
+\noindent\coverfield{代码仓库}{（待填写）}\hfill
+\coverfield{文档版本}{2026 年 11 月}\par
+\vspace*{0.9cm}
 \end{titlepage}
 
 % ---------- 目录 ----------
