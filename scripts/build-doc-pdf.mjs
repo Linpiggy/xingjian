@@ -1,57 +1,45 @@
-/**
- * 生成技术文档 PDF：Pandoc 把 Markdown 转成 HTML，再用 Chromium 打印为 A4 PDF。
- * 字体使用项目自带的 Noto Serif / Sans SC，图片引用 docs/images。
- * 运行：npm run docs:pdf（需要本机安装 pandoc 与 Playwright Chromium）
- */
-import { execFileSync } from "node:child_process";
-import { readFileSync, rmSync } from "node:fs";
-import { resolve } from "node:path";
-import { pathToFileURL } from "node:url";
+// 用 XeLaTeX 编译技术文档：docs/latex/technical-doc.tex → docs/技术文档.pdf
+// 依赖：TeX Live / TinyTeX（xelatex、xeCJK、tcolorbox、titlesec 等）与 Noto Serif CJK SC、思源黑体字体。
+import { spawnSync } from "node:child_process";
+import { copyFileSync, existsSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 
-const root = process.cwd();
-const source = resolve(root, "docs/技术文档.md");
-const html = resolve(root, "docs/.技术文档.build.html");
-const output = resolve(root, "docs/技术文档.pdf");
-const fonts = ["noto-sans-sc", "noto-serif-sc"].map(
-  (name) =>
-    pathToFileURL(resolve(root, `node_modules/@fontsource-variable/${name}/index.css`))
-      .href,
-);
-const css = pathToFileURL(resolve(root, "scripts/doc-assets/doc.css")).href;
+const root = join(dirname(fileURLToPath(import.meta.url)), "..");
+const workdir = join(root, "docs", "latex");
+const source = "technical-doc.tex";
 
-execFileSync("pandoc", [
-  source,
-  "--from=markdown+raw_html",
-  "--to=html5",
-  "--standalone",
-  `--template=${resolve(root, "scripts/doc-assets/template.html")}`,
-  "--toc",
-  "--toc-depth=2",
-  "--metadata=lang:zh-CN",
-  ...fonts.map((href) => `--css=${href}`),
-  `--css=${css}`,
-  `--output=${html}`,
-]);
+// 两遍：第二遍写入目录与页码
+for (let pass = 1; pass <= 2; pass += 1) {
+  const result = spawnSync(
+    "xelatex",
+    ["-interaction=nonstopmode", "-halt-on-error", source],
+    {
+      cwd: workdir,
+      encoding: "utf8",
+    },
+  );
+  if (result.error) {
+    console.error(
+      "无法运行 xelatex，请先安装 TeX Live 或 TinyTeX：",
+      result.error.message,
+    );
+    process.exit(1);
+  }
+  if (result.status !== 0) {
+    const errors = result.stdout.split("\n").filter((line) => line.startsWith("!"));
+    console.error(
+      `xelatex 第 ${pass} 遍失败：\n${errors.join("\n") || result.stdout.slice(-2000)}`,
+    );
+    console.error("完整日志：docs/latex/technical-doc.log");
+    process.exit(1);
+  }
+}
 
-// 与 scripts/playwright.mjs 一致：使用安装在 node_modules 内的浏览器
-process.env.PLAYWRIGHT_BROWSERS_PATH ??= "0";
-const { chromium } = await import("@playwright/test");
-const browser = await chromium.launch();
-const page = await browser.newPage();
-await page.goto(pathToFileURL(html).href, { waitUntil: "networkidle" });
-await page.evaluate(() => document.fonts.ready);
-await page.pdf({
-  path: output,
-  format: "A4",
-  printBackground: true,
-  preferCSSPageSize: true,
-  displayHeaderFooter: true,
-  headerTemplate: "<span></span>",
-  footerTemplate:
-    '<div style="width:100%;font-size:8px;color:#8d8274;text-align:center;font-family:sans-serif"><span class="pageNumber"></span> / <span class="totalPages"></span></div>',
-  margin: { top: "18mm", bottom: "18mm", left: "17mm", right: "17mm" },
-});
-await browser.close();
-rmSync(html);
-const pages = (readFileSync(output, "latin1").match(/\/Type\s*\/Page[^s]/g) ?? []).length;
-console.log(`生成 ${output}，共 ${pages} 页`);
+const output = join(workdir, "technical-doc.pdf");
+if (!existsSync(output)) {
+  console.error("未生成 PDF");
+  process.exit(1);
+}
+copyFileSync(output, join(root, "docs", "技术文档.pdf"));
+console.log("已生成 docs/技术文档.pdf");
